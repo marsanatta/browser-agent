@@ -12,9 +12,11 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from starlette.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
 from app.agent.executor import Executor
@@ -22,6 +24,7 @@ from app.agent.models import LLMGateway
 from app.agent.planner import LLMPlanner, SubTask
 from app.browser.provider import PlaywrightProvider
 from app.obs.tracing import init_observability
+from app.security import TokenAuthMiddleware, is_configured, issue_cookie, valid
 from app.stream import events, screenshots
 
 
@@ -33,17 +36,37 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="browser-agent", version="0.0.0", lifespan=lifespan)
 
+app.add_middleware(TokenAuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+class _TokenIn(BaseModel):
+    token: str
+
+
+@app.post("/auth")
+async def auth(body: _TokenIn):
+    """Exchange the shared access token for an httponly cookie. The cookie then
+    rides along on SSE and screenshot requests automatically (those can't send
+    headers). Returns 503 if the operator hasn't configured a token."""
+    if not is_configured():
+        raise HTTPException(status_code=503, detail="AGENT_ACCESS_TOKEN not configured")
+    if not valid(body.token):
+        raise HTTPException(status_code=401, detail="invalid token")
+    resp = JSONResponse({"ok": True})
+    issue_cookie(resp, body.token)
+    return resp
 
 
 def _placeholder_run(task: str):

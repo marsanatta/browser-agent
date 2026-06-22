@@ -100,12 +100,30 @@ export default function App() {
   const [url, setUrl] = useState("");
   const [running, setRunning] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [authed, setAuthed] = useState(() => localStorage.getItem("ba_authed") === "1");
   const [state, dispatch] = useReducer(reduce, initialState);
   const sourceRef = useRef(null);
 
   const steps = state.steps;
   const selectedStep = useMemo(() => steps.find((s) => s.id === selected) ?? null, [steps, selected]);
   const run = state.run;
+
+  async function unlock(token) {
+    const res = await fetch(`${BACKEND}/auth`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ token }),
+    });
+    if (res.ok) {
+      localStorage.setItem("ba_authed", "1");
+      setAuthed(true);
+      return null;
+    }
+    return res.status === 503 ? "Server has no access token configured." : "Invalid access token.";
+  }
+
+  if (!authed) return <AuthGate onUnlock={unlock} />;
 
   function start() {
     if (!task.trim() || running) return;
@@ -116,7 +134,7 @@ export default function App() {
 
     const params = new URLSearchParams({ task });
     if (url.trim()) params.set("url", url.trim());
-    const es = new EventSource(`${BACKEND}/agent/run?${params.toString()}`);
+    const es = new EventSource(`${BACKEND}/agent/run?${params.toString()}`, { withCredentials: true });
     sourceRef.current = es;
 
     const onAny = (e) => {
@@ -228,6 +246,48 @@ export default function App() {
           ))}
         </section>
       )}
+    </main>
+  );
+}
+
+function AuthGate({ onUnlock }) {
+  const [token, setToken] = useState("");
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!token.trim() || busy) return;
+    setBusy(true);
+    setError(null);
+    const err = await onUnlock(token.trim()).catch(() => "Could not reach the server.");
+    setBusy(false);
+    if (err) setError(err);
+  }
+
+  return (
+    <main className="app gate">
+      <header className="head">
+        <h1>browser-agent</h1>
+        <p className="disclosure">This instance is access-controlled. Enter the access token your operator gave you.</p>
+      </header>
+      <form className="runbar" onSubmit={submit}>
+        <label className="field">
+          <span>Access token</span>
+          <input
+            type="password"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder="access token"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </label>
+        <button type="submit" className="btn" disabled={!token.trim() || busy}>
+          {busy ? "Unlocking…" : "Unlock"}
+        </button>
+      </form>
+      {error && <p className="notice ask">{error}</p>}
     </main>
   );
 }
