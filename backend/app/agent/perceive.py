@@ -45,28 +45,25 @@ class Perception:
 
 
 async def perceive(page: Any) -> Perception:
-    snapshot = await page.accessibility.snapshot(interesting_only=True)
-    raw: list[tuple[str, str]] = []
-    _collect(snapshot, raw)
+    rows = await _scan_interactive(page)
+    raw = [(r["role"], r["name"]) for r in rows if r["role"] in _INTERACTIVE_ROLES and r["name"]]
     merged = _merge_co_labeled(raw)
-    attrs_by_key = await _dom_attrs(page)
+    attrs_by_key: dict[tuple[str, str], dict[str, str]] = {}
+    for r in rows:
+        key = (r["role"], r["name"])
+        attrs_by_key.setdefault(key, {
+            "id": r["id"],
+            "testid": r["testid"],
+            "aria_label": r["ariaLabel"],
+            "href": r["href"],
+            "cls": r["cls"],
+        })
     elements = [
         IndexedElement(i, role, name, attrs_by_key.get((role, name), {}))
         for i, (role, name) in enumerate(merged)
     ]
     markdown = await _tables_lists_markdown(page)
     return Perception(url=page.url, elements=elements, markdown=markdown)
-
-
-def _collect(node: Any, out: list[tuple[str, str]]) -> None:
-    if not node:
-        return
-    role = (node.get("role") or "").lower()
-    name = (node.get("name") or "").strip()
-    if role in _INTERACTIVE_ROLES and name:
-        out.append((role, name))
-    for child in node.get("children", []) or []:
-        _collect(child, out)
 
 
 def _merge_co_labeled(items: list[tuple[str, str]]) -> list[tuple[str, str]]:
@@ -81,10 +78,12 @@ def _merge_co_labeled(items: list[tuple[str, str]]) -> list[tuple[str, str]]:
     return merged
 
 
-async def _dom_attrs(page: Any) -> dict[tuple[str, str], dict[str, str]]:
-    """One pass over interactive DOM nodes to harvest locator-grade attributes,
-    keyed by (role, accessible-name) so PERCEIVE and LOCATE share vocabulary."""
-    rows = await page.evaluate(
+async def _scan_interactive(page: Any) -> list[dict[str, str]]:
+    """One pass over interactive DOM nodes computing ARIA role + accessible name
+    (the user-facing contract per docs/architecture/02 §2.1) plus locator-grade
+    attributes, so PERCEIVE and LOCATE share vocabulary. Replaces the removed
+    Playwright `page.accessibility` API with an equivalent DOM-computed scan."""
+    return await page.evaluate(
         """() => {
             const sel = 'a,button,input,textarea,select,[role]';
             const roleOf = (el) => {
@@ -127,19 +126,6 @@ async def _dom_attrs(page: Any) -> dict[tuple[str, str], dict[str, str]]:
             return out;
         }"""
     )
-    by_key: dict[tuple[str, str], dict[str, str]] = {}
-    for r in rows:
-        key = (r["role"], r["name"])
-        if key in by_key:
-            continue
-        by_key[key] = {
-            "id": r["id"],
-            "testid": r["testid"],
-            "aria_label": r["ariaLabel"],
-            "href": r["href"],
-            "cls": r["cls"],
-        }
-    return by_key
 
 
 async def _tables_lists_markdown(page: Any) -> str:

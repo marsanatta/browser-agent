@@ -1,8 +1,12 @@
 """Deterministic integration test against live books.toscrape.com.
 
 No LLM: perceive the catalog, locate a book by its accessible name via the
-cascade, navigate, assert the product title. Ground truth (probed): the first
-catalog book is 'A Light in the Attic'.
+cascade, navigate, assert the product title.
+
+Ground truth (probed): books.toscrape truncates the catalog link's visible text,
+so the link's accessible name is the truncated 'A Light in the ...' (NOT the full
+title). The full title 'A Light in the Attic' is the product page <h1> — that is
+the independent ground truth we assert after navigation.
 """
 
 import pytest
@@ -13,7 +17,8 @@ from app.agent.perceive import perceive
 from app.browser.provider import PlaywrightProvider
 
 BASE = "https://books.toscrape.com"
-BOOK = "A Light in the Attic"
+BOOK_LINK = "A Light in the ..."  # truncated visible text = the link's accessible name
+BOOK_FULL = "A Light in the Attic"  # product page <h1> (full title)
 
 
 @pytest.fixture
@@ -31,7 +36,7 @@ async def test_perceive_catalog_has_books(page):
     await act.navigate(page, BASE)
     perception = await perceive(page)
     names = {e.name.strip() for e in perception.elements if e.role == "link"}
-    assert BOOK in names
+    assert BOOK_LINK in names
     assert "Travel" in names  # category nav
 
 
@@ -41,8 +46,11 @@ async def test_locate_book_navigate_and_assert_title(page):
     await act.navigate(page, BASE)
     perception = await perceive(page)
     target = next(
-        e for e in perception.elements if e.role == "link" and e.name.strip() == BOOK
+        (e for e in perception.elements
+         if e.role == "link" and e.name.strip() == BOOK_LINK),
+        None,
     )
+    assert target is not None, "catalog book link not perceived"
 
     located = await locate(page, target, cache=LocatorCache())
     assert located is not None
@@ -55,4 +63,4 @@ async def test_locate_book_navigate_and_assert_title(page):
     assert result is verify.VerifyResult.CHANGED
 
     title = await page.locator("h1").first.inner_text()
-    assert title.strip() == BOOK
+    assert title.strip() == BOOK_FULL  # independent ground truth on the product page
