@@ -69,7 +69,7 @@ class LLMGateway:
         except ImportError as exc:  # setup: package not installed
             raise RuntimeError(
                 "github-copilot-sdk is not installed; run "
-                "`pip install github-copilot-sdk==1.0.3` and start "
+                "`pip install github-copilot-sdk==1.0.2` and start "
                 "`copilot --headless --port <PORT>`."
             ) from exc
 
@@ -106,7 +106,7 @@ def _extract_text(resp) -> str:
     (`resp.data.content` vs `resp.content`); read defensively and redact the
     content before it can reach a span/SSE/log.
     """
-    content = getattr(getattr(resp, "data", resp), "content", None)
-    if content is None:
-        content = str(resp)
-    return redact(content)
+    data = getattr(resp, "data", None)
+    src = data if data is not None else resp
+    text = getattr(src, "content", None) or ""
+    return redact(text)

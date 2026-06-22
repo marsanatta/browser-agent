@@ -105,3 +105,76 @@ def test_non_string_scalars_passthrough():
     assert redact(42) == 42
     assert redact(True) is True
     assert redact(None) is None
+
+
+def test_json_stringified_api_key_masked():
+    out = redact('{"api_key":"supersecretvalue","step":"click"}')
+    assert "supersecretvalue" not in out
+    assert MASK in out
+    assert '"step":"click"' in out
+
+
+def test_json_stringified_jwt_value_masked():
+    out = redact('{"jwt":"eyJabc123.eyJdef456.sigGHI789"}')
+    assert "eyJabc123" not in out
+    assert "sigGHI789" not in out
+
+
+def test_raw_jwt_masked():
+    out = redact("the token is eyJhbGciOiJIUzI1Ni.eyJzdWIiOiIxMjM0.SflKxwRJSMeKKF2QT4")
+    assert "eyJhbGci" not in out
+    assert MASK in out
+
+
+def test_aws_access_key_masked():
+    out = redact("aws key AKIAIOSFODNN7EXAMPLE in config")
+    assert "AKIAIOSFODNN7EXAMPLE" not in out
+    assert MASK in out
+
+
+def test_slack_token_masked():
+    assert "xoxb-" not in redact("xoxb-123456789012-abcdEFGHijklMNOP")
+
+
+def test_google_api_key_masked():
+    assert "AIza" not in redact("AIzaSyA1234567890abcdefghijklmnopqrstuv")
+
+
+def test_github_pat_fine_grained_masked():
+    out = redact("github_pat_11ABCDE0Y0abcdefghij_KLMNOPQRSTUVWXYZ1234567890")
+    assert "github_pat_" not in out
+
+
+def test_pem_private_key_block_masked():
+    pem = (
+        "key:\n-----BEGIN RSA PRIVATE KEY-----\n"
+        "MIIEpAIBAAKCAQEAabc123\nlinetwo456\n"
+        "-----END RSA PRIVATE KEY-----\nrest"
+    )
+    out = redact(pem)
+    assert "MIIEpAIBAAKCAQEAabc123" not in out
+    assert "BEGIN RSA PRIVATE KEY" not in out
+    assert "rest" in out
+
+
+def test_bytes_value_decoded_and_masked():
+    out = redact(b'{"api_key":"secretbytesvalue"}')
+    assert "secretbytesvalue" not in out
+    assert MASK in out
+
+
+def test_bytearray_value_masked():
+    out = redact(bytearray(b"Bearer eyJhbGci.payloadpart.sigpart"))
+    assert "eyJhbGci" not in out
+
+
+def test_undecodable_bytes_masked():
+    out = redact(b"\xff\xfe\xfa\xfb")
+    assert isinstance(out, str)
+
+
+def test_prose_with_email_not_mangled_beyond_email():
+    text = "Email alice@example.com about the page-2 results, then click Submit."
+    out = redact(text)
+    assert "alice@example.com" not in out
+    assert "about the page-2 results, then click Submit." in out
