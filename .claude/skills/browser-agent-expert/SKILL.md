@@ -50,19 +50,19 @@ Q: "Should the agent read the DOM, the accessibility tree, or use vision?"
 
 ```
 Q: "How do I know the agent didn't just claim success?"
-→ routing rows "silent-failure detection" (evaluation/03) + "verifying without ground
-  truth" (evaluation/06)
+→ routing rows "silent-failure detection" (evaluation/01) + "verifying without ground
+  truth" (evaluation/02)
 → Answer: dual-channel — programmatic state check + screenshot-grounded judge scored
   twice; report nominal vs verified completion (CuP); never trust verbalized confidence.
-→ Source: evaluation/03 (§4) and evaluation/06 (silent-failure layer).
+→ Source: evaluation/01 (§4) and evaluation/02 (silent-failure layer).
 ```
 
 ```
 Q: "Is tree search worth it for our agent?"
-→ routing row "tree search, LATS, MCTS" → architecture/07
+→ routing row "tree search, LATS, MCTS" → architecture/03
 → Answer: skip it — ~17× token cost and needs transaction-safe state reversion;
   linear retry-with-reflection gives +29% at ~3× instead.
-→ Source: docs/research/architecture/07-memory-search-and-milestone-eval.md.
+→ Source: docs/research/architecture/03-memory-search-and-milestone-eval.md.
 → Caveat: LATS web results are WebShop-only (flagged in the doc).
 ```
 
@@ -79,6 +79,6 @@ The skill carries no hard-coded file list on purpose — it trusts `docs/INDEX.m
 
 - Route first, read second — don't open all 8 docs; the routing table exists so you open 1–2.
 - The synthesis (`research/00-...`) is the right target only for "big picture / where do I start", not for a specific mechanism — those live in the category docs.
-- Watch the cross-list traps: milestone/deterministic eval is in `architecture/07` (not evaluation/); security is split across `infrastructure/04` and `infrastructure/05`.
+- Watch the cross-list traps: milestone/deterministic eval is in `architecture/03` (not evaluation/); security is split across `infrastructure/01` and `infrastructure/02`.
 - Always carry the verification flag through to the answer — a `vendor-unverified` 99.97% is not a fact.
 - If two questions keep landing on the wrong doc, the fix is a better keyword in the `docs/INDEX.md` routing row, not more logic in this skill.

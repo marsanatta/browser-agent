@@ -1,7 +1,7 @@
 # Round 1 Synthesis — Grounded Design for the Browser Agent
 
 研究日期: 2026-06-22
-Inputs: [01-sota-browser-agents.md](architecture/01-sota-browser-agents.md), [02-self-correction-and-healing.md](architecture/02-self-correction-and-healing.md), [03-evaluation-and-failure-detection.md](evaluation/03-evaluation-and-failure-detection.md)
+Inputs: [architecture/01-sota-browser-agents.md](architecture/01-sota-browser-agents.md), [architecture/02-self-correction-and-healing.md](architecture/02-self-correction-and-healing.md), [evaluation/01-evaluation-and-failure-detection.md](evaluation/01-evaluation-and-failure-detection.md)
 
 Three independent research lines (SOTA survey, self-correction/healing, evaluation/silent-failure) **converge on one architecture**. That convergence — not any single source — is the load-bearing finding. This file distills it into concrete design decisions and maps each to the assignment's grading axes.
 
@@ -83,7 +83,7 @@ Task (natural language)
 
 ## Round 2 — Build / Deploy Stack (gap now filled)
 
-Inputs: [04-browser-infra-and-models.md](infrastructure/04-browser-infra-and-models.md), [05-frontend-and-deployment.md](infrastructure/05-frontend-and-deployment.md). Both self-scored 82/100 with unverified items flagged.
+Inputs: [infrastructure/01-browser-infra-and-models.md](infrastructure/01-browser-infra-and-models.md), [infrastructure/02-frontend-and-deployment.md](infrastructure/02-frontend-and-deployment.md). Both self-scored 82/100 with unverified items flagged.
 
 **Browser substrate & cost**
 - Self-hosted Playwright/Chromium behind a **swappable interface**, with Steel.dev (Apache-2.0, self-host *or* cloud) as the escalation path; reserve Browserbase for the minority needing managed stealth. Self-host vs hosted break-even ≈ 5K–10K tasks/mo.
@@ -106,7 +106,7 @@ Inputs: [04-browser-infra-and-models.md](infrastructure/04-browser-infra-and-mod
 
 ## Round 3 — Eval Methodology & Memory/Search Adopt-Skip (rigor layer)
 
-Inputs: [06-eval-methodology.md](evaluation/06-eval-methodology.md), [07-memory-search-and-milestone-eval.md](architecture/07-memory-search-and-milestone-eval.md). Self-scored 82 / 78.
+Inputs: [evaluation/02-eval-methodology.md](evaluation/02-eval-methodology.md), [architecture/03-memory-search-and-milestone-eval.md](architecture/03-memory-search-and-milestone-eval.md). Self-scored 82 / 78.
 
 **Eval methodology — how to verify correctness without trustworthy ground truth** (the assignment's hardest axis)
 - **Hard verifiers first, LLM judges last.** Use deterministic post-state checks (DOM/URL/API/extracted field) wherever inspectable; reserve LLM judges for text-only quality. Not needing a judge eliminates the worst judge failure modes outright.
