@@ -28,6 +28,9 @@ traces/
 *.har
 screenshots/
 
+# Runtime logs (may contain captured page text / PII)
+*.log
+
 # Editor / OS
 .DS_Store
 .idea/

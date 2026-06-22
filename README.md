@@ -3,11 +3,15 @@
 Natural-language browser-automation agent. See [`DESIGN.md`](./DESIGN.md) for the full
 design and [`docs/`](./docs/INDEX.md) for the grounding research.
 
-**Status: M1 core loop** — on top of the M0 scaffold (FastAPI + SSE, `BrowserProvider`,
-Copilot LLM gateway, redaction). M1 adds the happy-path agent loop: NL task -> plan
-(LLM) -> per sub-task perceive -> locate (zero-cost 10-tier cascade) -> act -> verify
-(predict/diff). `/agent/run` streams real step events; `/sse/stream` is the M0 placeholder.
-The deterministic core needs no LLM; the planner lazy-connects to Copilot on first use.
+**Status: M4 frontend + public deploy** — on top of the M0–M2 core (FastAPI + SSE,
+`BrowserProvider`, Copilot LLM gateway, redaction, the perceive -> locate -> act ->
+verify loop with the bounded recovery ladder). M4 adds a React frontend with a live
+step timeline and an **inspectable-failure view** (per step: annotated screenshot,
+chosen locator tier, `failure_category`, recovery/retry chain, nominal-vs-verified
+verdict), per-step screenshot capture served out-of-band, and a desktop self-host +
+Cloudflare quick-tunnel deploy. `/agent/run` streams real step events; `/sse/stream`
+is the M0 placeholder. The deterministic core needs no LLM; the planner lazy-connects
+to Copilot on first use.
 
 **Supported / unsupported:** bot-wall-free public sites only. Login / MFA / CAPTCHA /
 anti-bot walls are routed to an "unsupported" outcome, never evaded.
@@ -54,8 +58,36 @@ npm install
 npm run dev        # http://localhost:5173, subscribes to the backend SSE endpoint
 ```
 
-Point the frontend at a non-default backend with `VITE_BACKEND_URL`. Production build:
-`npm run build`.
+During development the frontend runs on Vite (`:5173`) and calls the backend via
+`VITE_BACKEND_URL` (default `http://localhost:8000`). For the public deploy the built
+`dist/` is served by the backend itself from the same origin (see below), so screenshots
+and the SSE stream share one host and no CORS/tunnel cross-origin config is needed.
+
+## Public deploy (desktop self-host + Cloudflare quick tunnel)
+
+The backend serves the built frontend at `/` and per-step screenshots at `/screenshots/*`,
+so one origin serves the whole app. A Cloudflare **quick tunnel** then exposes it on a
+temporary `*.trycloudflare.com` URL — no Cloudflare account or DNS setup required.
+
+```powershell
+# 1. Build the frontend (output: frontend/dist, served by the backend)
+cd frontend; npm install; npm run build
+
+# 2. Run the backend (serves API + SSE + dist + screenshots)
+cd ..\backend
+.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8123
+
+# 3. Expose it publicly (separate terminal). cloudflared needs no login for a quick tunnel.
+#    Install if missing: winget install --id Cloudflare.cloudflared
+cloudflared tunnel --url http://localhost:8123
+#   -> prints https://<random>.trycloudflare.com  (the public URL)
+```
+
+`scripts/run-local.ps1` runs steps 1–2 in one command; pass `-Tunnel` to also start the
+quick tunnel. Uptime depends on the desktop staying on during evaluation (DESIGN §9).
+
+When the frontend is served by the backend, leave `VITE_BACKEND_URL` unset before
+building so it defaults to same-origin (`""`).
 
 ## Live LLM (Copilot SDK gateway)
 

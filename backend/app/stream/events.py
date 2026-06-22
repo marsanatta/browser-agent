@@ -31,6 +31,7 @@ class EventType(str, Enum):
     TOOL_CALL_END = "TOOL_CALL_END"
     TEXT_MESSAGE = "TEXT_MESSAGE"
     SCREENSHOT_ANNOTATED = "SCREENSHOT_ANNOTATED"
+    LOCATOR_RESOLVED = "LOCATOR_RESOLVED"
     ASK_USER = "ASK_USER"
     RECOVERY = "RECOVERY"
 
@@ -78,8 +79,22 @@ def step_started(step_id: str, description: str) -> Event:
     return Event(EventType.STEP_STARTED, {"step_id": step_id, "description": description})
 
 
-def step_finished(step_id: str, status: str) -> Event:
-    return Event(EventType.STEP_FINISHED, {"step_id": step_id, "status": status})
+def step_finished(
+    step_id: str, status: str, failure_category: str | None = None
+) -> Event:
+    payload: dict[str, Any] = {"step_id": step_id, "status": status}
+    if failure_category:
+        payload["failure_category"] = failure_category
+    return Event(EventType.STEP_FINISHED, payload)
+
+
+def locator_resolved(step_id: str, tier: int, strategy: str) -> Event:
+    """Surface the deterministic-cascade outcome (DESIGN §8: chosen locator +
+    cascade level is part of the inspectable per-step diagnostics)."""
+    return Event(
+        EventType.LOCATOR_RESOLVED,
+        {"step_id": step_id, "tier": tier, "strategy": strategy},
+    )
 
 
 def tool_call_start(step_id: str, tool: str, call_id: str) -> Event:

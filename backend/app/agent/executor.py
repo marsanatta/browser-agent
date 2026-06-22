@@ -25,7 +25,7 @@ from app.agent.locate import LocatorCache, locate, make_l2_fallback
 from app.agent.perceive import IndexedElement, perceive
 from app.agent.planner import Planner, SubTask
 from app.browser.provider import BrowserProvider
-from app.stream import events
+from app.stream import events, screenshots
 from app.stream.events import Event
 
 _MAX_ATTEMPTS = 4  # bound the ladder; each attempt needs a new observation
@@ -74,7 +74,11 @@ class Executor:
                         outcome = ev
                     else:
                         yield ev
-                yield events.step_finished(step_id, "ok" if outcome.ok else "failed")
+                yield events.step_finished(
+                    step_id,
+                    "ok" if outcome.ok else "failed",
+                    failure_category=None if outcome.ok else outcome.failure_class,
+                )
 
                 if outcome.ok:
                     i += 1
@@ -113,13 +117,22 @@ class Executor:
         if st.action == "navigate":
             await act.navigate(page, st.url or "")
             yield events.tool_call_end(call_id, f"navigated to {page.url}")
+            shot = await screenshots.capture_step(page, step_id, None, f"navigated to {page.url}")
+            if shot is not None:
+                yield events.screenshot_annotated(shot)
             yield _Outcome(True)
             return
 
         last_class = FailureClass.NOT_FOUND
         reground = False
         for attempt in range(1, _MAX_ATTEMPTS + 1):
-            result, fc = await self._attempt(page, st, reground=reground)
+            result, fc, located, shot = await self._attempt(
+                page, step_id, st, reground=reground, attempt=attempt
+            )
+            if located is not None:
+                yield events.locator_resolved(step_id, located.tier, located.strategy)
+            if shot is not None:
+                yield events.screenshot_annotated(shot)
             if result is verify.VerifyResult.CHANGED:
                 yield events.tool_call_end(call_id, f"{st.action} -> CHANGED (attempt {attempt})")
                 yield _Outcome(True)
@@ -140,13 +153,20 @@ class Executor:
         yield events.tool_call_end(call_id, f"{st.action} failed: {last_class.value}")
         yield _Outcome(False, failure_class=last_class.value)
 
-    async def _attempt(self, page: Any, st: SubTask, reground: bool):
+    async def _attempt(self, page: Any, step_id: str, st: SubTask, reground: bool, attempt: int):
         """One perceive->locate->(precondition)->act->verify pass. Returns
-        (VerifyResult|None, FailureClass)."""
+        (VerifyResult|None, FailureClass, Located|None, ScreenshotAnnotated|None).
+
+        The Located surfaces the chosen locator tier and the screenshot is the
+        annotated diagnostic for this step (DESIGN §8). The screenshot is taken
+        BEFORE the action so the highlight box references the element on the page
+        the agent acted on (after a click that navigates, the element detaches and
+        its box would be empty)."""
         perception = await perceive(page)
         target = _match(perception.elements, st)
         if target is None:
-            return None, FailureClass.NOT_FOUND
+            shot = await self._shot(page, step_id, st, None, "NO_TARGET", attempt)
+            return None, FailureClass.NOT_FOUND, None, shot
 
         if reground:
             self._cache.invalidate(_page_key(page), target)
@@ -154,17 +174,22 @@ class Executor:
         l2 = make_l2_fallback(self._gateway, perception.elements) if self._gateway else None
         located = await locate(page, target, cache=self._cache, l2_fallback=l2)
         if located is None:
-            return None, FailureClass.NOT_FOUND
+            shot = await self._shot(page, step_id, st, None, "NO_TARGET", attempt)
+            return None, FailureClass.NOT_FOUND, None, shot
 
         # Precondition check (UFO2 §1.4): is the element interactable BEFORE we
         # act? is_visible/is_enabled is ground truth, not the LLM's opinion.
         pre = await classify_located(located.locator)
         if pre is not FailureClass.NONE:
-            return verify.VerifyResult.NO_CHANGE, pre
+            shot = await self._shot(page, step_id, st, located, pre.value, attempt)
+            return verify.VerifyResult.NO_CHANGE, pre, located, shot
 
         if st.action == "fill" and act.requires_confirmation(act.Action(kind="fill")):
             if not await self._confirm():
-                return verify.VerifyResult.NO_CHANGE, FailureClass.WRONG_PAGE
+                return verify.VerifyResult.NO_CHANGE, FailureClass.WRONG_PAGE, located, None
+
+        # Capture with the target still attached, before the action mutates/detaches it.
+        shot = await self._shot(page, step_id, st, located, "acting", attempt)
 
         before = await verify.snapshot(page)
         try:
@@ -180,12 +205,17 @@ class Executor:
                 await act.click(located.locator)
                 expect = verify.Expectation(url_changes=True, dom_changes=True)
         except Exception as exc:
-            return verify.VerifyResult.NO_CHANGE, classify_exception(exc)
+            return verify.VerifyResult.NO_CHANGE, classify_exception(exc), located, shot
 
         result = await verify.verify_after_act(page, before, expect)
         if result is verify.VerifyResult.NO_CHANGE:
-            return result, FailureClass.NOT_FOUND  # re-ground on a silent no-op
-        return result, FailureClass.NONE
+            return result, FailureClass.NOT_FOUND, located, shot  # re-ground on a silent no-op
+        return result, FailureClass.NONE, located, shot
+
+    async def _shot(self, page, step_id, st, located, verdict, attempt):
+        locator = located.locator if located is not None else None
+        caption = f"{_describe(st)} -> {verdict} (attempt {attempt})"
+        return await screenshots.capture_step(page, step_id, locator, caption)
 
     async def _apply_recovery(self, page: Any, st: SubTask, rec: Recovery) -> bool:
         located = await self._current_locator(page, st)

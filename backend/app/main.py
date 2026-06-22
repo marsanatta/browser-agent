@@ -10,17 +10,19 @@ from __future__ import annotations
 import asyncio
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sse_starlette.sse import EventSourceResponse
 
 from app.agent.executor import Executor
 from app.agent.models import LLMGateway
-from app.agent.planner import LLMPlanner
+from app.agent.planner import LLMPlanner, SubTask
 from app.browser.provider import PlaywrightProvider
 from app.obs.tracing import init_observability
-from app.stream import events
+from app.stream import events, screenshots
 
 
 @asynccontextmanager
@@ -64,15 +66,45 @@ async def sse_stream(task: str = "demo task"):
     return EventSourceResponse(gen())
 
 
+class _StartUrlPlanner:
+    """Prepend a navigate sub-task for the optional start URL so the LLM plan
+    starts from the user-chosen page (it would otherwise have to guess the URL)."""
+
+    def __init__(self, inner, start_url: str) -> None:
+        self._inner = inner
+        self._start_url = start_url
+
+    async def plan(self, task: str) -> list[SubTask]:
+        subtasks = await self._inner.plan(task)
+        if subtasks and subtasks[0].action == "navigate":
+            return subtasks
+        return [SubTask(action="navigate", url=self._start_url, description="open start URL"), *subtasks]
+
+
 @app.get("/agent/run")
-async def agent_run(task: str):
+async def agent_run(task: str, url: str | None = None):
     """Drive the real M1 loop. The planner lazy-connects to Copilot on first use;
     without a live Copilot server it emits a RUN_ERROR event (the stream still
-    opens — no auth needed to reach this endpoint)."""
-    executor = Executor(PlaywrightProvider(headless=True), LLMPlanner(LLMGateway()))
+    opens — no auth needed to reach this endpoint). An optional `url` seeds a
+    navigate sub-task so the run starts from the user-provided page."""
+    planner = LLMPlanner(LLMGateway())
+    if url:
+        planner = _StartUrlPlanner(planner, url)
+    executor = Executor(PlaywrightProvider(headless=True), planner)
 
     async def gen():
         async for event in executor.run(task):
             yield event.to_sse()
 
     return EventSourceResponse(gen())
+
+
+app.mount(
+    screenshots.ROUTE_PREFIX,
+    StaticFiles(directory=screenshots.store_dir(), check_dir=False),
+    name="screenshots",
+)
+
+_FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+if _FRONTEND_DIST.is_dir():
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIST, html=True), name="frontend")
