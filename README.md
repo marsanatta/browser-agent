@@ -3,10 +3,11 @@
 Natural-language browser-automation agent. See [`DESIGN.md`](./DESIGN.md) for the full
 design and [`docs/`](./docs/INDEX.md) for the grounding research.
 
-**Status: M0 scaffold** — FastAPI + SSE skeleton, `BrowserProvider` interface, Copilot
-SDK LLM gateway (lazy-connect), redaction + observability seam, React/Vite frontend. The
-agent loop itself is M1. The app starts and SSE streams **without** a live Copilot
-connection.
+**Status: M1 core loop** — on top of the M0 scaffold (FastAPI + SSE, `BrowserProvider`,
+Copilot LLM gateway, redaction). M1 adds the happy-path agent loop: NL task -> plan
+(LLM) -> per sub-task perceive -> locate (zero-cost 10-tier cascade) -> act -> verify
+(predict/diff). `/agent/run` streams real step events; `/sse/stream` is the M0 placeholder.
+The deterministic core needs no LLM; the planner lazy-connects to Copilot on first use.
 
 **Supported / unsupported:** bot-wall-free public sites only. Login / MFA / CAPTCHA /
 anti-bot walls are routed to an "unsupported" outcome, never evaded.
@@ -16,9 +17,11 @@ anti-bot walls are routed to an "unsupported" outcome, never evaded.
 - **Python 3.11–3.12** (`github-copilot-sdk` requires >= 3.11; the Windows wheel is
   pinned to 1.0.2 — 1.0.3 ships macOS-only wheels).
 - **Node 18+** for the frontend.
-- **GitHub Copilot CLI** for live LLM calls (not required for M0 boot/tests):
-  `copilot --headless --port 4321`. The backend connects to this as a model gateway and
-  connects **lazily** on first LLM use, so M0 runs without it.
+- **Chromium** for Playwright: `.venv\Scripts\python -m playwright install chromium`.
+- **GitHub Copilot** for live LLM calls (not required for the deterministic core or its
+  tests). By default the gateway talks to the SDK's bundled binary over stdio and uses
+  your `gh` / `copilot login` auth — no separate server needed. To target a separately-run
+  headless server instead, set `COPILOT_HOST` + `COPILOT_PORT` in `.env`.
 
 ## Backend
 
@@ -31,17 +34,17 @@ copy .env.example .env          # placeholders; edit if running live Copilot
 ```
 
 - Health: `http://localhost:8000/health`
-- SSE stream: `http://localhost:8000/sse/stream?task=demo` (placeholder step events).
+- M0 placeholder stream: `http://localhost:8000/sse/stream?task=demo`.
+- **M1 agent loop**: `http://localhost:8000/agent/run?task=<NL task>` — plans with the
+  Copilot LLM, then runs perceive/locate/act/verify and streams real step events.
 
-Run tests:
+Run tests (includes live seed-site integration tests over the real network):
 
 ```powershell
 cd backend
 .venv\Scripts\python -m pytest -q
+.venv\Scripts\python -m pytest -m "not live" -q   # offline subset only
 ```
-
-For live browser runs later (M1+), install the Chromium binary once:
-`.venv\Scripts\python -m playwright install chromium`.
 
 ## Frontend
 
@@ -57,16 +60,17 @@ Point the frontend at a non-default backend with `VITE_BACKEND_URL`. Production 
 ## Live LLM (Copilot SDK gateway)
 
 All LLM calls route through the GitHub Copilot SDK used as a model gateway — never a
-direct Anthropic/OpenAI call. Start the headless CLI server and export its token (the
-token is read by the **CLI server**, not committed):
+direct Anthropic/OpenAI call. By default the gateway connects over **stdio** to the SDK's
+bundled binary and uses your existing GitHub auth:
 
 ```powershell
-$env:COPILOT_GITHUB_TOKEN = "gho_your_token"
-copilot --headless --port 4321
+gh auth login        # or: copilot login
 ```
 
-The backend reads `COPILOT_HOST` / `COPILOT_PORT` from `.env` and connects on first LLM
-call.
+The gateway connects **lazily** on the first LLM call. To target a separately-run headless
+server instead, set `COPILOT_HOST` + `COPILOT_PORT` in `.env`. Model IDs
+(`backend/app/agent/models.py`) are verified against `client.list_models()`; the judge uses
+a different model family from the actor.
 
 ## Security
 

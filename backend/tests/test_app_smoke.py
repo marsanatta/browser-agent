@@ -33,8 +33,3 @@ async def test_sse_yields_at_least_one_event():
     assert len(events) >= 1
     assert events[0]["type"] == "RUN_STARTED"
     assert events[0]["payload"]["task"] == "smoke"
-
-
-@pytest.fixture
-def anyio_backend():
-    return "asyncio"

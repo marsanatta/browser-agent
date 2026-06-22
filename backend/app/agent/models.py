@@ -36,9 +36,10 @@ from app.obs.tracing import redact
 
 # Tiered routing: cheap triage -> workhorse -> escalation. The judge MUST be a
 # different model FAMILY from the actor to avoid self-preference correlation.
-ACTOR_TRIAGE = "gpt-4.1"
-ACTOR_WORKHORSE = "gpt-5"
-ACTOR_ESCALATION = "gpt-5"
+# IDs verified against `client.list_models()` on Copilot CLI 1.0.63 (2026-06).
+ACTOR_TRIAGE = "gpt-5-mini"
+ACTOR_WORKHORSE = "gpt-5.4"
+ACTOR_ESCALATION = "claude-opus-4.8"
 JUDGE_MODEL = "claude-sonnet-4.5"
 
 
@@ -57,8 +58,12 @@ class LLMGateway:
     """
 
     def __init__(self, host: str | None = None, port: int | None = None) -> None:
-        self._host = host or os.getenv("COPILOT_HOST", "localhost")
-        self._port = port or int(os.getenv("COPILOT_PORT", "4321"))
+        # If COPILOT_HOST/PORT are configured, connect to a separately-run
+        # headless server (the DESIGN.md deployment shape) via for_uri. Otherwise
+        # use stdio against the SDK's bundled binary, which works out-of-box with
+        # `gh` auth and needs no separate server.
+        self._host = host or os.getenv("COPILOT_HOST")
+        self._port = port or (int(os.getenv("COPILOT_PORT")) if os.getenv("COPILOT_PORT") else None)
         self._client = None
 
     async def _ensure_client(self):
@@ -69,12 +74,14 @@ class LLMGateway:
         except ImportError as exc:  # setup: package not installed
             raise RuntimeError(
                 "github-copilot-sdk is not installed; run "
-                "`pip install github-copilot-sdk==1.0.2` and start "
-                "`copilot --headless --port <PORT>`."
+                "`pip install github-copilot-sdk==1.0.2`."
             ) from exc
 
-        uri = f"{self._host}:{self._port}"
-        client = CopilotClient(connection=RuntimeConnection.for_uri(uri))
+        if self._host and self._port:
+            conn = RuntimeConnection.for_uri(f"{self._host}:{self._port}")
+            client = CopilotClient(connection=conn)
+        else:
+            client = CopilotClient()  # stdio against bundled binary
         await client.start()
         self._client = client
         return client
