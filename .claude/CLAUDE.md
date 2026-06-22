@@ -59,7 +59,7 @@
 
 ## Browser-Agent Engineering Principles (grounded in `docs/`)
 
-These distill `docs/research/00-synthesis-and-design-implications.md`. **Before designing, implementing, or verifying any agent component, consult `/browser-agent-expert`** for the grounded decision + its source + verification flag. The docs and that skill are the source of truth — when a principle changes, update them, not just this list. A `vendor-unverified` number is not a fact; carry the flag through.
+These distill `docs/00-synthesis-and-design-implications.md`. **Before designing, implementing, or verifying any agent component, consult `/browser-agent-expert`** for the grounded decision + its source + verification flag. The docs and that skill are the source of truth — when a principle changes, update them, not just this list. A `vendor-unverified` number is not a fact; carry the flag through.
 
 ### Design
 
