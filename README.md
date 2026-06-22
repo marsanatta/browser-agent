@@ -3,9 +3,11 @@
 Natural-language browser-automation agent. See [`DESIGN.md`](./DESIGN.md) for the full
 design and [`docs/`](./docs/INDEX.md) for the grounding research.
 
-**Status: M4 frontend + public deploy** — on top of the M0–M2 core (FastAPI + SSE,
-`BrowserProvider`, Copilot LLM gateway, redaction, the perceive -> locate -> act ->
-verify loop with the bounded recovery ladder). M4 adds a React frontend with a live
+**Status: M3 eval layer + M4 frontend/public deploy** — on top of the M0–M2 core
+(FastAPI + SSE, `BrowserProvider`, Copilot LLM gateway, redaction, the perceive ->
+locate -> act -> verify loop with the bounded recovery ladder). M3 adds the self-built
+eval set + scoring harness (key-node TCR/TSR, pass^k, nominal-vs-verified silent-failure
+gap, budget-matched baseline) — see [Eval](#eval-m3). M4 adds a React frontend with a live
 step timeline and an **inspectable-failure view** (per step: annotated screenshot,
 chosen locator tier, `failure_category`, recovery/retry chain, nominal-vs-verified
 verdict), per-step screenshot capture served out-of-band, and a desktop self-host +
@@ -48,6 +50,33 @@ Run tests (includes live seed-site integration tests over the real network):
 cd backend
 .venv\Scripts\python -m pytest -q
 .venv\Scripts\python -m pytest -m "not live" -q   # offline subset only
+```
+
+## Eval (M3)
+
+A self-built eval set (`eval/eval_set/tasks.yaml`, ~12 NL tasks across
+domain/type/difficulty, with **≥20% held-out on quotes.toscrape.com**, a site never
+used in dev) plus a scoring harness that runs each task through the real agent and
+grades success by **independent programmatic assertions on the live page** — never the
+agent's self-report. Metrics: **key-node TCR/TSR**, **pass^k (k=3)** for side-effecting
+tasks, and the headline **nominal-vs-verified (CuP) silent-failure gap**, each with a
+**budget-matched vanilla baseline** column (the non-negotiable ablation rule). The
+verification layer (`eval/verify/`) is REAL — programmatic state check + a
+Semantic-Entropy-style consistency check; SVDD / Inspect AI / full REAL are marked
+seams (`eval/verify/seams.py`). Scoring math is unit-tested offline (no Copilot).
+
+```powershell
+# Full run (a few dozen Copilot calls); regenerates eval/REPORT.md.
+.\scripts\run-eval.ps1
+.\scripts\run-eval.ps1 -Limit 3        # smoke run on the first 3 tasks
+```
+
+`eval/REPORT.md` is generated from an actual run (metric table, per-task pass/fail,
+approximate Copilot call count, honest caveats). Scoring/verify/loader unit tests:
+
+```powershell
+cd backend
+.venv\Scripts\python -m pytest tests/test_eval_scoring.py tests/test_eval_verify.py tests/test_eval_loader.py -q
 ```
 
 ## Frontend

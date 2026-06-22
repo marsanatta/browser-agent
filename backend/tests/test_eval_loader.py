@@ -1,0 +1,59 @@
+"""Offline unit tests for the eval-set loader: schema validation + held-out ratio."""
+
+import sys
+from pathlib import Path
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from eval.loader import load_tasks
+
+
+def test_eval_set_loads_and_is_modest():
+    tasks = load_tasks()
+    assert 10 <= len(tasks) <= 14  # modest set per the cost budget
+
+
+def test_held_out_at_least_20_percent():
+    tasks = load_tasks()
+    held = [t for t in tasks if t.held_out]
+    assert len(held) / len(tasks) >= 0.20
+    # held-out site must be one never used in dev (quotes.toscrape.com)
+    assert all("quotes.toscrape.com" in t.start_url for t in held)
+
+
+def test_every_task_has_assertion_and_key_nodes():
+    for t in load_tasks():
+        assert t.assertion, f"{t.id} missing assertion"
+        assert t.key_nodes, f"{t.id} missing key nodes"
+
+
+def test_domains_and_types_are_diverse():
+    tasks = load_tasks()
+    assert len({t.domain for t in tasks}) >= 3
+    assert {"action", "retrieval", "side_effect"} & {t.task_type for t in tasks}
+    assert "side_effect" in {t.task_type for t in tasks}  # for pass^k
+
+
+def test_unique_ids():
+    tasks = load_tasks()
+    assert len({t.id for t in tasks}) == len(tasks)
+
+
+def test_bad_primitive_rejected(tmp_path):
+    bad = tmp_path / "bad.yaml"
+    bad.write_text(
+        "tasks:\n"
+        "  - id: x\n"
+        "    instruction: i\n"
+        "    start_url: u\n"
+        "    domain: d\n"
+        "    task_type: action\n"
+        "    difficulty: single\n"
+        "    key_nodes: []\n"
+        "    assert: {not_a_primitive: 1}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError):
+        load_tasks(bad)

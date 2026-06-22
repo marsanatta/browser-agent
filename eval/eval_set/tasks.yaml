@@ -1,0 +1,171 @@
+# Browser-agent eval set v1 (M3).
+#
+# Each task is DATA, not code. Scoring NEVER reads the agent's self-report; it
+# re-derives success from `assert` and `key_nodes` by inspecting the LIVE final
+# page (independent ground truth — eval/01 §4, eval/02 §F1).
+#
+# Diversity (eval/01 §5): domain x task_type x difficulty, with a held-out site
+# (quotes.toscrape.com) never used in dev to test generalization (>=20% of set).
+#
+# Assertion / key-node primitives (all checked programmatically against the page):
+#   url_contains: <substr>            final URL contains substr
+#   text_contains: <substr>          page body innerText contains substr (case-insensitive)
+#   h1_equals: <str>                 first <h1> innerText equals str
+#   selector_text_equals: {css, value}   first match's innerText equals value
+#
+# task_type:
+#   action     -> state-diff style assertion (REAL r_A, architecture/03 §3.2)
+#   retrieval  -> the fact must be VISIBLE on the final page (assertion checks it)
+#   side_effect-> mutates state; scored with pass^k (k=3) (eval/02 §C1/F2)
+#
+# difficulty: single | multi_same_domain | multi_cross_domain
+
+tasks:
+  # ---- the-internet.herokuapp.com (seed) ----
+  - id: internet_form_auth_nav
+    instruction: "Open the-internet site and go to the Form Authentication page."
+    start_url: "https://the-internet.herokuapp.com"
+    domain: forms
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - text_contains: "Form Authentication"   # home listing rendered
+    assert:
+      url_contains: "/login"
+
+  - id: internet_login_page_reached
+    instruction: "Navigate to the login form on the-internet and reach the Login Page."
+    start_url: "https://the-internet.herokuapp.com"
+    domain: forms
+    task_type: action
+    difficulty: multi_same_domain
+    held_out: false
+    key_nodes:
+      - text_contains: "Form Authentication"
+      - url_contains: "/login"
+    assert:
+      selector_text_equals: { css: "h2", value: "Login Page" }
+
+  - id: internet_login_submit
+    instruction: "On the-internet login form, sign in with username 'tomsmith' and password 'SuperSecretPassword!'."
+    start_url: "https://the-internet.herokuapp.com/login"
+    domain: forms
+    task_type: side_effect
+    difficulty: multi_same_domain
+    held_out: false
+    key_nodes:
+      - text_contains: "Username"
+    assert:
+      url_contains: "/secure"
+
+  - id: internet_dropdown_nav
+    instruction: "Go to the Dropdown example on the-internet."
+    start_url: "https://the-internet.herokuapp.com"
+    domain: navigation
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - text_contains: "Dropdown"
+    assert:
+      url_contains: "/dropdown"
+
+  - id: internet_checkboxes_nav
+    instruction: "Open the Checkboxes page on the-internet."
+    start_url: "https://the-internet.herokuapp.com"
+    domain: navigation
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - text_contains: "Checkboxes"
+    assert:
+      url_contains: "/checkboxes"
+
+  # ---- books.toscrape.com (seed) ----
+  - id: books_open_light_in_attic
+    instruction: "On books.toscrape.com open the product page for the book 'A Light in the ...'."
+    start_url: "https://books.toscrape.com"
+    domain: ecommerce
+    task_type: retrieval
+    difficulty: multi_same_domain
+    held_out: false
+    key_nodes:
+      - text_contains: "All products"          # catalog loaded
+    assert:
+      h1_equals: "A Light in the Attic"
+
+  - id: books_open_travel_category
+    instruction: "On books.toscrape.com browse to the Travel category."
+    start_url: "https://books.toscrape.com"
+    domain: ecommerce
+    task_type: action
+    difficulty: multi_same_domain
+    held_out: false
+    key_nodes:
+      - text_contains: "All products"
+    assert:
+      h1_equals: "Travel"
+
+  - id: books_price_visible
+    instruction: "Open the 'A Light in the ...' product page on books.toscrape.com and show its price."
+    start_url: "https://books.toscrape.com"
+    domain: ecommerce
+    task_type: retrieval
+    difficulty: multi_same_domain
+    held_out: false
+    key_nodes:
+      - h1_equals: "A Light in the Attic"
+    assert:
+      text_contains: "51.77"                    # the book's price, visible on the product page
+
+  # ---- quotes.toscrape.com (HELD-OUT: never used in dev) ----
+  - id: quotes_open_einstein_author
+    instruction: "On quotes.toscrape.com open the author page for Albert Einstein."
+    start_url: "https://quotes.toscrape.com"
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    held_out: true
+    key_nodes:
+      - text_contains: "Albert Einstein"
+    assert:
+      selector_text_equals: { css: "h3.author-title", value: "Albert Einstein" }
+
+  - id: quotes_einstein_born_location
+    instruction: "Find where Albert Einstein was born on quotes.toscrape.com."
+    start_url: "https://quotes.toscrape.com"
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    held_out: true
+    key_nodes:
+      - text_contains: "Albert Einstein"
+      - url_contains: "/author/Albert-Einstein"
+    assert:
+      text_contains: "in Ulm, Germany"
+
+  - id: quotes_open_login
+    instruction: "Go to the Login page on quotes.toscrape.com."
+    start_url: "https://quotes.toscrape.com"
+    domain: forms
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - text_contains: "Login"
+    assert:
+      url_contains: "/login"
+
+  - id: quotes_tag_love
+    instruction: "Browse quotes tagged 'love' on quotes.toscrape.com."
+    start_url: "https://quotes.toscrape.com"
+    domain: information
+    task_type: action
+    difficulty: multi_same_domain
+    held_out: true
+    key_nodes:
+      - text_contains: "Top Ten tags"
+    assert:
+      url_contains: "/tag/love"

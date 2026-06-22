@@ -17,7 +17,7 @@ consume the same source of truth. The browser is driven through BrowserProvider
 from __future__ import annotations
 
 import uuid
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Awaitable, Callable
 
 from app.agent import act, recover, verify
 from app.agent.classify import FailureClass, Recovery, classify_exception, classify_located, recovery_for
@@ -30,6 +30,12 @@ from app.stream.events import Event
 
 _MAX_ATTEMPTS = 4  # bound the ladder; each attempt needs a new observation
 
+# verify_hook(page) -> bool: an independent post-run ground-truth check run on the
+# LIVE final page, before the browser closes. Wired by the eval harness (M3) so
+# `verified_completion` reflects a programmatic state assertion rather than the
+# agent's own self-report — the basis of the nominal-vs-verified (CuP) gap.
+VerifyHook = Callable[[Any], Awaitable[bool]]
+
 
 class Executor:
     def __init__(
@@ -38,6 +44,9 @@ class Executor:
         planner: Planner,
         gateway: Any = None,
         confirm_submit: Any = None,
+        verify_hook: VerifyHook | None = None,
+        step_hook: VerifyHook | None = None,
+        max_attempts: int = _MAX_ATTEMPTS,
     ) -> None:
         self._provider = provider
         self._planner = planner
@@ -45,6 +54,16 @@ class Executor:
         # confirm-before-submit hook: async () -> bool. Default autopilot approves
         # (no human-in-the-loop yet) but the gate is real.
         self._confirm_submit = confirm_submit
+        self._verify_hook = verify_hook
+        # step_hook(page) is awaited on the live page after EACH sub-task so the
+        # eval harness can test key-node checkpoints as the trajectory passes
+        # through intermediate states (WebCanvas key-node TCR, architecture/03 §3.1):
+        # a checkpoint counts if it was observable at ANY point, not just the end.
+        self._step_hook = step_hook
+        # max_attempts=1 disables the recovery ladder (and, with gateway=None, the
+        # L2 heal) — the budget-matched vanilla baseline the ablation rule requires
+        # (architecture/03 §4). The full agent keeps the default 4-step ladder.
+        self._max_attempts = max_attempts
         self._cache = LocatorCache()
 
     async def run(self, task: str) -> AsyncIterator[Event]:
@@ -61,6 +80,7 @@ class Executor:
         page = await self._provider.new_page()
         all_ok = True
         replanned = False
+        verified = None
 
         try:
             i = 0
@@ -79,6 +99,12 @@ class Executor:
                     "ok" if outcome.ok else "failed",
                     failure_category=None if outcome.ok else outcome.failure_class,
                 )
+
+                if self._step_hook is not None:
+                    try:
+                        await self._step_hook(page)
+                    except Exception:
+                        pass
 
                 if outcome.ok:
                     i += 1
@@ -102,10 +128,25 @@ class Executor:
                 )
                 all_ok = False
                 break
+
+            # Independent post-run ground-truth check on the live page, BEFORE
+            # close (architecture/02 §1.6, eval/01 §4): never trust the agent's
+            # self-report. verified diverges from nominal exactly when the agent
+            # claims success but the state assertion fails — the CuP silent-failure
+            # signal. Hook absent -> verified mirrors nominal (unchanged M1 behavior).
+            if self._verify_hook is not None:
+                try:
+                    verified = await self._verify_hook(page)
+                except Exception:
+                    verified = False
         finally:
             await self._provider.close()
 
-        yield events.run_finished(run_id, nominal=all_ok, verified=all_ok)
+        yield events.run_finished(
+            run_id,
+            nominal=all_ok,
+            verified=all_ok if verified is None else verified,
+        )
 
     async def _run_subtask(
         self, page: Any, step_id: str, st: SubTask
@@ -125,7 +166,7 @@ class Executor:
 
         last_class = FailureClass.NOT_FOUND
         reground = False
-        for attempt in range(1, _MAX_ATTEMPTS + 1):
+        for attempt in range(1, self._max_attempts + 1):
             result, fc, located, shot = await self._attempt(
                 page, step_id, st, reground=reground, attempt=attempt
             )
