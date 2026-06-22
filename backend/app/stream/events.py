@@ -31,6 +31,8 @@ class EventType(str, Enum):
     TOOL_CALL_END = "TOOL_CALL_END"
     TEXT_MESSAGE = "TEXT_MESSAGE"
     SCREENSHOT_ANNOTATED = "SCREENSHOT_ANNOTATED"
+    ASK_USER = "ASK_USER"
+    RECOVERY = "RECOVERY"
 
 
 @dataclass(frozen=True)
@@ -100,6 +102,22 @@ def text_message(role: str, content: str) -> Event:
 
 def screenshot_annotated(shot: ScreenshotAnnotated) -> Event:
     return Event(EventType.SCREENSHOT_ANNOTATED, asdict(shot))
+
+
+def ask_user(step_id: str, question: str) -> Event:
+    return Event(EventType.ASK_USER, {"step_id": step_id, "question": question})
+
+
+def recovery(step_id: str, failure_class: str, action: str, attempt: int) -> Event:
+    return Event(
+        EventType.RECOVERY,
+        {
+            "step_id": step_id,
+            "failure_class": failure_class,
+            "recovery": action,
+            "attempt": attempt,
+        },
+    )
 
 
 def run_finished(run_id: str, nominal: bool, verified: bool) -> Event:

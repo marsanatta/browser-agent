@@ -21,22 +21,51 @@ class VerifyResult(str, Enum):
 @dataclass(frozen=True)
 class Expectation:
     """What the agent predicts the action will do. Any satisfied channel counts
-    as CHANGED; all-unchanged is NO_CHANGE."""
+    as CHANGED; all-unchanged is NO_CHANGE.
+
+    `target_locator` + `target_effect` add a deterministic, element-specific
+    channel (docs/architecture/02 §1.4): a fill should leave the field holding
+    its value; a click that toggles state should make the target attached/
+    detached/visible. This is stronger than a page-wide DOM-length heuristic
+    because it survives unrelated DOM churn and catches the case where the page
+    mutated elsewhere but the intended element did not change."""
 
     url_changes: bool = False
     url_contains: str | None = None
     dom_changes: bool = True
+    target_locator: Any = None
+    target_effect: str | None = None  # "value" | "detached" | "visible_enabled"
+    target_value: str | None = None
 
 
 @dataclass(frozen=True)
 class StateSnapshot:
     url: str
     dom_len: int
+    dom_hash: int
 
 
 async def snapshot(page: Any) -> StateSnapshot:
-    dom_len = await page.evaluate("() => document.body ? document.body.innerHTML.length : 0")
-    return StateSnapshot(url=page.url, dom_len=int(dom_len))
+    body = await page.evaluate(
+        "() => document.body ? document.body.innerHTML : ''"
+    )
+    return StateSnapshot(url=page.url, dom_len=len(body), dom_hash=hash(body))
+
+
+async def _target_satisfied(expect: Expectation) -> bool:
+    loc = expect.target_locator
+    if loc is None or expect.target_effect is None:
+        return False
+    try:
+        if expect.target_effect == "value":
+            return (await loc.input_value()) == (expect.target_value or "")
+        if expect.target_effect == "detached":
+            return await loc.count() == 0
+        if expect.target_effect == "visible_enabled":
+            return await loc.is_visible() and await loc.is_enabled()
+    except Exception:
+        return False
+    return False
 
 
 async def verify_after_act(
@@ -47,13 +76,20 @@ async def verify_after_act(
     if expect.url_contains is not None:
         return VerifyResult.CHANGED if expect.url_contains in after.url else VerifyResult.NO_CHANGE
 
+    if await _target_satisfied(expect):
+        return VerifyResult.CHANGED
+
     if expect.url_changes and after.url != before.url:
         return VerifyResult.CHANGED
 
-    if expect.dom_changes and after.dom_len != before.dom_len:
+    # DOM-mutation: length OR content hash change. Hash catches same-length
+    # mutations (e.g. a class/attribute flip) the coarse length diff missed.
+    if expect.dom_changes and (
+        after.dom_len != before.dom_len or after.dom_hash != before.dom_hash
+    ):
         return VerifyResult.CHANGED
 
-    if not expect.url_changes and not expect.dom_changes:
+    if not expect.url_changes and not expect.dom_changes and expect.target_effect is None:
         # Nothing was predicted to change; treat a stable page as success.
         return VerifyResult.CHANGED
 

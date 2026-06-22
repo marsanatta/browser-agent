@@ -20,6 +20,7 @@ cascade miss; the seam is `l2_fallback` and is left unwired for M1 (returns None
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
@@ -92,6 +93,10 @@ async def locate(
             return Located(loc, tier, strategy)
 
     if l2_fallback is not None:
+        try:
+            l2_fallback._cache = cache  # let the fallback write its hit back
+        except (AttributeError, TypeError):
+            pass
         return await l2_fallback(page, el)
     return None
 
@@ -135,6 +140,95 @@ def _build(page: Any, strategy: str, el: IndexedElement) -> Any:
     if strategy == "text":
         return page.get_by_text(el.name, exact=True)
     return None
+
+
+_L2_PROMPT = """You are a locator expert for a browser-automation agent.
+The deterministic selector cascade could not uniquely resolve this target:
+
+    target role: __ROLE__
+    target name: __NAME__
+
+Here is a shortlist of candidate elements currently on the page (index: role | name):
+__CANDIDATES__
+
+Reply with ONLY the integer index of the single best matching candidate, or -1
+if none match. No prose."""
+
+
+def make_l2_fallback(gateway: Any, candidates: list[IndexedElement]) -> L2Fallback:
+    """Wire the documented L2 LLM re-rank (docs/architecture/02 §2.5, Healwright
+    pattern): on a FULL deterministic miss, hand the LLM a compact <=5-candidate
+    shortlist (minimal JSON, never raw HTML) and let it pick one; we then resolve
+    the chosen candidate through the same deterministic cascade and cache it.
+
+    The shortlist is pre-filtered by accessible-name overlap so the LLM only ever
+    sees a small, relevant set (cost + accuracy)."""
+
+    async def fallback(page: Any, el: IndexedElement) -> Located | None:
+        shortlist = _shortlist(el, candidates, limit=5)
+        if not shortlist:
+            return None
+        prompt = (
+            _L2_PROMPT.replace("__ROLE__", el.role)
+            .replace("__NAME__", el.name)
+            .replace(
+                "__CANDIDATES__",
+                "\n".join(f"{i}: {c.role} | {c.name}" for i, c in enumerate(shortlist)),
+            )
+        )
+        resp = await gateway.complete(prompt)
+        idx = _parse_index(resp.content)
+        if idx is None or not (0 <= idx < len(shortlist)):
+            return None
+        chosen = shortlist[idx]
+        for tier, strategy in enumerate(_TIERS, start=1):
+            loc = _build(page, strategy, chosen)
+            if loc is not None and await _resolves(loc):
+                if cache := getattr(fallback, "_cache", None):
+                    cache.put(_page_key(page), el, tier, strategy)
+                return Located(loc, tier, strategy)
+        return None
+
+    return fallback
+
+
+def _shortlist(
+    el: IndexedElement, candidates: list[IndexedElement], limit: int
+) -> list[IndexedElement]:
+    target = el.name.strip().lower()
+    toks = set(target.split())
+
+    def score(c: IndexedElement) -> int:
+        name = c.name.strip().lower()
+        s = 0
+        if c.role == el.role:
+            s += 2
+        if toks & set(name.split()):
+            s += 2
+        if target and (target in name or name in target):
+            s += 1
+        return s
+
+    ranked = sorted(candidates, key=score, reverse=True)
+    return [c for c in ranked if score(c) > 0][:limit]
+
+
+def _parse_index(content: str) -> int | None:
+    s = content.strip()
+    try:
+        return int(s)
+    except ValueError:
+        pass
+    for tok in s.replace(",", " ").split():
+        try:
+            return int(tok)
+        except ValueError:
+            continue
+    try:
+        val = json.loads(s)
+        return int(val) if isinstance(val, (int, float, str)) else None
+    except (ValueError, TypeError):
+        return None
 
 
 def _first_class(cls: str) -> str:

@@ -1,9 +1,13 @@
-"""EXECUTOR: drive perceive -> locate -> act -> verify per sub-task.
+"""EXECUTOR: drive perceive -> locate -> act -> verify per sub-task, with the
+M2 bounded escalation ladder.
 
-M1 = happy path + a single re-ground attempt on NO_CHANGE. Full per-class
-recovery and global replan are M2 (docs/architecture/02 §1.2/§1.3). The
-correction signal is observable browser state (verify-after-act), never the
-LLM's self-report (§1.6).
+The ladder (docs/architecture/02 §1.2/§1.3): classify the failure from
+OBSERVABLE browser state (is_visible/is_enabled, exception text, NO_CHANGE
+diff), pick the per-class recovery, and retry ONLY when the recovery produced a
+NEW observation. Escalation order: retry-same-action -> re-ground/heal (local
+strategy switch) -> global replan -> ask_user. Retries are bounded (no infinite
+loop); side-effecting (submit) retries are gated behind confirmation. The
+correction signal is never the LLM's self-report (§1.6).
 
 `run()` is an async generator of stream Events so the SSE endpoint and tests
 consume the same source of truth. The browser is driven through BrowserProvider
@@ -15,19 +19,32 @@ from __future__ import annotations
 import uuid
 from typing import Any, AsyncIterator
 
-from app.agent import act, verify
-from app.agent.locate import LocatorCache, locate
+from app.agent import act, recover, verify
+from app.agent.classify import FailureClass, Recovery, classify_exception, classify_located, recovery_for
+from app.agent.locate import LocatorCache, locate, make_l2_fallback
 from app.agent.perceive import IndexedElement, perceive
 from app.agent.planner import Planner, SubTask
 from app.browser.provider import BrowserProvider
 from app.stream import events
 from app.stream.events import Event
 
+_MAX_ATTEMPTS = 4  # bound the ladder; each attempt needs a new observation
+
 
 class Executor:
-    def __init__(self, provider: BrowserProvider, planner: Planner) -> None:
+    def __init__(
+        self,
+        provider: BrowserProvider,
+        planner: Planner,
+        gateway: Any = None,
+        confirm_submit: Any = None,
+    ) -> None:
         self._provider = provider
         self._planner = planner
+        self._gateway = gateway  # enables the L2 LLM locator fallback when set
+        # confirm-before-submit hook: async () -> bool. Default autopilot approves
+        # (no human-in-the-loop yet) but the gate is real.
+        self._confirm_submit = confirm_submit
         self._cache = LocatorCache()
 
     async def run(self, task: str) -> AsyncIterator[Event]:
@@ -43,21 +60,44 @@ class Executor:
         await self._provider.launch()
         page = await self._provider.new_page()
         all_ok = True
+        replanned = False
 
         try:
-            for i, st in enumerate(subtasks, start=1):
-                step_id = f"{run_id}-s{i}"
+            i = 0
+            while i < len(subtasks):
+                st = subtasks[i]
+                step_id = f"{run_id}-s{i + 1}"
                 yield events.step_started(step_id, _describe(st))
-                ok = False
+                outcome = _Outcome(False)
                 async for ev in self._run_subtask(page, step_id, st):
                     if isinstance(ev, _Outcome):
-                        ok = ev.ok
+                        outcome = ev
                     else:
                         yield ev
-                all_ok = all_ok and ok
-                yield events.step_finished(step_id, "ok" if ok else "no_change")
-                if not ok:
-                    break
+                yield events.step_finished(step_id, "ok" if outcome.ok else "failed")
+
+                if outcome.ok:
+                    i += 1
+                    continue
+
+                # Exhausted local recovery on this sub-task. Global replan once
+                # (docs/architecture/02 §1.3: replan only on local exhaustion),
+                # then ask_user.
+                if not replanned:
+                    replanned = True
+                    yield events.recovery(step_id, outcome.failure_class, Recovery.REPLAN.value, _MAX_ATTEMPTS)
+                    try:
+                        new_subtasks = await self._planner.plan(task)
+                    except Exception:
+                        new_subtasks = None
+                    if new_subtasks:
+                        subtasks = subtasks[:i] + new_subtasks
+                        continue
+                yield events.ask_user(
+                    step_id, f"Could not complete '{_describe(st)}' after recovery; need guidance."
+                )
+                all_ok = False
+                break
         finally:
             await self._provider.close()
 
@@ -76,50 +116,106 @@ class Executor:
             yield _Outcome(True)
             return
 
-        # click / fill: perceive -> locate -> act -> verify, single re-ground.
-        result = await self._perceive_locate_act_verify(page, st, reground=False)
-        if result is verify.VerifyResult.NO_CHANGE:
-            yield events.text_message("agent", f"NO_CHANGE on '{st.target}', re-grounding")
-            result = await self._perceive_locate_act_verify(page, st, reground=True)
+        last_class = FailureClass.NOT_FOUND
+        reground = False
+        for attempt in range(1, _MAX_ATTEMPTS + 1):
+            result, fc = await self._attempt(page, st, reground=reground)
+            if result is verify.VerifyResult.CHANGED:
+                yield events.tool_call_end(call_id, f"{st.action} -> CHANGED (attempt {attempt})")
+                yield _Outcome(True)
+                return
 
-        if result is None:
-            yield events.tool_call_end(call_id, f"element not found: {st.target}")
-            yield _Outcome(False)
-            return
+            last_class = fc
+            rec = recovery_for(fc)
+            yield events.recovery(step_id, fc.value, rec.value, attempt)
 
-        yield events.tool_call_end(call_id, f"{st.action} -> {result.value}")
-        yield _Outcome(result is verify.VerifyResult.CHANGED)
+            # A retry must be justified by a NEW observation (§1.3): apply the
+            # per-class recovery and only continue if it actually changed state.
+            progressed = await self._apply_recovery(page, st, rec)
+            if rec is Recovery.REGROUND:
+                reground = True  # local strategy switch: invalidate + re-perceive (+ L2)
+            if not progressed and attempt >= 2:
+                break  # recovery is a no-op -> stop escalating locally
 
-    async def _perceive_locate_act_verify(
-        self, page: Any, st: SubTask, reground: bool
-    ):
+        yield events.tool_call_end(call_id, f"{st.action} failed: {last_class.value}")
+        yield _Outcome(False, failure_class=last_class.value)
+
+    async def _attempt(self, page: Any, st: SubTask, reground: bool):
+        """One perceive->locate->(precondition)->act->verify pass. Returns
+        (VerifyResult|None, FailureClass)."""
         perception = await perceive(page)
         target = _match(perception.elements, st)
         if target is None:
-            return None
+            return None, FailureClass.NOT_FOUND
 
         if reground:
             self._cache.invalidate(_page_key(page), target)
 
-        located = await locate(page, target, cache=self._cache)
+        l2 = make_l2_fallback(self._gateway, perception.elements) if self._gateway else None
+        located = await locate(page, target, cache=self._cache, l2_fallback=l2)
         if located is None:
-            return None
+            return None, FailureClass.NOT_FOUND
+
+        # Precondition check (UFO2 §1.4): is the element interactable BEFORE we
+        # act? is_visible/is_enabled is ground truth, not the LLM's opinion.
+        pre = await classify_located(located.locator)
+        if pre is not FailureClass.NONE:
+            return verify.VerifyResult.NO_CHANGE, pre
+
+        if st.action == "fill" and act.requires_confirmation(act.Action(kind="fill")):
+            if not await self._confirm():
+                return verify.VerifyResult.NO_CHANGE, FailureClass.WRONG_PAGE
 
         before = await verify.snapshot(page)
-        if st.action == "fill":
-            await act.fill(located.locator, st.value or "")
-            expect = verify.Expectation(dom_changes=True)
-        else:
-            await act.click(located.locator)
-            expect = verify.Expectation(url_changes=True, dom_changes=True)
-        return await verify.verify_after_act(page, before, expect)
+        try:
+            if st.action == "fill":
+                await act.fill(located.locator, st.value or "")
+                expect = verify.Expectation(
+                    dom_changes=True,
+                    target_locator=located.locator,
+                    target_effect="value",
+                    target_value=st.value or "",
+                )
+            else:
+                await act.click(located.locator)
+                expect = verify.Expectation(url_changes=True, dom_changes=True)
+        except Exception as exc:
+            return verify.VerifyResult.NO_CHANGE, classify_exception(exc)
+
+        result = await verify.verify_after_act(page, before, expect)
+        if result is verify.VerifyResult.NO_CHANGE:
+            return result, FailureClass.NOT_FOUND  # re-ground on a silent no-op
+        return result, FailureClass.NONE
+
+    async def _apply_recovery(self, page: Any, st: SubTask, rec: Recovery) -> bool:
+        located = await self._current_locator(page, st)
+        if rec is Recovery.WAIT_SCROLL_DISMISS and located is not None:
+            return await recover.wait_scroll_dismiss(page, located.locator)
+        if rec is Recovery.STATE_WAIT and located is not None:
+            return await recover.state_wait(page, located.locator)
+        if rec is Recovery.REGROUND:
+            return True  # the next attempt re-perceives with the cache invalidated
+        return False
+
+    async def _current_locator(self, page: Any, st: SubTask):
+        perception = await perceive(page)
+        target = _match(perception.elements, st)
+        if target is None:
+            return None
+        return await locate(page, target, cache=self._cache)
+
+    async def _confirm(self) -> bool:
+        if self._confirm_submit is None:
+            return True  # autopilot default; the gate exists for human-in-the-loop
+        return await self._confirm_submit()
 
 
 class _Outcome:
-    __slots__ = ("ok",)
+    __slots__ = ("ok", "failure_class")
 
-    def __init__(self, ok: bool) -> None:
+    def __init__(self, ok: bool, failure_class: str = "") -> None:
         self.ok = ok
+        self.failure_class = failure_class
 
 
 def _match(elements: list[IndexedElement], st: SubTask) -> IndexedElement | None:

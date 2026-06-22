@@ -49,6 +49,27 @@ class LLMResponse:
     content: str
 
 
+class MockGateway:
+    """Test double with the LLMGateway surface (complete/judge), no Copilot auth.
+
+    `responder` maps a prompt to the raw text the model would return, so a test
+    can drive the L2 locator fallback (or any LLM seam) deterministically."""
+
+    def __init__(self, responder) -> None:
+        self._responder = responder
+        self.calls: list[str] = []
+
+    async def complete(self, prompt: str, model: str = ACTOR_WORKHORSE) -> LLMResponse:
+        self.calls.append(prompt)
+        return LLMResponse(model=model, content=self._responder(prompt))
+
+    async def judge(self, prompt: str) -> LLMResponse:
+        return await self.complete(prompt, model=JUDGE_MODEL)
+
+    async def close(self) -> None:
+        return None
+
+
 class LLMGateway:
     """Lazy-connecting wrapper around a shared Copilot headless server.
 
