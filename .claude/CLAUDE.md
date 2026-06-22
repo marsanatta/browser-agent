@@ -56,3 +56,38 @@
 ## Commit Messages
 
 - **NEVER** include `Co-Authored-By` lines or any AI attribution in git commit messages.
+
+## Browser-Agent Engineering Principles (grounded in `docs/`)
+
+These distill `docs/research/00-synthesis-and-design-implications.md`. **Before designing, implementing, or verifying any agent component, consult `/browser-agent-expert`** for the grounded decision + its source + verification flag. The docs and that skill are the source of truth — when a principle changes, update them, not just this list. A `vendor-unverified` number is not a fact; carry the flag through.
+
+### Design
+
+- **Keep the LLM out of the hot path.** Deterministic / cached / rule-based execution first; invoke the LLM only on failure. This is the cost lever *and* the reliability lever at once.
+- **Hybrid perception.** Fused DOM + accessibility-tree indexed element list as primary; screenshot + Set-of-Marks only when DOM grounding is ambiguous, and only with sparse, precise boxes. **Never feed raw DOM** (token blowup).
+- **Verify-after-act is mandatory.** Predict expected effect → act → diff actual vs predicted (DOM / URL / network) → re-ground on NO_CHANGE. Ground every correction signal in observable browser state, **never** in the LLM's self-assessment.
+- **Self-correction = classify-then-respond, not generic retry.** not-found → re-ground/heal; not-interactable → wait/scroll/dismiss overlay; wrong-page → replan; stale/timing → state-wait then retry the *same* action.
+- **Self-maintenance = semantic-first locator cascade.** `getByRole`+name → `getByLabel` → `getByText`+role → `getByTestId` → heuristic fingerprint → LLM re-rank of ≤5 → vision. Two-layer cache so a hit costs 0 LLM tokens. Avoid CSS/XPath as primary.
+- **Retry only on a new observation.** Escalate retry → local strategy-switch → global replan on exhaustion; **confirm before any side-effecting (write/submit) retry**; expose an explicit `ask_user` escape hatch.
+- **Hierarchical plan + stateless sub-task executor** (fresh context per sub-task to avoid pollution).
+- **Anti-bot: route, don't evade.** Send Cloudflare-Turnstile / DataDome / login-walled sites to a "needs-auth / unsupported" outcome. That list *is* the honest unsupported-sites disclosure ASSIGNMENT.md requires.
+- **Observability is first-class.** Every step logs prompt, model version, chosen locator + cascade level, screenshot, predicted-vs-actual diff, and failure class.
+
+### Implementation
+
+- **Swappable browser-runtime interface.** Self-host Playwright/Chromium as default; Steel.dev / Browserbase as escalation. Stateless ephemeral browser per task; recycle to bound memory creep.
+- **Tiered models.** Haiku/o4-mini triage → Sonnet workhorse → Opus/o3 strictly gated on repeated failure. Prompt caching + Batch API on by default. Raw frontier-per-step is a cost trap.
+- **Frontend = SSE progress streaming** (`sse-starlette`/FastAPI) with the AG-UI event vocabulary; a Skyvern-style **inspectable-failure view** (annotated screenshot · element tree · prompt+raw response · locator+cascade level · `failure_category` · retry chain · HAR).
+- **Observability backend = Langfuse + OpenTelemetry GenAI spans** (each Playwright action wrapped as a tool span). The trajectory store feeds frontend replay and the anomaly trip-wire.
+- **Deploy headless Chromium in a real container** (`mcr.microsoft.com/playwright` base, `--disable-dev-shm-usage`, non-root, `tini`).
+- **Redact secrets at serialization, not post-hoc** — see *Secrets, Tokens & Credentials* above. No raw cookie/auth/`sk-*` ever reaches a span, SSE `data:`, or replay file.
+
+### Verification
+
+- **Independent ground truth, hard verifiers first.** Deterministic post-state checks (DOM / URL / API / extracted field) before any LLM judge; not needing a judge removes its worst failure modes. (Extends *Engineering Rigor*: never self-consistency.)
+- **If an LLM judge is unavoidable:** different model family from the agent, explicit **"Unknown" escape hatch**, one dimension per call. Panels don't fix correlated error — spend extra judges on independent axes.
+- **Measure silent failure explicitly.** Report **nominal vs verified completion** (CuP-style); the delta is the headline reliability number. **Never** accept verbalized confidence as a success signal. Stack: Semantic-Entropy probe on extraction + consistency sampling + independent post-action state check + trajectory anomaly trip-wire.
+- **Report pass^k (k≥3), not pass@1** for any side-effecting task (booking/order/submit) — one wrong run in k is product-fatal.
+- **Eval-set discipline.** Domain × task-type × difficulty tiers; ≥20% held-out unseen sites; block shortcut paths; **WebCanvas key-node (TCR/TSR) scoring over binary**; REAL + Inspect AI as harness; target n≈1,000 and report SE/CI. Build eval-first from 20–50 *real* failure cases with two-reviewer pass/fail agreement.
+- **Ablation rule (non-negotiable):** any "X improves performance" claim must report total token usage **and** a budget-matched vanilla-actor baseline.
+- **Surface failure modes honestly** — concrete unsupported-site examples; intent drift is an open problem we *mitigate* (goal-level verify) but do not claim to solve.
