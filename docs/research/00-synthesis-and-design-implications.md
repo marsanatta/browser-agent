@@ -104,8 +104,35 @@ Inputs: [04-browser-infra-and-models.md](04-browser-infra-and-models.md), [05-fr
 
 ---
 
+## Round 3 — Eval Methodology & Memory/Search Adopt-Skip (rigor layer)
+
+Inputs: [06-eval-methodology.md](06-eval-methodology.md), [07-memory-search-and-milestone-eval.md](07-memory-search-and-milestone-eval.md). Self-scored 82 / 78.
+
+**Eval methodology — how to verify correctness without trustworthy ground truth** (the assignment's hardest axis)
+- **Hard verifiers first, LLM judges last.** Use deterministic post-state checks (DOM/URL/API/extracted field) wherever inspectable; reserve LLM judges for text-only quality. Not needing a judge eliminates the worst judge failure modes outright.
+- **If a judge is unavoidable:** different model family from the agent (GPT-4 shows significant self-preference bias), explicit **"Unknown" escape hatch**, one dimension per call, recalibrate monthly vs human labels.
+- **Panels don't fix correlated error** — 9 judges ≈ 2 independent votes; best single judge ≈ full panel. Spend extra judges on *independent axes*, not redundant votes.
+- **Report pass^k (k≥3), not pass@1.** One wrong execution in k tries is product-fatal for bookings/orders/form submits. pass^k is the production-readiness signal.
+- **Silent-failure layer = three stacked signals:** Semantic Entropy Probes on extraction steps + repeat-and-compare consistency sampling + independent post-action state verification. **Never** accept verbalized confidence as the success signal (LLMs are systematically overconfident).
+- **Statistical rigor:** target n≈1,000 eval items, report SE/CI (clustered SE when tasks share a site); measure **calibration and discrimination separately**.
+- **Harness: Inspect AI**, each run in a clean isolated sandbox (shared state → correlated failures indistinguishable from real ones).
+- **Eval-driven development:** start from 20–50 *real* failure cases with two-reviewer agreement on pass/fail; saturation means the set needs harder tasks.
+
+**Memory / search / milestone — opinionated adopt-skip**
+- **SKIP Voyager code-skill libraries** — wrong substrate (DOM selectors are unstable; code skills break silently); no web benchmark evidence.
+- **SKIP LATS / MCTS tree search** — ~17× token multiplier and needs transaction-safe state reversion browsers don't provide. **Linear retry-with-reflection** gives +29% on WebArena at ~3× cost — strictly better for a cost-bounded web agent.
+- **ADOPT (cautiously) AWM offline workflow induction** — induct reusable workflows *offline from a curated good-trajectory corpus only*, never online (failed trajectories poison the library).
+- **ADOPT auto-evaluator (2404.06474) as a training-data filter, not a live pass/fail gate** (too noisy: ~30% error on ambiguous tasks).
+- **ADOPT WebCanvas key-node (TCR/TSR) scoring for our eval set** — binary success hides real partial progress (23.1% TSR vs 48.8% TCR gap); key-node scoring localizes where a task stalls.
+- **ADOPT REAL (2504.11543) as the primary offline eval harness** — 12 deterministic clones of mainstream sites, state-diff evaluation (no judge noise), reproducible and safe vs live-web.
+- **Non-negotiable ablation rule:** always report total token usage **and** a budget-matched vanilla-actor baseline. Any "memory/skill improves performance" claim is incomplete without it (a budget-matched vanilla actor beat AWM by 5.76pp using 29% fewer tokens — arXiv 2606.15017).
+
+**New flagged gaps (non-blocking):** offline-AWM vs budget-matched baseline untested; per-task key-node annotation cost unquantified; LATS at low branching with Playwright `storageState` unresearched; pass^k exact formula and abstention coverage/accuracy numbers abstract-only.
+
+---
+
 ## Final convergence verdict
 
-**Design-readiness: ~90/100. Research loop converged — sufficient to design a high-quality agent that targets every grading axis. Not claiming 100, and it is not reachable** (closed commercial internals, intent-drift is an open research problem, and several $/task figures require in-house measurement — none of which block design).
+**Design-readiness: ~92/100. Research loop converged across 3 rounds (8 docs) — sufficient to design a high-quality agent that targets every grading axis. Not claiming 100, and it is not reachable** (closed commercial internals, intent-drift is an open research problem, and several $/task and abstention figures require in-house measurement — none of which block design).
 
-All six grading axes now have grounded, sourced, implementable mechanisms (table above) **plus** a grounded build/deploy/frontend/security stack. The remaining unknowns are either fundamentally unanswerable from public sources or are measurements we can only take by building. Continuing to research would be loop-for-its-own-sake. **Recommendation: stop research, move to an architecture/implementation plan.**
+All six grading axes now have grounded, sourced, implementable mechanisms (table above) **plus** a grounded build/deploy/frontend/security stack **and** a rigorous eval methodology (hard-verifier-first, pass^k, SEP+consistency+state-verify, Inspect AI + REAL harness, budget-matched baselines). The remaining unknowns are either fundamentally unanswerable from public sources or are measurements we can only take by building. Continuing to research would be loop-for-its-own-sake. **Recommendation: stop research, move to an architecture/implementation plan.**
