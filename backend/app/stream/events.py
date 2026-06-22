@@ -1,0 +1,109 @@
+"""AG-UI-style event vocabulary for SSE step streaming.
+
+AG-UI defines a standard event set (RUN_*, STEP_*, TOOL_CALL_*, TEXT_MESSAGE_*)
+that CopilotKit-style frontends consume. AG-UI has no screenshot event, so we
+add a custom `SCREENSHOT_ANNOTATED` event carrying an element highlight box plus
+a screenshot reference (never inline image bytes on the hot SSE path).
+
+Every payload passes through `redact()` before serialization so no secret/PII
+reaches the SSE `data:` field.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+from dataclasses import asdict, dataclass, field
+from enum import Enum
+from typing import Any
+
+from app.obs.tracing import redact
+
+
+class EventType(str, Enum):
+    RUN_STARTED = "RUN_STARTED"
+    RUN_FINISHED = "RUN_FINISHED"
+    RUN_ERROR = "RUN_ERROR"
+    STEP_STARTED = "STEP_STARTED"
+    STEP_FINISHED = "STEP_FINISHED"
+    TOOL_CALL_START = "TOOL_CALL_START"
+    TOOL_CALL_ARGS = "TOOL_CALL_ARGS"
+    TOOL_CALL_END = "TOOL_CALL_END"
+    TEXT_MESSAGE = "TEXT_MESSAGE"
+    SCREENSHOT_ANNOTATED = "SCREENSHOT_ANNOTATED"
+
+
+@dataclass(frozen=True)
+class HighlightBox:
+    """Element highlight in CSS pixels relative to the screenshot's top-left."""
+
+    x: float
+    y: float
+    width: float
+    height: float
+    label: str | None = None
+
+
+@dataclass(frozen=True)
+class ScreenshotAnnotated:
+    """Custom AG-UI extension: a captured page screenshot plus the element the
+    agent acted on. `screenshot_ref` is an opaque id/URL into the trace store —
+    image bytes are served out-of-band, never inlined on the SSE stream."""
+
+    step_id: str
+    screenshot_ref: str
+    highlight: HighlightBox
+    caption: str | None = None
+
+
+@dataclass
+class Event:
+    type: EventType
+    payload: dict[str, Any] = field(default_factory=dict)
+    ts: float = field(default_factory=time.time)
+
+    def to_sse(self) -> dict[str, str]:
+        safe = redact(self.payload)
+        data = json.dumps({"type": self.type.value, "ts": self.ts, "payload": safe})
+        return {"event": self.type.value, "data": data}
+
+
+def run_started(task: str, run_id: str) -> Event:
+    return Event(EventType.RUN_STARTED, {"run_id": run_id, "task": task})
+
+
+def step_started(step_id: str, description: str) -> Event:
+    return Event(EventType.STEP_STARTED, {"step_id": step_id, "description": description})
+
+
+def step_finished(step_id: str, status: str) -> Event:
+    return Event(EventType.STEP_FINISHED, {"step_id": step_id, "status": status})
+
+
+def tool_call_start(step_id: str, tool: str, call_id: str) -> Event:
+    return Event(
+        EventType.TOOL_CALL_START, {"step_id": step_id, "tool": tool, "call_id": call_id}
+    )
+
+
+def tool_call_args(call_id: str, args: dict[str, Any]) -> Event:
+    return Event(EventType.TOOL_CALL_ARGS, {"call_id": call_id, "args": args})
+
+
+def tool_call_end(call_id: str, result: str) -> Event:
+    return Event(EventType.TOOL_CALL_END, {"call_id": call_id, "result": result})
+
+
+def text_message(role: str, content: str) -> Event:
+    return Event(EventType.TEXT_MESSAGE, {"role": role, "content": content})
+
+
+def screenshot_annotated(shot: ScreenshotAnnotated) -> Event:
+    return Event(EventType.SCREENSHOT_ANNOTATED, asdict(shot))
+
+
+def run_finished(run_id: str, nominal: bool, verified: bool) -> Event:
+    return Event(
+        EventType.RUN_FINISHED,
+        {"run_id": run_id, "nominal_completion": nominal, "verified_completion": verified},
+    )
