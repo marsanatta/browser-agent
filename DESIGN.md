@@ -109,6 +109,7 @@ NL Task
 
 - **Desktop self-host** (Windows-native): `uvicorn` (FastAPI) + Playwright Chromium running directly on the machine — no container required. Static React frontend served alongside or from a static host.
 - **Public URL via Cloudflare Tunnel**: free, stable named URL, TLS, no inbound port-forward (does not expose the home IP). Evaluators reach the desktop service through it.
+- **Public access gate** (threat model: single-operator demo, not a multi-user product). The agent/SSE/screenshot routes require a shared `AGENT_ACCESS_TOKEN` so a stranger who finds the URL cannot drive the agent or burn the operator's Copilot quota. Implemented conservatively: constant-time compare, fail-closed (503 unset / 401 wrong), one-time `POST /auth` → httponly+`Secure` cookie (so SSE/`<img>` authorize without headers), Bearer also accepted, and **no `?token=` query channel** (URL tokens leak via logs/history/`Referer`). Explicit limitation: a single shared secret has no per-user identity/revocation/audit; real multi-user access would require OAuth/OIDC, which is out of scope for this assignment.
 - **Caveat**: uptime depends on the desktop being on during evaluation.
 
 ## 10. Supported / unsupported scope (honest disclosure — must be prominent in README/frontend) [C4]

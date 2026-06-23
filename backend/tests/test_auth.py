@@ -30,12 +30,15 @@ def test_protected_401_without_token(monkeypatch):
 
 def test_protected_401_with_wrong_token(monkeypatch):
     monkeypatch.setenv("AGENT_ACCESS_TOKEN", SECRET)
-    assert _client().get(PROBE, params={"token": "nope"}).status_code == 401
+    r = _client().get(PROBE, headers={"Authorization": "Bearer nope"})
+    assert r.status_code == 401
 
 
-def test_passes_with_query_token(monkeypatch):
+def test_query_token_is_rejected(monkeypatch):
+    """A correct token in the URL must NOT authorize: URL-borne tokens leak via
+    logs/history/Referer, so the query channel was removed."""
     monkeypatch.setenv("AGENT_ACCESS_TOKEN", SECRET)
-    assert _client().get(PROBE, params={"token": SECRET}).status_code == 404
+    assert _client().get(PROBE, params={"token": SECRET}).status_code == 401
 
 
 def test_passes_with_bearer(monkeypatch):
@@ -58,6 +61,15 @@ def test_auth_endpoint_sets_cookie_and_authorizes(monkeypatch):
     assert "agent_token" in ok.cookies
     # cookie now rides along automatically (as SSE/img would)
     assert c.get(PROBE).status_code == 404
+
+
+def test_cookie_secure_follows_forwarded_proto(monkeypatch):
+    monkeypatch.setenv("AGENT_ACCESS_TOKEN", SECRET)
+    c = _client()
+    https = c.post("/auth", json={"token": SECRET}, headers={"X-Forwarded-Proto": "https"})
+    assert "secure" in https.headers["set-cookie"].lower()
+    plain = c.post("/auth", json={"token": SECRET})
+    assert "secure" not in plain.headers["set-cookie"].lower()
 
 
 def test_auth_endpoint_rejects_bad_token(monkeypatch):

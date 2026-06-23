@@ -7,11 +7,13 @@ quota. Protected paths require a shared secret from `AGENT_ACCESS_TOKEN`.
 Fail-closed: if `AGENT_ACCESS_TOKEN` is unset, protected paths return 503 — the
 operator must configure a token before exposing the tunnel.
 
-The token is accepted from (in order) the `agent_token` cookie, an
-`Authorization: Bearer` header, or a `?token=` query param. The cookie path is
-what makes SSE (`EventSource`) and `<img>` screenshot loads work, since neither
-can set request headers; the browser attaches the cookie automatically. Keeping
-the token in a cookie (not the URL) also avoids tripping `redact()`.
+The token is accepted from the `agent_token` cookie or an `Authorization:
+Bearer` header. The cookie path is what makes SSE (`EventSource`) and `<img>`
+screenshot loads work, since neither can set request headers; the browser
+attaches the cookie automatically. We deliberately do NOT accept a `?token=`
+query param: URL-borne tokens leak through access logs, proxy logs, browser
+history, and `Referer` headers. Keeping the token out of the URL also avoids
+tripping `redact()`.
 """
 
 from __future__ import annotations
@@ -57,21 +59,20 @@ class TokenAuthMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     {"detail": "AGENT_ACCESS_TOKEN not configured"}, status_code=503
                 )
-            supplied = (
-                request.cookies.get(COOKIE_NAME)
-                or _bearer(request.headers.get("authorization"))
-                or request.query_params.get("token")
+            supplied = request.cookies.get(COOKIE_NAME) or _bearer(
+                request.headers.get("authorization")
             )
             if not valid(supplied):
                 return JSONResponse({"detail": "unauthorized"}, status_code=401)
         return await call_next(request)
 
 
-def issue_cookie(response: Response, token: str) -> None:
+def issue_cookie(response: Response, token: str, secure: bool) -> None:
     response.set_cookie(
         COOKIE_NAME,
         token,
         httponly=True,
+        secure=secure,
         samesite="lax",
         max_age=86400,
         path="/",

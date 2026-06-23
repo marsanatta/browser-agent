@@ -12,7 +12,7 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -56,7 +56,7 @@ class _TokenIn(BaseModel):
 
 
 @app.post("/auth")
-async def auth(body: _TokenIn):
+async def auth(body: _TokenIn, request: Request):
     """Exchange the shared access token for an httponly cookie. The cookie then
     rides along on SSE and screenshot requests automatically (those can't send
     headers). Returns 503 if the operator hasn't configured a token."""
@@ -65,7 +65,11 @@ async def auth(body: _TokenIn):
     if not valid(body.token):
         raise HTTPException(status_code=401, detail="invalid token")
     resp = JSONResponse({"ok": True})
-    issue_cookie(resp, body.token)
+    # Behind the Cloudflare tunnel TLS terminates at the edge and the app sees
+    # http; trust X-Forwarded-Proto so the public leg gets a Secure cookie while
+    # plain-http localhost still works.
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    issue_cookie(resp, body.token, secure=proto == "https")
     return resp
 
 

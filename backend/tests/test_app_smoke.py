@@ -21,10 +21,11 @@ async def test_health():
 
 @pytest.mark.anyio
 async def test_sse_yields_at_least_one_event(monkeypatch):
-    monkeypatch.setenv("AGENT_ACCESS_TOKEN", "smoke-token")  # /sse is gated; authorize via ?token=
+    monkeypatch.setenv("AGENT_ACCESS_TOKEN", "smoke-token")  # /sse is gated; authorize via cookie
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        async with client.stream("GET", "/sse/stream?task=smoke&token=smoke-token") as resp:
+    cookies = {"agent_token": "smoke-token"}
+    async with AsyncClient(transport=transport, base_url="http://test", cookies=cookies) as client:
+        async with client.stream("GET", "/sse/stream?task=smoke") as resp:
             assert resp.status_code == 200
             events = []
             async for line in resp.aiter_lines():

@@ -269,8 +269,27 @@ stored trace (`backend/app/obs/tracing.py::redact`). Secrets (`sk-*`, Bearer tok
 masked. Captured cookies / auth / page state are treated as secrets and are git-ignored.
 Never commit `.env`.
 
-**Public-tunnel access control.** The public endpoints are gated by `AGENT_ACCESS_TOKEN`
-(see the deploy section): the agent/SSE/screenshot routes require the token via
-`Authorization: Bearer <token>` or `?token=<token>`; `/health` is open. The token is a
-secret — set it in the git-ignored `.env`, share it with evaluators out-of-band, and never
-commit it or print it in logs/screenshots.
+**Public-tunnel access control.** The agent/SSE/screenshot routes are gated by a single
+shared secret, `AGENT_ACCESS_TOKEN` (see the deploy section); `/health` and the static
+frontend are open.
+
+*Threat model.* This is a **single-operator demo** exposed over an ephemeral tunnel. The
+gate exists to stop a stranger who learns the URL from driving the agent and burning the
+operator's Copilot quota — not to support multiple end users. Against that bar a shared
+secret is the appropriate control, and it is implemented conservatively:
+
+- **Constant-time** comparison (`secrets.compare_digest`) — no timing oracle.
+- **Fail-closed**: unset token → `503`; wrong/absent token → `401`.
+- Token is exchanged once at `POST /auth` for an **httponly** cookie (`Secure` when served
+  over HTTPS); the cookie then rides SSE (`EventSource`) and `<img>` screenshot loads, which
+  cannot set headers. A direct `Authorization: Bearer <token>` is also accepted.
+- The token is **never accepted in a `?token=` query param** — URL-borne tokens leak via
+  access logs, proxy logs, browser history, and `Referer`. Keep it in the cookie/header only.
+
+*Known limitation (out of scope here).* A single shared secret has **no per-user identity,
+revocation, or audit** — fine for one operator, not for a multi-tenant product. Supporting
+real users would mean OAuth/OIDC sign-in with per-user sessions; that is deliberately not
+built, as user accounts are not part of this assignment.
+
+The token is a secret — set it in the git-ignored `.env`, share it with evaluators
+out-of-band, and never commit it or print it in logs/screenshots.
