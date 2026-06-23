@@ -153,6 +153,57 @@ During development the frontend runs on Vite (`:5173`) and calls the backend via
 `dist/` is served by the backend itself from the same origin (see below), so screenshots
 and the SSE stream share one host and no CORS/tunnel cross-origin config is needed.
 
+## Docker (container + Cloudflare named tunnel)
+
+A multi-stage build packages the whole app into one Linux image: stage 1
+(`node:20`) builds `frontend/dist`; stage 2 (`mcr.microsoft.com/playwright/python:v1.55.0-noble`,
+matching the pinned `playwright==1.55.0` and shipping Python 3.12 + bundled
+Chromium) installs the backend (including `github-copilot-sdk==1.0.2`, which has
+a glibc `manylinux_2_28` wheel) and serves the built frontend same-origin. The
+container runs **non-root** under `tini`.
+
+Auth inside the container is **non-interactive** — the Copilot SDK reads
+`COPILOT_GITHUB_TOKEN` from the environment; there is no `gh auth login` step.
+
+```powershell
+# 1. Create .env (git-ignored) from the template and fill the three secrets.
+cp .env.example .env   # then edit:
+#   COPILOT_GITHUB_TOKEN   - a GitHub fine-grained PAT with the "Copilot Requests"
+#                            permission (the SDK authenticates from this env var)
+#   AGENT_ACCESS_TOKEN     - long random secret gating /agent /sse /screenshots
+#                            (python -c "import secrets; print(secrets.token_urlsafe(32))")
+#   CLOUDFLARE_TUNNEL_TOKEN- connector token for a NAMED Cloudflare tunnel
+
+# 2. Build + run the app and the tunnel.
+docker compose up --build
+```
+
+`docker compose` starts two services: `app` (uvicorn on `:8123`) and
+`cloudflared` running a **named** tunnel (`tunnel run --token $CLOUDFLARE_TUNNEL_TOKEN`).
+A named tunnel is the default because **SSE needs a stable connection that quick
+tunnels do not reliably support**. Create the tunnel and a public hostname route
+to `http://app:8123` in the Cloudflare Zero Trust dashboard, then paste the
+connector token into `.env`.
+
+> **Quick-tunnel fallback** (ephemeral `*.trycloudflare.com`, no Cloudflare
+> account, but unreliable for SSE): replace the `cloudflared` command in
+> `docker-compose.yml` with `tunnel --no-autoupdate --url http://app:8123` and
+> read the printed URL from `docker compose logs cloudflared`.
+
+To run only the app without a tunnel (e.g. for local testing):
+
+```powershell
+docker build -t browser-agent .
+docker run --rm -p 8123:8123 --env-file .env browser-agent
+```
+
+The app boots **without** Copilot or a token configured — `/health` returns
+`{"status":"ok"}` and the LLM gateway lazy-connects on first agent use. The
+gated endpoints fail closed (503 if `AGENT_ACCESS_TOKEN` is unset, 401 if the
+supplied token is wrong). As with the host deploy, **the machine running the
+container must stay awake** for the whole evaluation window — if it sleeps or the
+`cloudflared` container stops, the public URL goes dead.
+
 ## Public deploy (desktop self-host + Cloudflare quick tunnel)
 
 The backend serves the built frontend at `/` and per-step screenshots at `/screenshots/*`,

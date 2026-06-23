@@ -1,3 +1,31 @@
+# M6 — Dockerize the app
+
+## Plan
+- [ ] Dockerfile (stage1 node:20 build frontend; stage2 playwright/python:v1.55.0-jammy run backend)
+- [ ] .dockerignore
+- [ ] docker-compose.yml (app + cloudflared named tunnel)
+- [ ] .env.example (root) with CLOUDFLARE_TUNNEL_TOKEN + COPILOT_GITHUB_TOKEN + AGENT_ACCESS_TOKEN
+- [ ] README Docker section
+- [ ] docker build + smoke tests
+- [ ] commit on main, no push
+
+## Layout (matches main.py parents[2])
+- backend -> /app/backend (WORKDIR), app.main importable
+- _FRONTEND_DIST = parents[2]/frontend/dist => /app/frontend/dist
+- _STORE_DIR (screenshots) = parents[2]/screenshots => /app/screenshots
+- non-root, tini PID1, CMD uvicorn app.main:app --host 0.0.0.0 --port 8123
+
+## Review (M6)
+Done. Base image switched jammy -> noble: jammy ships Python 3.10 which fails
+pyproject requires-python >=3.11; noble ships 3.12 (in range) and is still glibc
+(2.39) so the github-copilot-sdk 1.0.2 manylinux_2_28 wheel installs. Chromium
+bundled at /ms-playwright (PLAYWRIGHT_BROWSERS_PATH already set), no `playwright
+install` needed. Smoke tests all green: health ok, 401 gates, RUN_STARTED SSE,
+frontend title, chromium launch, import copilot, non-root pwuser, tini PID1,
+writable screenshots.
+
+---
+
 # M3 — Evaluation set + silent-failure rigor
 
 ## Goal

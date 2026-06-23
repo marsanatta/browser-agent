@@ -1,0 +1,24 @@
+services:
+  app:
+    build: .
+    image: browser-agent
+    env_file: .env
+    ports:
+      - "8123:8123"
+    restart: unless-stopped
+
+  # Named (token) tunnel: required for SSE. Create the tunnel + route in the
+  # Cloudflare Zero Trust dashboard, point it at http://app:8123, and put the
+  # connector token in .env as CLOUDFLARE_TUNNEL_TOKEN.
+  #
+  # Quick-tunnel fallback (ephemeral *.trycloudflare.com URL, NO token needed)
+  # does NOT reliably support SSE, so it is not the default. To use it anyway,
+  # replace this service's command with:
+  #   command: tunnel --no-autoupdate --url http://app:8123
+  # and read the printed URL from `docker compose logs cloudflared`.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    restart: unless-stopped
+    depends_on:
+      - app
