@@ -102,7 +102,18 @@ class LLMGateway:
             conn = RuntimeConnection.for_uri(f"{self._host}:{self._port}")
             client = CopilotClient(connection=conn)
         else:
-            client = CopilotClient()  # stdio against bundled binary
+            # stdio against the bundled Copilot CLI. It authenticates from the
+            # process env automatically — COPILOT_GITHUB_TOKEN / GH_TOKEN /
+            # GITHUB_TOKEN (docs.github.com/.../authenticate-copilot-cli). Make the
+            # dependency explicit so a missing token fails fast with guidance on
+            # first LLM use, rather than as an opaque auth error.
+            if not any(os.getenv(v) for v in ("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")):
+                raise RuntimeError(
+                    "No Copilot token in the environment. Set COPILOT_GITHUB_TOKEN in "
+                    ".env to a fine-grained PAT owned by your personal account with the "
+                    "'Copilot Requests' permission (classic PATs are not supported)."
+                )
+            client = CopilotClient()
         await client.start()
         self._client = client
         return client
