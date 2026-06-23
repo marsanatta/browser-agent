@@ -169,3 +169,40 @@ tasks:
       - text_contains: "Top Ten tags"
     assert:
       url_contains: "/tag/love"
+
+  # ---- ADVERSARIAL (Phase 0): RED tasks ----
+  # Ambiguous identical-label target: every quote has an identical "(about)" link.
+  # EMPIRICAL (verified by running it): this does NOT produce a silent wrong-pick.
+  # locate() requires count==1, and an ambiguous NAME resolves to >1, so the click
+  # fails LOUDLY (NOT_FOUND) and the agent asks/replans -> verified=False but
+  # nominal=False (a loud red, not a CuP silent failure). A TRUE silent wrong-pick
+  # needs a shared name with a uniquely-resolvable WRONG element (shared label but
+  # distinct id/href) - subtler than identical labels; not built yet. Kept as a
+  # hard red task; do NOT treat it as the silent-pick demonstrator.
+  - id: quotes_ambiguous_about_second_author
+    instruction: "On quotes.toscrape.com, click the (about) link next to the SECOND quote to open that author's page."
+    start_url: "https://quotes.toscrape.com"
+    domain: information
+    task_type: action
+    difficulty: multi_same_domain
+    held_out: true
+    key_nodes:
+      - text_contains: "Quotes to Scrape"
+    assert:
+      url_contains: "/author/J-K-Rowling"   # 2nd quote's author; 1st (about) goes to Albert-Einstein
+
+  # Impossible target: 'Marie Curie' is not an author on quotes.toscrape. Correct
+  # outcome = abstain (ask_user). EMPIRICAL: the real planner currently CLAIMS
+  # SUCCESS instead (nominal=True after only navigating) -> expect_abstain scores
+  # verified=False (red) because it wasn't a genuine refusal. That is correct: it
+  # exposes the agent's missing abstention. When a genuine refusal occurs
+  # (asked AND not nominal), expect_abstain credits it as success (proven via a
+  # forced MockPlanner run). So this task scores honestly either way.
+  - id: quotes_impossible_marie_curie
+    instruction: "On quotes.toscrape.com, open the author page for Marie Curie."
+    start_url: "https://quotes.toscrape.com"
+    domain: information
+    task_type: action
+    difficulty: single
+    held_out: true
+    expect_abstain: true

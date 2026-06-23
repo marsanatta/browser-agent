@@ -80,11 +80,13 @@ def step_started(step_id: str, description: str) -> Event:
 
 
 def step_finished(
-    step_id: str, status: str, failure_category: str | None = None
+    step_id: str, status: str, failure_category: str | None = None, verdict: str | None = None
 ) -> Event:
     payload: dict[str, Any] = {"step_id": step_id, "status": status}
     if failure_category:
         payload["failure_category"] = failure_category
+    if verdict:
+        payload["verdict"] = verdict  # per-step verify-after-act verdict: CHANGED | NO_CHANGE
     return Event(EventType.STEP_FINISHED, payload)
 
 

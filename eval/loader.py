@@ -29,6 +29,11 @@ class EvalTask:
     held_out: bool
     key_nodes: list[dict[str, Any]] = field(default_factory=list)
     assertion: dict[str, Any] = field(default_factory=dict)
+    # When True the correct outcome is to abstain (ask_user) rather than reach a
+    # page state. Scored by outcome (asked AND not nominal), not by `assert`, so
+    # `assert` is optional. This is what lets the harness score correct refusals
+    # as success instead of as a plain failure.
+    expect_abstain: bool = False
 
 
 def _validate_primitive(where: str, spec: dict[str, Any]) -> None:
@@ -56,7 +61,12 @@ def load_tasks(path: Path | str = EVAL_SET_PATH) -> list[EvalTask]:
             raise ValueError(f"{tid}: bad task_type {it['task_type']!r}")
         for node in it.get("key_nodes", []):
             _validate_primitive(f"{tid}.key_nodes", node)
-        _validate_primitive(f"{tid}.assert", it["assert"])
+        expect_abstain = bool(it.get("expect_abstain", False))
+        assertion = it.get("assert") or {}
+        if assertion:
+            _validate_primitive(f"{tid}.assert", assertion)
+        elif not expect_abstain:
+            raise ValueError(f"{tid}: 'assert' is required unless expect_abstain is true")
         tasks.append(
             EvalTask(
                 id=tid,
@@ -67,7 +77,8 @@ def load_tasks(path: Path | str = EVAL_SET_PATH) -> list[EvalTask]:
                 difficulty=it["difficulty"],
                 held_out=bool(it.get("held_out", False)),
                 key_nodes=list(it.get("key_nodes", [])),
-                assertion=it["assert"],
+                assertion=assertion,
+                expect_abstain=expect_abstain,
             )
         )
     return tasks

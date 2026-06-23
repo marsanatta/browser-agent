@@ -20,7 +20,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from app.agent.executor import Executor
@@ -83,6 +83,8 @@ class RunRecord:
     error: str | None
     steps: int
     copilot_calls: int
+    step_verdicts: list[str] = field(default_factory=list)
+    asked: bool = False
 
 
 async def _run_once(task: EvalTask, gateway: _CountingGateway, *, full: bool) -> RunRecord:
@@ -118,11 +120,19 @@ async def _run_once(task: EvalTask, gateway: _CountingGateway, *, full: bool) ->
 
     nominal = False
     steps = 0
+    asked = False
+    step_verdicts: list[str] = []
     error: str | None = None
     try:
         async for ev in executor.run(task.instruction):
             if ev.type == EventType.STEP_STARTED:
                 steps += 1
+            elif ev.type == EventType.STEP_FINISHED:
+                v = ev.payload.get("verdict")
+                if v:
+                    step_verdicts.append(v)
+            elif ev.type == EventType.ASK_USER:
+                asked = True
             elif ev.type == EventType.RUN_FINISHED:
                 nominal = bool(ev.payload.get("nominal_completion"))
             elif ev.type == EventType.RUN_ERROR:
@@ -130,14 +140,24 @@ async def _run_once(task: EvalTask, gateway: _CountingGateway, *, full: bool) ->
     except Exception as exc:  # harness must survive a single task crashing
         error = f"{type(exc).__name__}: {exc}"
 
+    # Abstain tasks are scored by OUTCOME, not page state: a correct refusal is
+    # asking the user without falsely claiming success. This is the primitive that
+    # lets the harness score a correct abstention as success instead of a failure.
+    if task.expect_abstain:
+        verified = asked and not nominal
+    else:
+        verified = verified_box["v"]
+
     return RunRecord(
         nominal=nominal,
-        verified=verified_box["v"],
+        verified=verified,
         key_nodes_hit=sum(hit_nodes),
         key_nodes_total=len(task.key_nodes),
         error=error,
         steps=steps,
         copilot_calls=gateway.calls - calls_before,
+        step_verdicts=step_verdicts,
+        asked=asked,
     )
 
 
@@ -151,7 +171,12 @@ def _to_result(task: EvalTask, rec: RunRecord) -> TaskResult:
         task_type=task.task_type,
         held_out=task.held_out,
         error=rec.error,
-        extra={"steps": rec.steps, "copilot_calls": rec.copilot_calls},
+        extra={
+            "steps": rec.steps,
+            "copilot_calls": rec.copilot_calls,
+            "step_verdicts": rec.step_verdicts,
+            "asked": rec.asked,
+        },
     )
 
 

@@ -98,6 +98,7 @@ class Executor:
                     step_id,
                     "ok" if outcome.ok else "failed",
                     failure_category=None if outcome.ok else outcome.failure_class,
+                    verdict="CHANGED" if outcome.ok else "NO_CHANGE",
                 )
 
                 if self._step_hook is not None:

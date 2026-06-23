@@ -25,8 +25,20 @@ def test_held_out_at_least_20_percent():
 
 def test_every_task_has_assertion_and_key_nodes():
     for t in load_tasks():
+        if t.expect_abstain:
+            # abstain tasks are scored by outcome (asked AND not nominal), not by a
+            # page-state assertion, so they legitimately carry no assert/key_nodes
+            assert not t.assertion, f"{t.id} expect_abstain should have no assert"
+            continue
         assert t.assertion, f"{t.id} missing assertion"
         assert t.key_nodes, f"{t.id} missing key nodes"
+
+
+def test_expect_abstain_task_present_and_assert_optional():
+    tasks = load_tasks()
+    abstain = [t for t in tasks if t.expect_abstain]
+    assert abstain, "expected at least one expect_abstain task"
+    assert all(not t.assertion for t in abstain)
 
 
 def test_domains_and_types_are_diverse():
