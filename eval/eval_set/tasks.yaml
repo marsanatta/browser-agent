@@ -171,14 +171,17 @@ tasks:
       url_contains: "/tag/love"
 
   # ---- ADVERSARIAL (Phase 0): RED tasks ----
-  # Ambiguous identical-label target: every quote has an identical "(about)" link.
-  # EMPIRICAL (verified by running it): this does NOT produce a silent wrong-pick.
-  # locate() requires count==1, and an ambiguous NAME resolves to >1, so the click
-  # fails LOUDLY (NOT_FOUND) and the agent asks/replans -> verified=False but
-  # nominal=False (a loud red, not a CuP silent failure). A TRUE silent wrong-pick
-  # needs a shared name with a uniquely-resolvable WRONG element (shared label but
-  # distinct id/href) - subtler than identical labels; not built yet. Kept as a
-  # hard red task; do NOT treat it as the silent-pick demonstrator.
+  # NOTE ON THE SILENT WRONG-PICK (proven via deterministic data-URL runs):
+  #   The silent _match wrong-pick is REAL and the harness DOES score it as a CuP
+  #   event (nominal=True, verified=False). It fires whenever the wrongly-picked
+  #   candidates[0] is UNIQUELY resolvable:
+  #     - substring target -> picks a unique-named wrong element -> tier1 role_name
+  #     - same name + distinct href/id -> tier7 href (or tier4 id)
+  #   It only fails LOUDLY (NOT_FOUND) in the narrow case of identical name AND no
+  #   distinguishing attr (locate falls through all tiers) - which is what THIS
+  #   particular quotes "(about)" page happens to hit. So this task is a hard red,
+  #   but NOT the silent-pick demonstrator. A proper silent-pick eval task must use
+  #   the substring or same-name-distinct-attr structure above.
   - id: quotes_ambiguous_about_second_author
     instruction: "On quotes.toscrape.com, click the (about) link next to the SECOND quote to open that author's page."
     start_url: "https://quotes.toscrape.com"
