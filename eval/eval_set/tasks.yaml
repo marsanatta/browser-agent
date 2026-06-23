@@ -209,3 +209,27 @@ tasks:
     difficulty: single
     held_out: true
     expect_abstain: true
+
+  # SILENT WRONG-PICK demonstrator (controlled inline fixture). Two identical-name
+  # "Read more" links, but the FIRST has a UNIQUE href. perceive dedups to the
+  # first "Read more"; locate misses the role tiers (name shared, count>1) and
+  # resolves it at the HREF tier (a[href="/a1"] is unique) -> clicks the FIRST
+  # silently. onclick records which one. The task wants the SECOND, so the agent
+  # lands on the wrong element while the click "succeeds" (CHANGED -> nominal=True)
+  # and the independent assertion (CLICKED:A2) fails -> nominal=True/verified=False:
+  # a real CuP silent failure. This is the demonstrator the (about) task could not be.
+  - id: silent_wrong_pick_readmore
+    instruction: "Click the 'Read more' link to open the SECOND article."
+    inline_html: |
+      <a href="/a1" onclick="hit('A1');return false;">Read more</a>
+      <a href="/a2" onclick="hit('A2');return false;">Read more</a>
+      <div id="out">none</div>
+      <script>function hit(t){document.getElementById('out').textContent='CLICKED:'+t}</script>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - text_contains: "Read more"
+    assert:
+      text_contains: "CLICKED:A2"

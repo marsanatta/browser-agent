@@ -6,6 +6,7 @@ loader enforces the schema so a malformed assertion fails fast at load, not mid-
 
 from __future__ import annotations
 
+import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -62,6 +63,16 @@ def load_tasks(path: Path | str = EVAL_SET_PATH) -> list[EvalTask]:
         for node in it.get("key_nodes", []):
             _validate_primitive(f"{tid}.key_nodes", node)
         expect_abstain = bool(it.get("expect_abstain", False))
+        # inline_html builds a controlled data: URL fixture (a deterministic page
+        # the agent really perceives/locates/clicks) so a task can reproduce an
+        # exact DOM structure - e.g. a silent wrong-pick - without depending on a
+        # flaky live site. It just becomes the task's start_url.
+        inline_html = it.get("inline_html")
+        start_url = it.get("start_url")
+        if inline_html:
+            start_url = "data:text/html," + urllib.parse.quote(inline_html)
+        elif not start_url:
+            raise ValueError(f"{tid}: needs start_url or inline_html")
         assertion = it.get("assert") or {}
         if assertion:
             _validate_primitive(f"{tid}.assert", assertion)
@@ -71,7 +82,7 @@ def load_tasks(path: Path | str = EVAL_SET_PATH) -> list[EvalTask]:
             EvalTask(
                 id=tid,
                 instruction=it["instruction"],
-                start_url=it["start_url"],
+                start_url=start_url,
                 domain=it["domain"],
                 task_type=it["task_type"],
                 difficulty=it["difficulty"],

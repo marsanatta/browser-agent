@@ -12,7 +12,7 @@ from eval.loader import load_tasks
 
 def test_eval_set_loads_and_is_modest():
     tasks = load_tasks()
-    assert 10 <= len(tasks) <= 14  # modest set per the cost budget
+    assert 12 <= len(tasks) <= 60  # modest now; upper bound headroom for autoresearch growth
 
 
 def test_held_out_at_least_20_percent():
