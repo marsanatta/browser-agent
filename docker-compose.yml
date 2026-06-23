@@ -13,18 +13,19 @@ services:
       retries: 5
       start_period: 15s
 
-  # Named (token) tunnel: required for SSE. Create the tunnel + route in the
-  # Cloudflare Zero Trust dashboard, point it at http://app:8123, and put the
-  # connector token in .env as CLOUDFLARE_TUNNEL_TOKEN.
+  # DEFAULT: quick tunnel — NO Cloudflare account and NO token. Prints an
+  # ephemeral https://<random>.trycloudflare.com URL (read it from
+  # `docker compose logs cloudflared`). Verified to carry our SSE stream.
+  # The URL rotates on restart and the app must keep running.
   #
-  # Quick-tunnel fallback (ephemeral *.trycloudflare.com URL, NO token needed)
-  # does NOT reliably support SSE, so it is not the default. To use it anyway,
-  # replace this service's command with:
-  #   command: tunnel --no-autoupdate --url http://app:8123
-  # and read the printed URL from `docker compose logs cloudflared`.
+  # UPGRADE to a STABLE NAMED tunnel: create a tunnel in the Cloudflare Zero
+  # Trust dashboard, route it to http://app:8123, put the connector token in
+  # .env as CLOUDFLARE_TUNNEL_TOKEN, and swap the command to:
+  #   command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+  # (the token is Cloudflare-issued — it cannot be a self-generated string).
   cloudflared:
     image: cloudflare/cloudflared:2026.6.1
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate --url http://app:8123
     restart: unless-stopped
     depends_on:
       app:
