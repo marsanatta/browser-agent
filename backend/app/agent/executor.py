@@ -205,15 +205,27 @@ class Executor:
         the agent acted on (after a click that navigates, the element detaches and
         its box would be empty)."""
         perception = await perceive(page)
-        target = _match(perception.elements, st)
-        if target is None:
+        target, ambiguous = _match(perception.elements, st)
+        if target is None and not ambiguous:
             shot = await self._shot(page, step_id, st, None, "NO_TARGET", attempt)
             return None, FailureClass.NOT_FOUND, None, shot
+
+        if ambiguous:
+            # Genuine ambiguity: never silently pick one. A pseudo-target (the raw
+            # requested name, no attrs) makes the deterministic cascade miss so
+            # resolution routes through the L2 LLM re-rank over the distinct
+            # candidates — or abstains (NOT_FOUND) when no gateway is wired.
+            target = IndexedElement(
+                index=-1, role=st.role or ambiguous[0].role, name=(st.target or "").strip()
+            )
+            l2_candidates = ambiguous
+        else:
+            l2_candidates = perception.elements
 
         if reground:
             self._cache.invalidate(_page_key(page), target)
 
-        l2 = make_l2_fallback(self._gateway, perception.elements) if self._gateway else None
+        l2 = make_l2_fallback(self._gateway, l2_candidates) if self._gateway else None
         located = await locate(page, target, cache=self._cache, l2_fallback=l2)
         if located is None:
             shot = await self._shot(page, step_id, st, None, "NO_TARGET", attempt)
@@ -271,7 +283,7 @@ class Executor:
 
     async def _current_locator(self, page: Any, st: SubTask):
         perception = await perceive(page)
-        target = _match(perception.elements, st)
+        target, _ = _match(perception.elements, st)
         if target is None:
             return None
         return await locate(page, target, cache=self._cache)
@@ -290,16 +302,29 @@ class _Outcome:
         self.failure_class = failure_class
 
 
-def _match(elements: list[IndexedElement], st: SubTask) -> IndexedElement | None:
+def _match(
+    elements: list[IndexedElement], st: SubTask
+) -> tuple[IndexedElement | None, list[IndexedElement]]:
+    """Resolve the sub-task target to a single element, or surface the ambiguity.
+
+    Returns (target, []) for a unique match, (None, candidates) when several
+    distinct candidates remain (route to L2 — never silently pick candidates[0]),
+    or (None, []) when nothing matches. Exact-name matches take priority over
+    substring matches structurally (the substring pass runs only when the exact
+    pass is empty), and an explicit role narrows before the count is taken."""
     target = (st.target or "").strip().lower()
     if not target:
-        return None
+        return None, []
     candidates = [e for e in elements if e.name.strip().lower() == target]
     if not candidates and not st.role:
         candidates = [e for e in elements if target in e.name.strip().lower()]
     if st.role:
         candidates = [e for e in candidates if e.role == st.role] or candidates
-    return candidates[0] if candidates else None
+    if not candidates:
+        return None, []
+    if len(candidates) == 1:
+        return candidates[0], []
+    return None, candidates
 
 
 def _page_key(page: Any) -> str:

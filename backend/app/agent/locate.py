@@ -11,11 +11,16 @@ because it is a user-facing contract, CSS/visible-text are last-resort.
     5 aria-label (exact)         10 visible text
 
 A locator "resolves" only when it matches exactly one element (count == 1) — an
-ambiguous match is treated as a miss so the cascade keeps narrowing. The first
-resolving tier wins and is written to a 2-layer in-memory cache (hit = 0 work).
+ambiguous match is treated as a miss so the cascade keeps narrowing. The one
+exception is tier 1 (role+name): when it matches several LIVE elements we narrow
+by interactability (visible + enabled + in-viewport); a lone survivor wins, but
+genuine ambiguity stops the cascade — we do NOT fall through to the attribute
+tiers, which would silently resolve the perceive-merged first node's href/id —
+and defer to L2. The first resolving tier wins and is written to a 2-layer
+in-memory cache (hit = 0 work).
 
 L2 (LLM re-rank of a shortlist, then vision) is the documented fallback on a full
-cascade miss; the seam is `l2_fallback` and is left unwired for M1 (returns None).
+cascade miss; `l2_fallback` is wired in prod (main.py) and the eval harness.
 """
 
 from __future__ import annotations
@@ -84,13 +89,9 @@ async def locate(
             return Located(loc, tier, strategy)
         cache.invalidate(key, el)
 
-    for tier, strategy in enumerate(_TIERS, start=1):
-        loc = _build(page, strategy, el)
-        if loc is None:
-            continue
-        if await _resolves(loc):
-            cache.put(key, el, tier, strategy)
-            return Located(loc, tier, strategy)
+    located = await _cascade(page, el, cache, key, el)
+    if located is not None:
+        return located
 
     if l2_fallback is not None:
         try:
@@ -99,6 +100,71 @@ async def locate(
             pass
         return await l2_fallback(page, el)
     return None
+
+
+async def _cascade(
+    page: Any, build_el: IndexedElement, cache: LocatorCache, key: str, store_el: IndexedElement
+) -> Located | None:
+    """Run the deterministic tiers for `build_el`, caching a hit under `store_el`.
+
+    Tier 1 (role+name) is the identity tier and the only place we tolerate an
+    initial count > 1: we narrow by interactability and take a lone survivor, but
+    on genuine ambiguity we STOP (return None) rather than fall through to the
+    attribute tiers — those would resolve the perceive-merged element's first-node
+    href/id and silently pick the wrong one. The narrowed survivor is position-
+    dependent (not reproducible via `_build`) so it is deliberately not cached."""
+    for tier, strategy in enumerate(_TIERS, start=1):
+        loc = _build(page, strategy, build_el)
+        if loc is None:
+            continue
+        if strategy == "role_name":
+            try:
+                n = await loc.count()
+            except Exception:
+                n = 0
+            if n == 1:
+                cache.put(key, store_el, tier, strategy)
+                return Located(loc, tier, strategy)
+            if n > 1:
+                live = await _interactable(page, loc)
+                if len(live) == 1:
+                    return Located(live[0], tier, strategy)
+                return None
+            continue
+        if await _resolves(loc):
+            cache.put(key, store_el, tier, strategy)
+            return Located(loc, tier, strategy)
+    return None
+
+
+async def _interactable(page: Any, loc: Any) -> list[Any]:
+    """The live matches of `loc` that are visible, enabled, and within the
+    viewport — the narrowing applied when role+name is ambiguous (count > 1)."""
+    try:
+        viewport = page.viewport_size
+    except Exception:
+        viewport = None
+    try:
+        candidates = await loc.all()
+    except Exception:
+        return []
+    out: list[Any] = []
+    for cand in candidates:
+        try:
+            if not (await cand.is_visible() and await cand.is_enabled()):
+                continue
+            if viewport is not None:
+                box = await cand.bounding_box()
+                if box is None:
+                    continue
+                if box["y"] + box["height"] <= 0 or box["y"] >= viewport["height"]:
+                    continue
+                if box["x"] + box["width"] <= 0 or box["x"] >= viewport["width"]:
+                    continue
+            out.append(cand)
+        except Exception:
+            continue
+    return out
 
 
 _TIERS = (
@@ -181,13 +247,12 @@ def make_l2_fallback(gateway: Any, candidates: list[IndexedElement]) -> L2Fallba
         if idx is None or not (0 <= idx < len(shortlist)):
             return None
         chosen = shortlist[idx]
-        for tier, strategy in enumerate(_TIERS, start=1):
-            loc = _build(page, strategy, chosen)
-            if loc is not None and await _resolves(loc):
-                if cache := getattr(fallback, "_cache", None):
-                    cache.put(_page_key(page), el, tier, strategy)
-                return Located(loc, tier, strategy)
-        return None
+        cache = getattr(fallback, "_cache", None) or _DEFAULT_CACHE
+        # Resolve the LLM's pick through the SAME tier-1 ambiguity handling as the
+        # main cascade: if the chosen element is itself ambiguous on the page (e.g.
+        # perceive-merged duplicates), this returns None and we abstain instead of
+        # silently resolving the first node's attributes.
+        return await _cascade(page, chosen, cache, _page_key(page), el)
 
     return fallback
 

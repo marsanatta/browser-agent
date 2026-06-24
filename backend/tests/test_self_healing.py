@@ -23,6 +23,12 @@ _TWO_BUTTONS = """
 </body></html>
 """
 
+_HEAL_PAGE = """
+<html><body>
+<button id="b1" class="primary-cta">Go</button>
+</body></html>
+"""
+
 
 @pytest.fixture
 async def page():
@@ -34,10 +40,13 @@ async def page():
 
 
 @pytest.mark.anyio
-async def test_cascade_heals_to_lower_tier_and_recaches(page):
-    await page.set_content(_TWO_BUTTONS)
-    # Same accessible name on both buttons -> role/role_name/text are ambiguous
-    # (count==2, treated as a miss), so only the unique #id resolves first.
+async def test_cascade_heals_down_tiers_and_recaches(page):
+    """Healing mechanism: when the cached tier stops resolving, re-cascade to a
+    lower tier and re-cache. Uses a UNIQUE accessible name so role+name is
+    unambiguous; breakage is simulated by mutating the live name / stripping
+    attributes. (On-page duplicate names now route to L2 instead of resolving via
+    a carried attribute — see the ambiguity test below.)"""
+    await page.set_content(_HEAL_PAGE)
     el = IndexedElement(
         0, "button", "Go",
         {"id": "b1", "testid": "", "aria_label": "", "href": "", "cls": "primary-cta"},
@@ -47,19 +56,38 @@ async def test_cascade_heals_to_lower_tier_and_recaches(page):
 
     first = await locate(page, el, cache=cache)
     assert first is not None
-    assert (first.tier, first.strategy) == (4, "id")
-    assert cache.get(key, el) == (4, "id")  # written back
+    assert (first.tier, first.strategy) == (1, "role_name")
+    assert cache.get(key, el) == (1, "role_name")
 
-    # Break the primary tier: strip the id. The cached id-locator no longer
-    # resolves, forcing a re-cascade.
-    await page.evaluate("() => document.getElementById('b1').removeAttribute('id')")
-
+    # Break role+name: mutate the live accessible name. The cached role_name
+    # locator no longer resolves -> re-cascade heals to the unique #id.
+    await page.evaluate("() => { document.getElementById('b1').textContent = 'Proceed'; }")
     healed = await locate(page, el, cache=cache)
     assert healed is not None
-    assert (healed.tier, healed.strategy) == (8, "css_exact")  # healed DOWN the cascade
-    assert cache.get(key, el) == (8, "css_exact")  # re-cached to the new tier
-    # the healed locator still points at the intended element, not its sibling
-    assert await healed.locator.get_attribute("class") == "primary-cta"
+    assert (healed.tier, healed.strategy) == (4, "id")
+    assert cache.get(key, el) == (4, "id")  # re-cached to the new tier
+
+    # Break the id too -> heal further DOWN to the class selector.
+    await page.evaluate("() => { document.querySelector('.primary-cta').removeAttribute('id'); }")
+    healed2 = await locate(page, el, cache=cache)
+    assert healed2 is not None
+    assert (healed2.tier, healed2.strategy) == (8, "css_exact")
+    assert cache.get(key, el) == (8, "css_exact")
+    assert await healed2.locator.get_attribute("class") == "primary-cta"
+
+
+@pytest.mark.anyio
+async def test_same_name_ambiguity_does_not_silently_resolve(page):
+    """Grounding fix: when role+name matches multiple visible in-viewport elements,
+    locate must NOT silently resolve via a carried attribute — the perceive-merged
+    element holds only the FIRST node's id/href, so resolving it would silently
+    pick the wrong one. With no L2 wired, it abstains (None)."""
+    await page.set_content(_TWO_BUTTONS)
+    el = IndexedElement(
+        0, "button", "Go",
+        {"id": "b1", "testid": "", "aria_label": "", "href": "", "cls": "primary-cta"},
+    )
+    assert await locate(page, el, cache=LocatorCache()) is None
 
 
 @pytest.mark.live

@@ -114,10 +114,11 @@ async def agent_run(task: str, url: str | None = None):
     without a live Copilot server it emits a RUN_ERROR event (the stream still
     opens — no auth needed to reach this endpoint). An optional `url` seeds a
     navigate sub-task so the run starts from the user-provided page."""
-    planner = LLMPlanner(LLMGateway())
+    gateway = LLMGateway()
+    planner = LLMPlanner(gateway)
     if url:
         planner = _StartUrlPlanner(planner, url)
-    executor = Executor(PlaywrightProvider(headless=True), planner)
+    executor = Executor(PlaywrightProvider(headless=True), planner, gateway=gateway)
 
     async def gen():
         async for event in executor.run(task):
