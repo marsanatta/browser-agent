@@ -1,75 +1,67 @@
-# M3 Eval Report
+# Eval Report — live evidence
 
-Generated from a REAL run on 2026-06-22 12:55 UTC. Metrics are computed by independent
-programmatic assertions on the live page (eval/01 §4) — never the agent's
-self-report. Per the ablation rule (architecture/03 §4) a budget-matched vanilla
-baseline (max_attempts=1, no L2 heal) runs alongside the full agent.
+Generated **2026-06-24 13:30 UTC** from a REAL harness run. Every "verified" below is an
+INDEPENDENT programmatic state check on the live page (URL / first-h1 / scoped
+selector) — never the agent's self-report, and never a loose `text_contains`.
+Copilot calls this run: 23.
 
-- Tasks: 12 (4 held-out on quotes.toscrape.com, a site
-  never used in dev — generalization test, eval/01 §5.3)
-- Approx Copilot calls (this run): **28**
-- Wall time: 343s
-- Held-out TSR: 1.000
+## Test architecture — what gates vs what's evidence
 
-## Headline metrics
+- **Offline CI gate — 93 pytest tests (`pytest -m "not live"`): NO network, NO
+  Copilot, deterministic, must stay green.** No real-site task is in this gate.
+- **Sandbox eval set (`eval/eval_set/tasks.yaml`)** — inline-deterministic fixtures
+  plus practice-site (toscrape / herokuapp) tasks; run through the harness with Copilot.
+- **Live real-world tier (`eval/eval_set/live_real_world.yaml`)** — REAL public sites,
+  diverse domains/types. Flaky and changing, so run ON DEMAND
+  (`python -m eval.run_live_tier`) and reported here. NOT part of the CI gate; a
+  red row here is evidence, not a broken build.
 
-| metric | agent | budget-matched baseline |
-|---|---|---|
-| TCR (key-node completion) | 1.000 | 1.000 |
-| TSR (task success) | 0.917 +/- 0.080 | 0.917 +/- 0.080 |
-| silent-failure gap (CuP) | 0.000 | 0.000 |
-| pass^3 (side-effect tasks) | 1.000 | n/a |
+## Live real-world tier — 3/4 verified
 
-Definitions: TCR = mean key-nodes hit per task (partial credit); TSR = fraction
-of tasks whose independent assertion passed; silent-failure gap (CuP) = fraction
-where the agent claimed success but verification failed; pass^k = fraction of
-side-effecting tasks that verified on ALL 3 runs (reliability, eval/02 §C1).
-SE is Bernoulli sqrt(p(1-p)/n) — independent-item; clustered SE would be larger
-because tasks share sites (eval/02 §C2).
+| task | site | type | deterministic? | nominal | verified | abstained |
+|---|---|---|---|---|---|---|
+| live_wikipedia_helium_retrieval | en.wikipedia.org | retrieval | no (live) | True | True | False |
+| live_pydocs_json_nav | docs.python.org | action | no (live) | True | True | False |
+| live_google_search_steam | www.google.com | action | no (live) | True | False | False |
+| live_wikipedia_signin_synonym | en.wikipedia.org | action | no (live) | True | True | False |
 
-## Per-task results
+## Day-3 realistic batch (folded in, reproducible) — 8/8 verified
 
-| task | type | held-out | key-nodes | agent verified | baseline verified | nominal | silent? |
-|---|---|---|---|---|---|---|---|
-| internet_form_auth_nav | action |  | 1/1 (100%) | PASS | PASS | PASS |  |
-| internet_login_page_reached | action |  | 2/2 (100%) | PASS | PASS | PASS |  |
-| internet_login_submit | side_effect |  | 1/1 (100%) | PASS | PASS | PASS |  |
-| internet_dropdown_nav | action |  | 1/1 (100%) | PASS | PASS | PASS |  |
-| internet_checkboxes_nav | action |  | 1/1 (100%) | PASS | PASS | PASS |  |
-| books_open_light_in_attic | retrieval |  | 1/1 (100%) | FAIL | FAIL | FAIL |  |
-| books_open_travel_category | action |  | 1/1 (100%) | PASS | PASS | PASS |  |
-| books_price_visible | retrieval |  | 1/1 (100%) | PASS | PASS | PASS |  |
-| quotes_open_einstein_author | retrieval | yes | 1/1 (100%) | PASS | PASS | PASS |  |
-| quotes_einstein_born_location | retrieval | yes | 2/2 (100%) | PASS | PASS | PASS |  |
-| quotes_open_login | action | yes | 1/1 (100%) | PASS | PASS | PASS |  |
-| quotes_tag_love | action | yes | 1/1 (100%) | PASS | PASS | PASS |  |
+| task | site | type | deterministic? | nominal | verified | abstained |
+|---|---|---|---|---|---|---|
+| internet_form_auth_nav | the-internet.herokuapp.com | action | no (live) | True | True | False |
+| internet_login_page_reached | the-internet.herokuapp.com | action | no (live) | True | True | False |
+| books_open_light_in_attic | books.toscrape.com | retrieval | no (live) | True | True | False |
+| books_open_travel_category | books.toscrape.com | action | no (live) | True | True | False |
+| books_price_visible | books.toscrape.com | retrieval | no (live) | True | True | False |
+| quotes_open_einstein_author | quotes.toscrape.com | retrieval | no (live) | True | True | False |
+| quotes_open_login | quotes.toscrape.com | action | no (live) | True | True | False |
+| synonym_label_signin_vs_login | (inline data: URL) | action | yes (inline) | True | True | False |
 
-## What is REAL vs SEAM
+## Notes
 
-REAL (run in this report):
-- Full agent loop (perceive/locate/act/verify) via the Copilot-backed LLM planner.
-- Independent programmatic state assertion on the live final page (`eval/verify/state.py`).
-- Nominal-vs-verified silent-failure gap (CuP).
-- Consistency check (`eval/verify/consistency.py`) — unit-tested; a Semantic-
-  Entropy-style sampling signal (run extraction n times, flag disagreement).
-- Budget-matched vanilla baseline column.
-- pass^3 for side-effecting tasks.
-
-SEAM (designed-for, not built — `eval/verify/seams.py`, raise NotImplementedError):
-- SVDD trajectory-anomaly trip-wire (needs a normal-trace corpus; eval/01 §4.2).
-- Inspect AI sandbox adapter (eval/02 §D1).
-- Full REAL deterministic-replica state-diff via agisdk (architecture/03 §3.2).
-- Hidden-state Semantic Entropy Probe (Copilot gateway exposes no logits; we ship
-  the sampling approximation instead — eval/02 §B3).
+- **deterministic?** "yes (inline)" rows use a data: URL fixture (no network);
+  every other row hits a live site over the network and may vary run-to-run.
+- **abstained** = the agent asked the user instead of acting — an honest
+  non-completion, never a silent wrong action. Where nominal == verified on a row,
+  there was no silent failure on that run.
+- The 93 offline pytest tests remain the network-free green gate; this live tier is
+  separate and does not gate.
 
 ## Honest caveats
 
-- n=12 is far below the ~1,000 items needed to detect a 3% delta at 80%
-  power (eval/02 §C2). These numbers are directional, not statistically powered —
-  the SE columns make the uncertainty explicit.
-- Live seed sites can change or rate-limit; a task FAIL may be a site change, not
-  an agent regression. Re-run to distinguish.
-- The judge/LLM is used only for PLANNING here; success is graded programmatically,
-  so judge bias does not enter the headline metrics.
-- Key-node TCR counts a checkpoint hit if it was observable at ANY step
-  (step_hook), matching WebCanvas trajectory semantics.
+- **Real sites bot-wall and change.** A live `verified=False` can be an anti-bot
+  interstitial (route-to-unsupported per the project's "route, don't evade" policy),
+  not an agent regression. Inspect the final URL to distinguish — a `/sorry/`,
+  consent, or CAPTCHA page is a bot-wall. Observed this run:
+  `live_google_search_steam` landed on Google's `/sorry/` CAPTCHA: the press/Enter DID
+  submit (its `continue=` URL is `/search?q=steam`), but Google blocks headless
+  automation, so it never reached results -> `nominal=True, verified=False`. The
+  independent check caught that silently-claimed success — exactly its job, and the
+  only silent failure in this run.
+- **The press/submit action is proven deterministically** by the offline test
+  `tests/test_ambiguity_grounding.py::test_press_action_submits_form` (no network, part
+  of the 93-green gate); the Google row shows the submit firing on a real site, then a
+  bot-wall — not a press failure.
+- A live row that abstains (asked=True) is an honest non-completion; only a
+  `nominal=True, verified=False` row is a silent failure worth chasing.

@@ -1,0 +1,74 @@
+# Live real-world eval tier — REAL public sites, diverse domains + task types.
+#
+# This tier is deliberately SEPARATE from eval_set/tasks.yaml and is NOT part of
+# the 93 offline pytest CI gate: it hits real public sites (flaky, and they
+# change) and needs Copilot. Run it ON DEMAND and report results to eval/REPORT.md:
+#     GH_TOKEN=$(gh auth token) PYTHONPATH=backend python -m eval.run_live_tier
+#
+# Every assertion is a PAGE-SPECIFIC independent check (URL / first-h1 / scoped
+# selector) — never a loose `text_contains`, which false-passed the books-price
+# task off the catalog grid. Same schema + same harness as the sandbox set.
+
+tasks:
+  # Information retrieval on Wikipedia — find a specific article (its atomic number
+  # lives on that page). Independent check: the article's first <h1>.
+  - id: live_wikipedia_helium_retrieval
+    instruction: "On Wikipedia, find and open the article about the chemical element Helium to read its atomic number."
+    start_url: "https://en.wikipedia.org/wiki/Main_Page"
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    held_out: false
+    key_nodes:
+      - url_contains: "wikipedia.org"
+    assert:
+      h1_equals: "Helium"
+
+  # Multi-step navigation on a real documentation site — walk a few menu levels.
+  # Independent check: the json module page URL.
+  - id: live_pydocs_json_nav
+    instruction: "On docs.python.org, open The Python Standard Library, then open the documentation page for the json module."
+    start_url: "https://docs.python.org/3/"
+    domain: documentation
+    task_type: action
+    difficulty: multi_same_domain
+    held_out: false
+    key_nodes:
+      - url_contains: "docs.python.org"
+    assert:
+      url_contains: "library/json"
+
+  # Search + submit (the day-3 Google case, now reproducible in-repo). The press/Enter
+  # DOES submit — the captured final URL is Google's /sorry/ interstitial whose
+  # `continue=` param is /search?q=steam, proving the submit fired. But Google serves
+  # that anti-bot /sorry/ CAPTCHA to headless automation, so it never reaches results
+  # and this verifies FALSE: a real-site BOT-WALL (route-to-unsupported per policy,
+  # never evade), NOT a press bug. The press action itself is proven deterministically
+  # offline by tests/test_ambiguity_grounding.py::test_press_action_submits_form.
+  # Independent check: the steam query in the final results URL.
+  - id: live_google_search_steam
+    instruction: "On google.com, search for steam and submit the search."
+    start_url: "https://www.google.com"
+    domain: search
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - url_contains: "google"
+    assert:
+      url_contains: "q=steam"
+
+  # Synonym / label mismatch on a REAL site: instruction says "Sign In" but the
+  # element is labelled "Log in" -> zero-candidate _match -> L2 picks it on a real,
+  # content-heavy page. Verified by reaching the login page URL (no credentials).
+  - id: live_wikipedia_signin_synonym
+    instruction: "On Wikipedia, click the Sign In link to go to the login page."
+    start_url: "https://en.wikipedia.org/wiki/Main_Page"
+    domain: information
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - url_contains: "wikipedia.org"
+    assert:
+      url_contains: "UserLogin"
