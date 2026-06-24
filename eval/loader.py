@@ -14,7 +14,9 @@ from typing import Any
 import yaml
 
 _VALID_TYPES = {"action", "retrieval", "side_effect"}
-_VALID_PRIMITIVES = {"url_contains", "text_contains", "h1_equals", "selector_text_equals"}
+_VALID_PRIMITIVES = {
+    "url_contains", "text_contains", "h1_equals", "selector_text_equals", "iframe_text_equals"
+}
 
 EVAL_SET_PATH = Path(__file__).resolve().parent / "eval_set" / "tasks.yaml"
 
@@ -50,6 +52,9 @@ def _validate_primitive(where: str, spec: dict[str, Any]) -> None:
     if kind == "selector_text_equals":
         if not isinstance(value, dict) or "css" not in value or "value" not in value:
             raise ValueError(f"{where}: selector_text_equals needs {{css, value}}, got {value!r}")
+    if kind == "iframe_text_equals":
+        if not isinstance(value, dict) or not {"frame", "css", "value"} <= value.keys():
+            raise ValueError(f"{where}: iframe_text_equals needs {{frame, css, value}}, got {value!r}")
 
 
 def load_tasks(path: Path | str = EVAL_SET_PATH) -> list[EvalTask]:

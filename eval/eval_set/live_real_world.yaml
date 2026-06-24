@@ -38,14 +38,14 @@ tasks:
     assert:
       url_contains: "library/json"
 
-  # Search + submit (the day-3 Google case, now reproducible in-repo). The press/Enter
-  # DOES submit — the captured final URL is Google's /sorry/ interstitial whose
-  # `continue=` param is /search?q=steam, proving the submit fired. But Google serves
-  # that anti-bot /sorry/ CAPTCHA to headless automation, so it never reaches results
-  # and this verifies FALSE: a real-site BOT-WALL (route-to-unsupported per policy,
-  # never evade), NOT a press bug. The press action itself is proven deterministically
-  # offline by tests/test_ambiguity_grounding.py::test_press_action_submits_form.
-  # Independent check: the steam query in the final results URL.
+  # Bot-wall demonstrator (the day-3 Google case). Google serves an anti-bot /sorry/
+  # CAPTCHA to headless automation; the press/Enter DOES submit (its /sorry/ `continue=`
+  # URL is /search?q=steam) but it never reaches results. With interstitial detection
+  # (verify.detect_block) the agent must NOT claim success — it abstains and routes
+  # blocked-unsupported (route, don't evade). So the CORRECT outcome is an honest
+  # abstain: expect_abstain scores `asked AND not nominal`. The press/submit action
+  # itself is proven by tests/...::test_press_action_submits_form and by
+  # live_wikipedia_search_submit below (a site that does not bot-block).
   - id: live_google_search_steam
     instruction: "On google.com, search for steam and submit the search."
     start_url: "https://www.google.com"
@@ -53,10 +53,7 @@ tasks:
     task_type: action
     difficulty: single
     held_out: false
-    key_nodes:
-      - url_contains: "google"
-    assert:
-      url_contains: "q=steam"
+    expect_abstain: true
 
   # Synonym / label mismatch on a REAL site: instruction says "Sign In" but the
   # element is labelled "Log in" -> zero-candidate _match -> L2 picks it on a real,
@@ -72,3 +69,79 @@ tasks:
       - url_contains: "wikipedia.org"
     assert:
       url_contains: "UserLogin"
+
+  # Search-submit on a non-bot-blocking real site — proves fill + press Enter actually
+  # submits and reaches the result. (DuckDuckGo HTML's search box has no accessible
+  # name and Bing's autocomplete intercepts the submit, both probed-and-failed
+  # headless, so Wikipedia's nameable search box is the reliable proof.)
+  - id: live_wikipedia_search_submit
+    instruction: "On Wikipedia, type 'Oxygen' in the search box and press Enter to open the article."
+    start_url: "https://en.wikipedia.org/wiki/Main_Page"
+    domain: information
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - url_contains: "wikipedia.org"
+    assert:
+      h1_equals: "Oxygen"
+
+  # --- Widget interaction coverage (patterns the rest of the eval never touches) ---
+
+  # Combobox / autocomplete on a real third-party site: type a prefix, then SELECT from
+  # the live suggestions popup. Independent check: the chosen article's h1.
+  - id: live_wikipedia_autocomplete
+    instruction: "On Wikipedia, type 'Argon' into the search box and choose 'Argon' from the autocomplete suggestions that appear, to open its article."
+    start_url: "https://en.wikipedia.org/wiki/Main_Page"
+    domain: information
+    task_type: action
+    difficulty: multi_same_domain
+    held_out: false
+    key_nodes:
+      - url_contains: "wikipedia.org"
+    assert:
+      h1_equals: "Argon"
+
+  # Lazy-load: the result is rendered asynchronously after a click (not in the initial
+  # DOM). Independent check: the late-rendered element's exact text.
+  - id: live_internet_lazyload
+    instruction: "On this Dynamic Loading page, click Start and wait for the hidden text to finish loading."
+    start_url: "https://the-internet.herokuapp.com/dynamic_loading/2"
+    domain: widgets
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - url_contains: "dynamic_loading"
+    assert:
+      selector_text_equals: { css: "#finish h4", value: "Hello World!" }
+
+  # Modal dialog: a modal owns the page on entry; confirm the modal's OWN state.
+  - id: live_internet_modal
+    instruction: "Open this page where a modal window appears, and read the modal window's title."
+    start_url: "https://the-internet.herokuapp.com/entry_ad"
+    domain: widgets
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - url_contains: "entry_ad"
+    # The title renders uppercase (CSS text-transform), and inner_text returns the
+    # RENDERED text — so the exact value is the uppercased form, not the HTML source.
+    assert:
+      selector_text_equals: { css: ".modal-title h3", value: "THIS IS A MODAL WINDOW" }
+
+  # Iframe: act on an element INSIDE a real iframe (the TinyMCE editor), verified by a
+  # frame-aware check. The locator cascade does not pierce iframes today, so this is
+  # expected to fail honestly — it documents the gap with a correct page-specific verifier.
+  - id: live_internet_iframe
+    instruction: "On this page, type 'browser agent was here' into the rich-text editor inside the iframe."
+    start_url: "https://the-internet.herokuapp.com/iframe"
+    domain: widgets
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - url_contains: "/iframe"
+    assert:
+      iframe_text_equals: { frame: "iframe#mce_0_ifr", css: "body", value: "browser agent was here" }

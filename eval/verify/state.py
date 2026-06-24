@@ -49,6 +49,15 @@ async def _check_one(page: Any, kind: str, spec: Any) -> bool:
         css = spec["css"]
         value = spec["value"]
         return (await _first_text(page, css)) == value
+    if kind == "iframe_text_equals":
+        # Frame-aware check: pierce a real iframe and assert on an element inside it.
+        try:
+            loc = page.frame_locator(spec["frame"]).locator(spec["css"]).first
+            if await loc.count() == 0:
+                return False
+            return (await loc.inner_text()).strip() == spec["value"]
+        except Exception:
+            return False
     raise ValueError(f"unknown assertion primitive: {kind!r}")
 
 

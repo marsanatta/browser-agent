@@ -62,6 +62,68 @@ async def snapshot(page: Any) -> StateSnapshot:
     return StateSnapshot(url=page.url, dom_len=len(body), dom_hash=hash(body))
 
 
+# Bot-wall / interstitial detection. Project policy is ROUTE, DON'T EVADE: when a
+# post-action page is one of these, the agent abstains and routes it as
+# blocked-unsupported — it never tries to solve the challenge. Markers are kept
+# high-confidence so legitimate pages are not falsely blocked.
+_BLOCK_URL_MARKERS = (
+    "/sorry/",                      # google "unusual traffic" interstitial
+    "challenges.cloudflare.com",    # cloudflare turnstile / managed challenge
+    "/recaptcha/api2",
+    "hcaptcha.com/captcha",
+    "px-captcha",                   # perimeterx
+    "/_incapsula_",                 # imperva/incapsula
+)
+_BLOCK_SELECTORS = (
+    'iframe[src*="recaptcha"]',
+    'iframe[src*="hcaptcha"]',
+    'iframe[title*="recaptcha" i]',
+    'iframe[title*="challenge" i]',
+    'div.g-recaptcha',
+    'div.h-captcha',
+    '#challenge-running',           # cloudflare
+    '#cf-challenge-running',
+)
+_BLOCK_TEXT_MARKERS = (
+    "unusual traffic from your computer",
+    "verify you are a human",
+    "verify you are human",
+    "are you a robot",
+    "i'm not a robot",
+    "complete the security check",
+    "checking if the site connection is secure",  # cloudflare
+    "enable javascript and cookies to continue",   # cloudflare
+)
+
+
+async def detect_block(page: Any) -> str | None:
+    """Return a short reason if the page is a known bot-wall / CAPTCHA / challenge
+    interstitial, else None. Used by the verify-after-act path so the agent does
+    NOT claim success on a block; it abstains and routes blocked-unsupported. We
+    never try to solve the challenge (route, don't evade)."""
+    try:
+        url = (page.url or "").lower()
+    except Exception:
+        url = ""
+    for marker in _BLOCK_URL_MARKERS:
+        if marker in url:
+            return f"url:{marker}"
+    for sel in _BLOCK_SELECTORS:
+        try:
+            if await page.locator(sel).count() > 0:
+                return f"widget:{sel}"
+        except Exception:
+            continue
+    try:
+        text = (await page.inner_text("body"))[:6000].lower()
+    except Exception:
+        text = ""
+    for marker in _BLOCK_TEXT_MARKERS:
+        if marker in text:
+            return f"text:{marker}"
+    return None
+
+
 async def _target_satisfied(expect: Expectation) -> bool:
     loc = expect.target_locator
     if loc is None or expect.target_effect is None:

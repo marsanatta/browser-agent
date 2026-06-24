@@ -26,6 +26,7 @@ class FailureClass(str, Enum):
     NOT_INTERACTABLE = "NOT_INTERACTABLE"
     WRONG_PAGE = "WRONG_PAGE"
     STALE_TIMING = "STALE_TIMING"
+    BLOCKED = "BLOCKED"  # bot-wall / CAPTCHA / consent interstitial -> route unsupported
 
 
 class Recovery(str, Enum):
@@ -85,4 +86,5 @@ def recovery_for(fc: FailureClass) -> Recovery:
         FailureClass.WRONG_PAGE: Recovery.REPLAN,
         FailureClass.STALE_TIMING: Recovery.STATE_WAIT,
         FailureClass.NONE: Recovery.STATE_WAIT,
+        FailureClass.BLOCKED: Recovery.ASK_USER,  # never retry / solve a CAPTCHA
     }[fc]

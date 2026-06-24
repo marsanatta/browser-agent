@@ -111,6 +111,18 @@ class Executor:
                     i += 1
                     continue
 
+                if outcome.failure_class == FailureClass.BLOCKED.value:
+                    # Bot-wall / CAPTCHA / consent interstitial: a DISTINCT outcome —
+                    # neither a capability pass nor a silent fail. Abstain and route
+                    # blocked-unsupported (never evade); replanning can't help.
+                    yield events.ask_user(
+                        step_id,
+                        "Blocked by a bot-wall / CAPTCHA / consent interstitial; "
+                        "routing as unsupported (not evading, not claiming success).",
+                    )
+                    all_ok = False
+                    break
+
                 # Exhausted local recovery on this sub-task. Global replan once
                 # (docs/architecture/02 §1.3: replan only on local exhaustion),
                 # then ask_user.
@@ -158,6 +170,11 @@ class Executor:
 
         if st.action == "navigate":
             await act.navigate(page, st.url or "")
+            block = await verify.detect_block(page)
+            if block is not None:
+                yield events.tool_call_end(call_id, f"navigate -> BLOCKED ({block})")
+                yield _Outcome(False, failure_class=FailureClass.BLOCKED.value)
+                return
             yield events.tool_call_end(call_id, f"navigated to {page.url}")
             shot = await screenshots.capture_step(page, step_id, None, f"navigated to {page.url}")
             if shot is not None:
@@ -178,6 +195,13 @@ class Executor:
             if result is verify.VerifyResult.CHANGED:
                 yield events.tool_call_end(call_id, f"{st.action} -> CHANGED (attempt {attempt})")
                 yield _Outcome(True)
+                return
+
+            if fc is FailureClass.BLOCKED:
+                # Bot-wall / CAPTCHA: terminal. Never retry or try to solve it.
+                yield events.recovery(step_id, fc.value, Recovery.ASK_USER.value, attempt)
+                yield events.tool_call_end(call_id, f"{st.action} -> BLOCKED")
+                yield _Outcome(False, failure_class=FailureClass.BLOCKED.value)
                 return
 
             last_class = fc
@@ -285,6 +309,10 @@ class Executor:
             return verify.VerifyResult.NO_CHANGE, classify_exception(exc), located, shot
 
         result = await verify.verify_after_act(page, before, expect)
+        if await verify.detect_block(page) is not None:
+            # Landed on a bot-wall / CAPTCHA — do NOT claim success even if the DOM
+            # changed (e.g. a /sorry/ navigation). Route as blocked-unsupported.
+            return verify.VerifyResult.NO_CHANGE, FailureClass.BLOCKED, located, shot
         if result is verify.VerifyResult.NO_CHANGE:
             return result, FailureClass.NOT_FOUND, located, shot  # re-ground on a silent no-op
         return result, FailureClass.NONE, located, shot
