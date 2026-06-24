@@ -15,10 +15,21 @@ import pytest
 
 from app.agent.executor import Executor, _match
 from app.agent.locate import LocatorCache, locate
+from app.agent.models import MockGateway
 from app.agent.perceive import IndexedElement
 from app.agent.planner import MockPlanner, SubTask
 from app.browser.provider import PlaywrightProvider
 from app.stream.events import EventType
+
+
+async def _run(planner, gateway, instruction, verify_hook):
+    ex = Executor(PlaywrightProvider(headless=True), planner, gateway=gateway, verify_hook=verify_hook)
+    nominal = verified = None
+    async for ev in ex.run(instruction):
+        if ev.type == EventType.RUN_FINISHED:
+            nominal = ev.payload.get("nominal_completion")
+            verified = ev.payload.get("verified_completion")
+    return nominal, verified
 
 
 def _el(i, role, name, attrs=None):
@@ -118,3 +129,75 @@ async def test_ambiguous_click_abstains_without_silent_navigation():
     assert asked is True
     assert nominal is False
     assert changed_clicks == 0  # never silently resolved + clicked a wrong link
+
+
+# --- Fix: zero-candidate _match (synonym/label mismatch) routes to L2 ------------
+
+_SYNONYM = """
+<button id="b">Log in</button>
+<div id="out">none</div>
+<script>document.getElementById('b').onclick=function(){document.getElementById('out').textContent='SUBMITTED'};</script>
+"""
+
+
+@pytest.mark.anyio
+async def test_zero_candidate_synonym_routes_to_l2():
+    # Instruction targets "Sign In" but the only element is named "Log in" -> _match
+    # returns ZERO candidates. With a gateway, L2 ranks the full perceived list and
+    # picks "Log in"; the click then fires.
+    data_url = "data:text/html," + urllib.parse.quote(_SYNONYM)
+    planner = MockPlanner(
+        [SubTask(action="navigate", url=data_url), SubTask(action="click", target="Sign In")]
+    )
+    gateway = MockGateway(lambda _p: "0")  # L2 picks shortlist[0]
+
+    async def verify_hook(page):
+        return (await page.locator("#out").inner_text()) == "SUBMITTED"
+
+    nominal, verified = await _run(planner, gateway, "sign in", verify_hook)
+    assert nominal is True
+    assert verified is True  # the L2-picked 'Log in' button was actually clicked
+
+
+@pytest.mark.anyio
+async def test_zero_candidate_synonym_abstains_without_gateway():
+    # Same page, NO gateway -> no L2 -> must abstain honestly, never silent-click.
+    data_url = "data:text/html," + urllib.parse.quote(_SYNONYM)
+    planner = MockPlanner(
+        [SubTask(action="navigate", url=data_url), SubTask(action="click", target="Sign In")]
+    )
+
+    async def verify_hook(page):
+        return (await page.locator("#out").inner_text()) == "SUBMITTED"
+
+    nominal, verified = await _run(planner, None, "sign in", verify_hook)
+    assert nominal is False
+    assert verified is False  # abstained; the wrong element was NOT clicked
+
+
+# --- Fix: press action submits a form Enter can't be done by a click -------------
+
+_PRESS_FORM = """
+<form id="f"><input aria-label="Query" /></form>
+<div id="out">none</div>
+<script>document.getElementById('f').onsubmit=function(){document.getElementById('out').textContent='SENT';return false;};</script>
+"""
+
+
+@pytest.mark.anyio
+async def test_press_action_submits_form():
+    data_url = "data:text/html," + urllib.parse.quote(_PRESS_FORM)
+    planner = MockPlanner(
+        [
+            SubTask(action="navigate", url=data_url),
+            SubTask(action="fill", target="Query", value="steam"),
+            SubTask(action="press", target="Query", value="Enter"),
+        ]
+    )
+
+    async def verify_hook(page):
+        return (await page.locator("#out").inner_text()) == "SENT"
+
+    nominal, verified = await _run(planner, None, "search steam", verify_hook)
+    assert nominal is True
+    assert verified is True  # Enter submitted the form (a click could not)

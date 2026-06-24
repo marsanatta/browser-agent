@@ -198,24 +198,33 @@ class Executor:
     def _target_and_l2(self, perception: Any, st: SubTask):
         """Map a sub-task to (target_element, l2_fallback), shared by the action
         path (_attempt) and the recovery path (_current_locator) so BOTH get the L2
-        re-ground. On genuine ambiguity the target is a pseudo element (empty attrs
-        -> deterministic cascade miss) and L2 ranks the distinct candidates;
-        otherwise L2 ranks the full perception. Returns (None, None) when nothing
-        matches at all."""
+        re-ground. Three cases, each ending at a (pseudo-or-real) target plus the
+        right L2 candidate pool; (None, None) only when the page has no elements:
+          - unique deterministic match -> that element; L2 over the full perception.
+          - genuine ambiguity          -> pseudo-target; L2 over the tied candidates.
+          - ZERO deterministic candidates (synonym / label mismatch, e.g. "Sign In"
+            vs "Log in") -> pseudo-target; L2 over the FULL perception so the LLM
+            picks the element best matching intent. This closes the open loop where
+            the planner's word matches no accessible name.
+        A pseudo-target has empty attrs so the deterministic cascade misses and
+        resolution routes to L2; with no gateway every pseudo path falls through to
+        an honest abstain (NOT_FOUND), never a silent pick."""
         target, ambiguous = _match(perception.elements, st)
-        if target is None and not ambiguous:
-            return None, None
-        if ambiguous:
-            # Genuine ambiguity: never silently pick one. A pseudo-target (the raw
-            # requested name, no attrs) makes the deterministic cascade miss so
-            # resolution routes through the L2 LLM re-rank over the distinct
-            # candidates — or abstains (NOT_FOUND) when no gateway is wired.
+        if target is not None:
+            l2_candidates = perception.elements
+        elif ambiguous:
             target = IndexedElement(
                 index=-1, role=st.role or ambiguous[0].role, name=(st.target or "").strip()
             )
             l2_candidates = ambiguous
-        else:
+        elif perception.elements:
+            default_role = "textbox" if st.action in ("fill", "press") else "button"
+            target = IndexedElement(
+                index=-1, role=st.role or default_role, name=(st.target or "").strip()
+            )
             l2_candidates = perception.elements
+        else:
+            return None, None
         l2 = make_l2_fallback(self._gateway, l2_candidates) if self._gateway else None
         return target, l2
 
@@ -266,6 +275,9 @@ class Executor:
                     target_effect="value",
                     target_value=st.value or "",
                 )
+            elif st.action == "press":
+                await act.press(located.locator, st.value or "Enter")
+                expect = verify.Expectation(url_changes=True, dom_changes=True)
             else:
                 await act.click(located.locator)
                 expect = verify.Expectation(url_changes=True, dom_changes=True)

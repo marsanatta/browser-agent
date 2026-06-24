@@ -46,9 +46,19 @@ class StateSnapshot:
 
 
 async def snapshot(page: Any) -> StateSnapshot:
-    body = await page.evaluate(
-        "() => document.body ? document.body.innerHTML : ''"
-    )
+    body = ""
+    try:
+        body = await page.evaluate("() => document.body ? document.body.innerHTML : ''")
+    except Exception:
+        # A navigating action (e.g. Enter-to-submit) can destroy the execution
+        # context mid-flight ("Execution context was destroyed"). Let it settle and
+        # retry once; if it still fails, fall back to a URL-only snapshot — the
+        # url-change channel still detects the navigation as CHANGED.
+        try:
+            await page.wait_for_load_state("domcontentloaded", timeout=5000)
+            body = await page.evaluate("() => document.body ? document.body.innerHTML : ''")
+        except Exception:
+            body = ""
     return StateSnapshot(url=page.url, dom_len=len(body), dom_hash=hash(body))
 
 

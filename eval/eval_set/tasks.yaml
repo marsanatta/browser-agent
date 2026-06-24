@@ -117,8 +117,10 @@ tasks:
     held_out: false
     key_nodes:
       - h1_equals: "A Light in the Attic"
+    # Page-specific: `.product_main` exists ONLY on the product page, so this no
+    # longer false-passes off the catalog grid (which also shows .price_color).
     assert:
-      text_contains: "51.77"                    # the book's price, visible on the product page
+      selector_text_equals: { css: ".product_main .price_color", value: "£51.77" }
 
   # ---- quotes.toscrape.com (HELD-OUT: never used in dev) ----
   - id: quotes_open_einstein_author

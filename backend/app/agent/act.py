@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-ActionKind = Literal["navigate", "click", "fill", "submit"]
+ActionKind = Literal["navigate", "click", "fill", "press", "submit"]
 _WRITE_ACTIONS: frozenset[str] = frozenset({"fill", "submit"})
 
 
@@ -36,3 +36,9 @@ async def click(locator: Any) -> None:
 
 async def fill(locator: Any, value: str) -> None:
     await locator.fill(value)
+
+
+async def press(locator: Any, key: str) -> None:
+    """Press a key on the focused element (e.g. Enter on a search box to submit).
+    Fills the gap where a button click can't trigger a form's submit."""
+    await locator.press(key)

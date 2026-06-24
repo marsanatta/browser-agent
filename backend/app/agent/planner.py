@@ -21,11 +21,11 @@ from app.agent.models import ACTOR_WORKHORSE, LLMGateway
 
 @dataclass(frozen=True)
 class SubTask:
-    action: str  # navigate | click | fill
-    target: str | None = None  # accessible name of the element (click/fill)
+    action: str  # navigate | click | fill | press
+    target: str | None = None  # accessible name of the element (click/fill/press)
     role: str | None = None  # optional role hint for disambiguation
     url: str | None = None  # for navigate
-    value: str | None = None  # for fill
+    value: str | None = None  # fill value, or the key to press (e.g. "Enter")
     description: str = ""
 
 
@@ -46,10 +46,13 @@ class MockPlanner:
 _PLAN_PROMPT = """You are the planner for a browser-automation agent.
 Decompose the user task into an ordered list of atomic sub-tasks.
 Each sub-task is one of: navigate (needs "url"), click (needs "target": the
-visible label/accessible name), fill (needs "target" and "value").
+visible label/accessible name), fill (needs "target" and "value"), press (needs
+"target" and "value": a key such as "Enter" — use it AFTER fill to submit a
+search box or form when there is no obvious submit button).
 Respond with ONLY a JSON array, no prose. Example:
-[{"action":"navigate","url":"https://example.com"},
- {"action":"click","target":"Sign in"}]
+[{"action":"navigate","url":"https://www.google.com"},
+ {"action":"fill","target":"Search","value":"steam"},
+ {"action":"press","target":"Search","value":"Enter"}]
 
 User task: __TASK__
 """
