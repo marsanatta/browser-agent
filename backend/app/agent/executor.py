@@ -195,21 +195,16 @@ class Executor:
         yield events.tool_call_end(call_id, f"{st.action} failed: {last_class.value}")
         yield _Outcome(False, failure_class=last_class.value)
 
-    async def _attempt(self, page: Any, step_id: str, st: SubTask, reground: bool, attempt: int):
-        """One perceive->locate->(precondition)->act->verify pass. Returns
-        (VerifyResult|None, FailureClass, Located|None, ScreenshotAnnotated|None).
-
-        The Located surfaces the chosen locator tier and the screenshot is the
-        annotated diagnostic for this step (DESIGN §8). The screenshot is taken
-        BEFORE the action so the highlight box references the element on the page
-        the agent acted on (after a click that navigates, the element detaches and
-        its box would be empty)."""
-        perception = await perceive(page)
+    def _target_and_l2(self, perception: Any, st: SubTask):
+        """Map a sub-task to (target_element, l2_fallback), shared by the action
+        path (_attempt) and the recovery path (_current_locator) so BOTH get the L2
+        re-ground. On genuine ambiguity the target is a pseudo element (empty attrs
+        -> deterministic cascade miss) and L2 ranks the distinct candidates;
+        otherwise L2 ranks the full perception. Returns (None, None) when nothing
+        matches at all."""
         target, ambiguous = _match(perception.elements, st)
         if target is None and not ambiguous:
-            shot = await self._shot(page, step_id, st, None, "NO_TARGET", attempt)
-            return None, FailureClass.NOT_FOUND, None, shot
-
+            return None, None
         if ambiguous:
             # Genuine ambiguity: never silently pick one. A pseudo-target (the raw
             # requested name, no attrs) makes the deterministic cascade miss so
@@ -221,11 +216,27 @@ class Executor:
             l2_candidates = ambiguous
         else:
             l2_candidates = perception.elements
+        l2 = make_l2_fallback(self._gateway, l2_candidates) if self._gateway else None
+        return target, l2
+
+    async def _attempt(self, page: Any, step_id: str, st: SubTask, reground: bool, attempt: int):
+        """One perceive->locate->(precondition)->act->verify pass. Returns
+        (VerifyResult|None, FailureClass, Located|None, ScreenshotAnnotated|None).
+
+        The Located surfaces the chosen locator tier and the screenshot is the
+        annotated diagnostic for this step (DESIGN §8). The screenshot is taken
+        BEFORE the action so the highlight box references the element on the page
+        the agent acted on (after a click that navigates, the element detaches and
+        its box would be empty)."""
+        perception = await perceive(page)
+        target, l2 = self._target_and_l2(perception, st)
+        if target is None:
+            shot = await self._shot(page, step_id, st, None, "NO_TARGET", attempt)
+            return None, FailureClass.NOT_FOUND, None, shot
 
         if reground:
             self._cache.invalidate(_page_key(page), target)
 
-        l2 = make_l2_fallback(self._gateway, l2_candidates) if self._gateway else None
         located = await locate(page, target, cache=self._cache, l2_fallback=l2)
         if located is None:
             shot = await self._shot(page, step_id, st, None, "NO_TARGET", attempt)
@@ -283,10 +294,10 @@ class Executor:
 
     async def _current_locator(self, page: Any, st: SubTask):
         perception = await perceive(page)
-        target, _ = _match(perception.elements, st)
+        target, l2 = self._target_and_l2(perception, st)
         if target is None:
             return None
-        return await locate(page, target, cache=self._cache)
+        return await locate(page, target, cache=self._cache, l2_fallback=l2)
 
     async def _confirm(self) -> bool:
         if self._confirm_submit is None:
