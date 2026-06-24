@@ -212,9 +212,14 @@ async def run_eval(tasks: list[EvalTask], k: int = K_SIDE_EFFECT) -> dict[str, A
     }
 
 
-def summarize(data: dict[str, Any]) -> dict[str, Any]:
-    agent = data["agent"]
-    baseline = data["baseline"]
+def summarize(data: dict[str, Any], tasks: list[EvalTask]) -> dict[str, Any]:
+    # Regression-anchors (green-on-day-one) are kept OUT of the headline rate so
+    # they cannot inflate it; they still run and are reported as a separate count.
+    anchor_ids = {t.id for t in tasks if t.regression_anchor}
+    agent = [r for r in data["agent"] if r.task_id not in anchor_ids]
+    baseline = [r for r in data["baseline"] if r.task_id not in anchor_ids]
+    anchors = [r for r in data["agent"] if r.task_id in anchor_ids]
+    passk_runs = {t: rs for t, rs in data["passk_runs"].items() if t not in anchor_ids}
     tsr_mean, tsr_se = scoring.mean_se(agent)
     base_tsr_mean, base_tsr_se = scoring.mean_se(baseline)
     held = [r for r in agent if r.held_out]
@@ -227,10 +232,12 @@ def summarize(data: dict[str, Any]) -> dict[str, Any]:
         "baseline_tsr": base_tsr_mean,
         "baseline_tsr_se": base_tsr_se,
         "baseline_cup": scoring.silent_failure_gap(baseline),
-        "passk": scoring.pass_hat_k(data["passk_runs"]),
+        "passk": scoring.pass_hat_k(passk_runs),
         "held_out_tsr": scoring.tsr(held) if held else None,
         "n": len(agent),
         "n_held_out": len(held),
+        "n_regression_anchors": len(anchors),
+        "regression_anchors_verified": sum(1 for r in anchors if r.verified),
         "copilot_calls": data["copilot_calls"],
     }
 
@@ -248,7 +255,7 @@ async def _main() -> None:
     t0 = time.time()
     data = await run_eval(tasks, k=args.k)
     elapsed = time.time() - t0
-    summary = summarize(data)
+    summary = summarize(data, tasks)
 
     out_path = report_mod.write_report(tasks, data, summary, elapsed)
     print(f"REPORT written: {out_path}")

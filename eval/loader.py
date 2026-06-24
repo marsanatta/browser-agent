@@ -35,6 +35,10 @@ class EvalTask:
     # `assert` is optional. This is what lets the harness score correct refusals
     # as success instead of as a plain failure.
     expect_abstain: bool = False
+    # A task that is GREEN on the current code tests nothing about today's gaps, but
+    # guards against future regressions. Flag it so the harness keeps it OUT of the
+    # headline success rate (it would only inflate it) while still running it.
+    regression_anchor: bool = False
 
 
 def _validate_primitive(where: str, spec: dict[str, Any]) -> None:
@@ -90,6 +94,7 @@ def load_tasks(path: Path | str = EVAL_SET_PATH) -> list[EvalTask]:
                 key_nodes=list(it.get("key_nodes", [])),
                 assertion=assertion,
                 expect_abstain=expect_abstain,
+                regression_anchor=bool(it.get("regression_anchor", False)),
             )
         )
     return tasks

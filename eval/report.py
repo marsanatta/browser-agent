@@ -27,8 +27,9 @@ def _per_task_rows(tasks: list[EvalTask], agent: list[TaskResult], baseline: lis
         b = by_id_base.get(t.id)
         silent = "YES" if (r.nominal and not r.verified) else ""
         kn = f"{r.key_nodes_hit}/{r.key_nodes_total} ({task_tcr(r):.0%})"
+        tid = f"{t.id} (anchor)" if t.regression_anchor else t.id
         lines.append(
-            f"| {t.id} | {t.task_type} | {'yes' if t.held_out else ''} | {kn} | "
+            f"| {tid} | {t.task_type} | {'yes' if t.held_out else ''} | {kn} | "
             f"{_pf(r.verified)} | {_pf(b.verified) if b else '-'} | "
             f"{_pf(r.nominal)} | {silent} |"
         )
@@ -44,6 +45,12 @@ def write_report(
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     s = summary
     held_tsr = "n/a" if s["held_out_tsr"] is None else f"{s['held_out_tsr']:.3f}"
+    n_anchor = s.get("n_regression_anchors", 0)
+    anchor_note = (
+        f" + {n_anchor} regression-anchor(s) [green-on-day-one, excluded from the "
+        f"headline rate; {s.get('regression_anchors_verified', 0)}/{n_anchor} passing]"
+        if n_anchor else ""
+    )
 
     metric_table = "\n".join([
         "| metric | agent | budget-matched baseline |",
@@ -62,8 +69,8 @@ programmatic assertions on the live page (eval/01 §4) — never the agent's
 self-report. Per the ablation rule (architecture/03 §4) a budget-matched vanilla
 baseline (max_attempts=1, no L2 heal) runs alongside the full agent.
 
-- Tasks: {s['n']} ({s['n_held_out']} held-out on quotes.toscrape.com, a site
-  never used in dev — generalization test, eval/01 §5.3)
+- Tasks: {s['n']} headline ({s['n_held_out']} held-out on quotes.toscrape.com, a site
+  never used in dev — generalization test, eval/01 §5.3){anchor_note}
 - Approx Copilot calls (this run): **{s['copilot_calls']}**
 - Wall time: {elapsed_s:.0f}s
 - Held-out TSR: {held_tsr}

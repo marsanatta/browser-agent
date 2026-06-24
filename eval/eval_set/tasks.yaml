@@ -233,3 +233,87 @@ tasks:
       - text_contains: "Read more"
     assert:
       text_contains: "CLICKED:A2"
+
+  # ---- Day-2 locator-stress tasks (hand-authored; each LIVE-verified RED on the
+  #      current code, else tagged regression_anchor and kept out of the headline) ----
+
+  # Synonym label: the instruction says "Sign In" but the DOM accessible name is
+  # "Log in". _match is literal (exact/substring), so the planner's "Sign In" target
+  # matches nothing -> NOT_FOUND. Exposes the missing synonym/semantic mapping.
+  - id: synonym_label_signin_vs_login
+    instruction: "Click the Sign In button to sign in."
+    inline_html: |
+      <button id="b">Log in</button>
+      <div id="out">none</div>
+      <script>document.getElementById('b').onclick=function(){document.getElementById('out').textContent='SUBMITTED'};</script>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - text_contains: "Log in"
+    assert:
+      text_contains: "SUBMITTED"
+
+  # JS-rendered label: the button has NO text in static HTML; a script sets its
+  # accessible name at load. perceive reads the LIVE DOM (page.evaluate), so it sees
+  # "Continue" and resolves. Guards that perceive reads rendered content, not raw HTML.
+  - id: js_rendered_label_continue
+    instruction: "Click the Continue button."
+    inline_html: |
+      <button id="b"></button>
+      <div id="out">none</div>
+      <script>
+        var b=document.getElementById('b'); b.textContent='Continue';
+        b.onclick=function(){document.getElementById('out').textContent='SUBMITTED'};
+      </script>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    held_out: false
+    regression_anchor: true   # GREEN on current code (perceive reads rendered DOM)
+    key_nodes:
+      - text_contains: "Continue"
+    assert:
+      text_contains: "SUBMITTED"
+
+  # Cross-domain multi-page (fills the previously-empty multi_cross_domain tier):
+  # a step on books.toscrape.com, then switch DOMAINS to the-internet and reach a
+  # second page. Tests plan decomposition + navigation across domains.
+  - id: cross_domain_books_then_internet
+    instruction: "First open the Travel category on books.toscrape.com, then go to the-internet.herokuapp.com and open the Form Authentication page."
+    start_url: "https://books.toscrape.com"
+    domain: navigation
+    task_type: action
+    difficulty: multi_cross_domain
+    held_out: false
+    regression_anchor: true   # GREEN on current code (cross-domain navigation works)
+    key_nodes:
+      - h1_equals: "Travel"
+      - text_contains: "Form Authentication"
+    assert:
+      url_contains: "/login"
+
+  # Real side-effect beyond login: a 3-step form mutation (fill Name, fill Message,
+  # click Send) recorded in the DOM. task_type=side_effect so pass^k (k=3) applies.
+  - id: side_effect_contact_form_submit
+    instruction: "Fill the Name field with 'Ada' and the Message field with 'hello', then click Send."
+    inline_html: |
+      <input aria-label="Name" id="n" />
+      <input aria-label="Message" id="m" />
+      <button id="send">Send</button>
+      <div id="out">none</div>
+      <script>
+        document.getElementById('send').onclick=function(){
+          document.getElementById('out').textContent='SENT name='+document.getElementById('n').value+' msg='+document.getElementById('m').value;
+        };
+      </script>
+    domain: synthetic
+    task_type: side_effect
+    difficulty: single
+    held_out: false
+    regression_anchor: true   # GREEN on current code (3-step form mutation works)
+    key_nodes:
+      - text_contains: "Send"
+    assert:
+      text_contains: "SENT name=Ada msg=hello"
