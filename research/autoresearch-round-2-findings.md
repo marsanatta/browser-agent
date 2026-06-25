@@ -112,5 +112,52 @@ nominal-completion, planner-rooted) — a stop signal (§ stop condition 2).
 **Batch 3 net: M2 14→16 (+books/openlibrary, +Q&A/stackoverflow), one DISCARD (rfc-editor silent failure),
 M3 held at 1. Breadth target (~15–20) reached; the discard tail is now a single recurring named class.**
 
+---
+
+## Round 2 — Conclusion (STOPPED; close full-tier snapshot is the official number; NOT merged, NOT pushed)
+
+**Stop reason:** breadth target reached (M2 16, in the ~15–20 band) **and** the failure tail collapsed to a
+single recurring named ceiling — the *locate-miss + lax-nominal-completion silent failure* (`w3.org`,
+`rfc-editor.org`: agent claims success while still on the homepage), which is planner-rooted (B2) and
+off-limits. Stop conditions 1+2. **No Probe-A code change was earned** — every silent failure round-2
+surfaced was a planner-rooted named ceiling (never-fix), so the round is **pure breadth**: zero changes to
+`backend/` (planner.py, state.py, executor, recover all untouched).
+
+**11 iterations: 9 kept, 2 discarded.** All 9 kept add a distinct real domain; both discards were
+silent-failure candidates kept OUT of the tier (the Amazon rule), so **round-2 introduced no new silent
+failure**.
+
+### Close full-tier snapshot (official) — `eval/REPORT.md` + `eval/AUDIT.md`, 2026-06-25, `attribution_coverage=1.000`
+
+- **Live tier: 16/21 verified.** Flag tally **OK=23, BLOCKED=1, HONEST_FAIL=5, SILENT_FAILURE=0.**
+- The 5 non-verified rows are **all honest** (HONEST_FAIL / abstain): `modal`, `iframe`, `gnu`, `archive`,
+  `stackoverflow` — none falsely claimed success.
+- **Bot-wall-prone arbiter passed:** `finance.yahoo.com` **VERIFIED** (reached `/quote/AAPL/` again),
+  `stackoverflow` **HONEST_FAIL/abstain** — neither silent-failed, so neither is discarded.
+
+| metric | baseline (open run) | close run (official) | honest reading |
+|---|---|---|---|
+| **M2 distinct domains** | 7 | **16** | **+9 — the headline, structural and run-independent** (maps, news/lobsters, docs/mdn, media/archive, gov, science, finance, books/openlibrary, Q&A) |
+| **M3 silent failures** | 1 (`helium`) | **0** | **RUN-NOISY — do NOT read as "M3=0 achieved."** Baseline=1, close=0: the planner-rooted named-ceiling failures (`helium`/`modal`) manifest as *silent* on some runs and *honest-fail* on others. Round-2's stable result is **no NEW silent failure introduced** (2 candidates discarded); the underlying risk persists, unfixed (off-limits). |
+| **M1 verified-rate** | 8/12 = 0.667 | 16/21 = **0.762** | up, on a **much broader tier (21 vs 12)** — a genuine breadth+quality signal, but M1 is run-noisy (helium verified this run, silent-failed at baseline). |
+
+**Honest correction carried from round-1's lesson:** M3 is read from full-tier re-runs, and the two runs
+disagree (1 vs 0) — so the truthful statement is **"M3 stayed within its 0–1 noise band; round-2 added zero
+new silent failures,"** not "round-2 drove M3 to 0." The `helium`/`modal` silent-failure risk is a
+pre-existing planner-rooted ceiling, untouched by this round.
+
+**Guards held every iteration AND at close:** offline gate **113** green/network-free; `planner.py`
+untouched; `state.py` assertion frozen; zero `text_contains`; whole-round diff is purely additive
+(`live_real_world.yaml` breadth + regenerated `eval/REPORT.md`/`AUDIT.md` + `research/*`) — **no `backend/`
+code changed.**
+
+**Named ceilings (unchanged, off-limits, all observed this round):** B2 planner open-loop / lax
+nominal-completion (the `helium`/`modal` silent-failure band + the `w3.org`/`rfc-editor` discards) ·
+iframe-piercing (`iframe`) · search-box-strategy (`helium` portal-search path) · bot-walls
+(route-don't-evade — `google` BLOCKED; `yahoo`/`stackoverflow` are bot-wall-prone and arbiter-tracked).
+
+**Disposition: DO NOT MERGE, NOT PUSHED.** Branch `autoresearch/round-2`, commits local-only. Awaiting
+review before any merge to `main`.
+
 
 

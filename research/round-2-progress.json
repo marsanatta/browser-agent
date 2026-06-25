@@ -108,5 +108,15 @@
     "decision": "discarded",
     "reason": "SILENT_FAILURE: nominal=True verified=False, final URL still https://www.rfc-editor.org/ -- agent never left homepage yet claimed success (About link not located, lax nominal-completion). Same recurring named-ceiling class as w3.org. Amazon rule -> NOT committed, M3 held at 1. Stop signal (failure tail = single recurring named class).",
     "guards_ok": true
+  },
+  {
+    "iter": 12,
+    "probe_type": "snapshot",
+    "target": "close full-tier run_live_tier (official numbers + bot-wall arbiter)",
+    "metrics_before": { "M1": 0.714, "M2": 16, "M3": 1 },
+    "metrics_after": { "M1": 0.762, "M2": 16, "M3": 0 },
+    "decision": "snapshot",
+    "reason": "Close snapshot: live 16/21 verified; flag tally OK=23 BLOCKED=1 HONEST_FAIL=5 SILENT_FAILURE=0. M3=0 THIS run but RUN-NOISY (baseline run was M3=1, helium silent; close run helium verified) -- do NOT read as a stable M3=0. Stable result = M2 7->16 with zero NEW silent failures introduced (2 candidates discarded). Bot-wall arbiter passed: yahoo VERIFIED, stackoverflow HONEST_FAIL/abstain -- neither silent, no post-close discards. Guards: offline 113 green, planner.py + state.py untouched, no backend code changed.",
+    "guards_ok": true
   }
 ]
