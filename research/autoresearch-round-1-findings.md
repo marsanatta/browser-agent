@@ -162,3 +162,62 @@ failure because a bot-wall masked it.
 is kept evidence of a graceful-failure class. File changed vs main: `eval/eval_set/live_real_world.yaml`.
 
 ---
+
+## Round 1 — Conclusion (STOPPED on condition 1; NOT merged, NOT pushed — for review)
+
+**Stop reason (plan §6, condition 1):** the live-tier failure tail decomposes **entirely** into known
+classes — `modal` (plan-time planner open-loop), `iframe` (perception/iframe-pierce ceiling), `gnu`
+(locate-on-real-nav, graceful abstain), `google` (correct BLOCKED abstain). The one *new* observation,
+Amazon's silent failure, was **named** (block-detector coverage gap) and **discarded**. No remaining
+unexplained defect → stop. (Conditions 2/3 not reached: M2 still climbing, 5 of ~25 iterations used.)
+
+**5 iterations: 4 kept, 1 discarded.**
+
+| iter | probe | target | outcome | M1 | M2 | M3 | decision |
+|---|---|---|---|---|---|---|---|
+| 0 | — | baseline (clean main) | — | 0.667 | 4 | 1 | — |
+| 1 | A | lazyload settle (ground-time fix) | deterministic test green; live VERIFIED | 0.778 | 4 | **0** | **kept** |
+| 2 | B | example.com→iana.org (reference) | VERIFIED | 0.800 | 5 | 0 | kept |
+| 3 | B | news.ycombinator.com→newest (news) | VERIFIED | 0.818 | 6 | 0 | kept |
+| 4 | B | amazon.com (shopping) | SILENT_FAILURE (undetected block) | 0.818 | 6 | 0 | **discarded** |
+| 5 | B | gnu.org→Licenses (reference) | ABSTAIN (graceful) | 0.750 | **7** | 0 | kept |
+
+**Headline (the reliability number the project is about):** **M3 SILENT_FAILURE 1 → 0**, and **held at 0**
+through every subsequent probe — including the Amazon probe that *tried* to reintroduce one (discarded
+precisely to keep M3=0). The agent's failures this round are all **safe** (honest abstain) or **caught** by
+the independent verifier — never a silent lie that survived.
+
+**Independent deltas (per-iteration characterizations = the keep basis; live rows are single-run/noisy):**
+- **M3 (silent failures): 1 → 0** — primary, deterministic-test-anchored (iter 1).
+- **M2 (distinct real domains): 4 → 7** — +example.com (reference), +news.ycombinator.com (news),
+  +gnu.org (reference); the tier is no longer Wikipedia-dominated. (iana.org is additionally exercised as
+  iter-2's verified destination.)
+- **M1 (verified-rate): 0.667 → 0.750 net** — rose on iters 1–3, then a *deliberate honest dip* at iter 5
+  (the gnu graceful-abstain RED row) — the breadth↔verified tradeoff the plan predicted (§2). Net still up,
+  on a broader, harder tier, with M3=0.
+
+**Guards held every iteration AND at round end:** G1 offline gate **113** green/network-free; G2
+`planner.py` untouched; G3 `state.py` assertion frozen, zero `text_contains` added. Whole-round diff is
+surgical: `recover.py` + `executor.py` + `test_settle_loading.py` (capability), `live_real_world.yaml`
+(breadth), `research/*` (artifacts). Nothing else.
+
+**New named ceilings surfaced (feed `UNSUPPORTED_SITES` / future rounds):**
+1. **Block-detector coverage gap** — `verify.detect_block` catches Google's `/sorry/` interstitial but not
+   Amazon-style robot-check walls, so those become *silent* failures rather than honest abstains. Future
+   **Probe A**: deterministic block-page fixture + `detect_block` classifies it BLOCKED, **gated on** a live
+   regression check (a too-eager heuristic false-abstains and lowers M1). Deferred — high regression risk.
+2. **Locate-on-real-nav** — the cascade can miss a nav link on a content-heavy real page; the desirable
+   property (demonstrated by gnu) is that the agent **abstains** rather than silently failing.
+
+**Pre-existing named ceilings (unchanged, never touched):** plan-time planner open-loop (`modal`),
+iframe-piercing perception (`iframe`), search-box-strategy, SPA-no-spinner, CSS-anim verifier-artifact,
+bot-wall route-don't-evade (`google`).
+
+**Disposition: DO NOT MERGE.** Branch `autoresearch/round-1` off `main`, commits local-only, nothing
+pushed. Awaiting human review before any merge back to `main`.
+
+<!-- Consolidated full-tier snapshot (eval/REPORT.md + eval/AUDIT.md) regenerated at round end; folded in
+below once the run lands. Per plan §5/§7 the keeps do not depend on it — it is the authoritative consolidated
+measurement, subject to live nondeterminism. -->
+
+---
