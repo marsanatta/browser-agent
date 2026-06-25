@@ -130,3 +130,35 @@ the honest `UNSUPPORTED_SITES` disclosure (real commercial bot-walls → unsuppo
 **Independent signals:** M1 unchanged (8/10 → not added), M2 unchanged (5 — discarded), M3 **0** (held).
 
 ---
+
+## Iteration 5 — Probe B: breadth `gnu.org → Licenses` (reference) — **KEPT** (graceful-abstain class)
+
+**Why this domain:** a distinct **reference/org** domain with a sidebar-nav target — probed to test the
+locate cascade on a real, content-heavy navigation (not a practice page).
+
+**Task (honest page-specific verifier, zero `text_contains`):** `live_gnu_licenses_nav` —
+`assert: url_contains "licenses"`. Deliberately **not** `expect_abstain`: gnu.org/licenses is a public
+page the agent *should* reach, so scoring an abstain as "success" would be dishonest. It lands as an honest
+non-verified row.
+
+**Live characterization:** `nominal=False verified=False asked=True blocked=False steps=4` → **ABSTAIN**.
+The locate cascade did not find the "Licenses" link, and the agent **honestly abstained** (`ask_user`)
+instead of claiming success. **Not** a silent failure — `nominal=False`, so M3 is untouched.
+
+**Independent signals:**
+| metric | before | after | how |
+|---|---|---|---|
+| M1 live verified-rate | 9/11 = 0.818 | 9/12 = 0.750 | new RED row (honest abstain) — the **breadth↔verified tradeoff** the plan predicts (§2) |
+| M2 distinct real domains | 6 | **7** | +gnu.org (reference) |
+| M3 SILENT_FAILURE count | 0 | **0** | abstain is `nominal=False` — the agent failed *safely*, did not lie |
+
+**Named ceiling (this row): locate-on-real-nav.** The cascade can miss a nav link on a content-heavy real
+page; the desirable property is that the agent then **abstains** (M3-safe) rather than silently failing.
+This is the *good* failure mode — contrast iter-4 (Amazon), where the same inability produced a silent
+failure because a bot-wall masked it.
+
+**Decision: KEPT.** Probe-B keep rests on the structural **M2 +1** + this audit (§5/§7), not on the
+(noisy) verified flag; the verifier is sound (page-specific, can fail); guards pass; M3 stays 0. The RED row
+is kept evidence of a graceful-failure class. File changed vs main: `eval/eval_set/live_real_world.yaml`.
+
+---

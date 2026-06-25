@@ -178,3 +178,20 @@ tasks:
       - url_contains: "ycombinator.com"
     assert:
       url_contains: "newest"
+
+  # Distinct reference/org domain with a sidebar-nav "Licenses" link. NOT a bot-wall
+  # (public page); scored by the honest page-specific check (NOT expect_abstain — the
+  # agent should be able to reach it). Documents a graceful-failure class: on a real
+  # nav the locate cascade can miss the link and the agent ABSTAINS (asks the user)
+  # rather than silently claiming success — a RED row that keeps M3 at 0.
+  - id: live_gnu_licenses_nav
+    instruction: "On gnu.org, click the 'Licenses' link in the navigation to open the licenses page."
+    start_url: "https://www.gnu.org/"
+    domain: reference
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "gnu.org"
+    assert:
+      url_contains: "licenses"
