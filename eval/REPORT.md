@@ -1,9 +1,9 @@
 # Eval Report — live evidence
 
-Generated **2026-06-25 09:05 UTC** from a REAL harness run. Every "verified" below is an
+Generated **2026-06-25 12:10 UTC** from a REAL harness run. Every "verified" below is an
 INDEPENDENT programmatic state check on the live page (URL / first-h1 / scoped
 selector) — never the agent's self-report, and never a loose `text_contains`.
-Copilot calls this run: 58.
+Copilot calls this run: 72.
 
 ## Test architecture — what gates vs what's evidence
 
@@ -16,22 +16,22 @@ Copilot calls this run: 58.
   (`python -m eval.run_live_tier`) and reported here. NOT part of the CI gate; a
   red row here is evidence, not a broken build.
 
-## Live real-world tier — 9/12 verified
+## Live real-world tier — 8/12 verified
 
 | task | site | type | deterministic? | nominal | verified | abstained |
 |---|---|---|---|---|---|---|
-| live_wikipedia_helium_retrieval | en.wikipedia.org | retrieval | no (live) | True | True | False |
+| live_wikipedia_helium_retrieval | en.wikipedia.org | retrieval | no (live) | True | False | False |
 | live_pydocs_json_nav | docs.python.org | action | no (live) | True | True | False |
 | live_google_search_steam | www.google.com | action | no (live) | False | True | True |
 | live_wikipedia_signin_synonym | en.wikipedia.org | action | no (live) | True | True | False |
 | live_wikipedia_search_submit | en.wikipedia.org | action | no (live) | True | True | False |
 | live_wikipedia_autocomplete | en.wikipedia.org | action | no (live) | True | True | False |
 | live_internet_lazyload | the-internet.herokuapp.com | action | no (live) | True | True | False |
-| live_internet_modal | the-internet.herokuapp.com | action | no (live) | True | False | False |
+| live_internet_modal | the-internet.herokuapp.com | action | no (live) | False | False | False |
 | live_internet_iframe | the-internet.herokuapp.com | action | no (live) | False | False | True |
 | live_example_more_info_nav | example.com | action | no (live) | True | True | False |
 | live_hackernews_newest_nav | news.ycombinator.com | action | no (live) | True | True | False |
-| live_gnu_licenses_nav | www.gnu.org | action | no (live) | False | False | False |
+| live_gnu_licenses_nav | www.gnu.org | action | no (live) | False | False | True |
 
 ## Day-3 realistic batch (folded in, reproducible) — 8/8 verified
 
