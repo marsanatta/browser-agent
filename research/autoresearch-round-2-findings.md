@@ -94,5 +94,23 @@ M2 13→**14**, M3 1.
 **Batch 2 net: M2 11→14 (+gov, +science, +finance), one DISCARD (w3.org silent failure, Amazon rule), M3
 held at 1.**
 
+### Iter 9 — Probe B: `openlibrary.org` → Log In (books/library) — **KEPT** (VERIFIED)
+Distinct registrable domain from archive.org. `verified=True`, landed `openlibrary.org/account/login`.
+M1 14/19→15/20=0.750, M2 14→**15**, M3 1.
+
+### Iter 10 — Probe B: `stackoverflow.com` → Questions (Q&A) — **KEPT** (graceful ABSTAIN)
+New category **Q&A**. `nominal=False asked=True blocked=False steps=4` → a locate/navigation graceful
+abstain (**not** a detected bot-wall — confirmed via a `blocked`-capture re-run), so scored by the honest
+assert, **not** `expect_abstain`. M3-safe RED row + distinct domain. M1 15/20→15/21=0.714, M2 15→**16**, M3 1.
+
+### Iter 11 — Probe B: `www.rfc-editor.org` → About (standards) — **DISCARDED** (SILENT_FAILURE)
+`nominal=True verified=False`, final URL still `https://www.rfc-editor.org/` — **same class as w3.org**: the
+agent never left the homepage yet claimed success (About link not located, lax nominal-completion). Amazon
+rule → **not committed**, M3 held at 1. This is the **recurring named-ceiling tail** (locate-miss + lax
+nominal-completion, planner-rooted) — a stop signal (§ stop condition 2).
+
+**Batch 3 net: M2 14→16 (+books/openlibrary, +Q&A/stackoverflow), one DISCARD (rfc-editor silent failure),
+M3 held at 1. Breadth target (~15–20) reached; the discard tail is now a single recurring named class.**
+
 
 

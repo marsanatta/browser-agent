@@ -78,5 +78,35 @@
     "decision": "kept",
     "reason": "New category finance. Live VERIFIED (landed finance.yahoo.com/quote/AAPL/); characterize-before-adopt passed. Caveat: bot-wall-prone (consent/anti-bot pages detect_block does not catch); close full-tier run is the M3 arbiter -- if it silent-fails there it is discarded. +1 distinct domain; M3 held at 1.",
     "guards_ok": true
+  },
+  {
+    "iter": 9,
+    "probe_type": "B",
+    "target": "openlibrary.org (books / digital library) -> Log In nav",
+    "metrics_before": { "M1": 0.737, "M2": 14, "M3": 1 },
+    "metrics_after": { "M1": 0.750, "M2": 15, "M3": 1 },
+    "decision": "kept",
+    "reason": "Distinct registrable domain from archive.org. Live VERIFIED (landed openlibrary.org/account/login). Page-specific url_contains login; +1 distinct domain; M3 held at 1.",
+    "guards_ok": true
+  },
+  {
+    "iter": 10,
+    "probe_type": "B",
+    "target": "stackoverflow.com (Q&A) -> Questions nav",
+    "metrics_before": { "M1": 0.750, "M2": 15, "M3": 1 },
+    "metrics_after": { "M1": 0.714, "M2": 16, "M3": 1 },
+    "decision": "kept",
+    "reason": "New category Q&A. Live graceful ABSTAIN (nominal=False asked=True blocked=False steps=4) -- a locate/navigation graceful failure, NOT a detected bot-wall (confirmed via blocked-capture re-run), so scored by honest assert, not expect_abstain. M3-safe RED row; +1 distinct domain; M3 held at 1. Close run is arbiter.",
+    "guards_ok": true
+  },
+  {
+    "iter": 11,
+    "probe_type": "B",
+    "target": "www.rfc-editor.org (standards) -> About nav",
+    "metrics_before": { "M1": 0.714, "M2": 16, "M3": 1 },
+    "metrics_after": { "M1": 0.714, "M2": 16, "M3": 1 },
+    "decision": "discarded",
+    "reason": "SILENT_FAILURE: nominal=True verified=False, final URL still https://www.rfc-editor.org/ -- agent never left homepage yet claimed success (About link not located, lax nominal-completion). Same recurring named-ceiling class as w3.org. Amazon rule -> NOT committed, M3 held at 1. Stop signal (failure tail = single recurring named class).",
+    "guards_ok": true
   }
 ]

@@ -295,3 +295,32 @@ tasks:
       - url_contains: "finance.yahoo.com"
     assert:
       url_contains: "AAPL"
+
+  # Books / digital library — open the sign-in page (distinct registrable domain from archive.org).
+  - id: live_openlibrary_login_nav
+    instruction: "On Open Library, click 'Log In' to open the sign-in page."
+    start_url: "https://openlibrary.org/"
+    domain: media
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "openlibrary.org"
+    assert:
+      url_contains: "login"
+
+  # Q&A — open the Questions listing. Distinct domain (qa). On adoption the agent ABSTAINED
+  # (nominal=False asked=True blocked=False, steps=4) -- a locate/navigation graceful failure
+  # (NOT a detected bot-wall), so scored by the honest page-specific assert (NOT expect_abstain).
+  # A RED abstain row that keeps M3 safe; close full-tier run is the arbiter.
+  - id: live_stackoverflow_questions_nav
+    instruction: "On Stack Overflow, open the 'Questions' page from the navigation."
+    start_url: "https://stackoverflow.com/"
+    domain: qa
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "stackoverflow.com"
+    assert:
+      url_contains: "questions"
