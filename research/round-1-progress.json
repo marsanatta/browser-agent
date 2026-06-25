@@ -18,5 +18,15 @@
     "decision": "kept",
     "reason": "Structurally-distinct reference domain; clean cross-domain nav (More information... -> iana.org). Live VERIFIED (nominal=True verified=True asked=False). Page-specific url_contains verifier, zero text_contains; +1 distinct domain; M3 stays 0.",
     "guards_ok": true
+  },
+  {
+    "iter": 3,
+    "probe_type": "B",
+    "target": "news.ycombinator.com (news aggregator) -> newest page nav",
+    "metrics_before": { "M1": 0.800, "M2": 5, "M3": 0 },
+    "metrics_after": { "M1": 0.818, "M2": 6, "M3": 0 },
+    "decision": "kept",
+    "reason": "Structurally-distinct news domain, automation-tolerant, top-nav click. Live VERIFIED (nominal=True verified=True asked=False). Page-specific url_contains newest, zero text_contains; +1 distinct domain; M3 stays 0.",
+    "guards_ok": true
   }
 ]

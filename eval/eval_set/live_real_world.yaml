@@ -163,3 +163,18 @@ tasks:
       - url_contains: "example.com"
     assert:
       url_contains: "iana.org"
+
+  # News aggregator (server-rendered, automation-tolerant): click the top-nav "new"
+  # link to reach the newest-submissions page. Distinct domain (news). Independent
+  # check: the newest page URL.
+  - id: live_hackernews_newest_nav
+    instruction: "On Hacker News, click the 'new' link in the top navigation to open the newest submissions page."
+    start_url: "https://news.ycombinator.com/"
+    domain: news
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "ycombinator.com"
+    assert:
+      url_contains: "newest"

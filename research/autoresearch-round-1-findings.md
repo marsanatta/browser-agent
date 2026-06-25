@@ -73,3 +73,28 @@ at round end). G2 planner.py untouched. G3 only a YAML add with a page-specific 
 M3 stays 0. File changed vs main: `eval/eval_set/live_real_world.yaml`.
 
 ---
+
+## Iteration 3 — Probe B: breadth `news.ycombinator.com → newest` (news) — **KEPT**
+
+**Why this domain:** a structurally-distinct **news aggregator** — server-rendered, automation-tolerant,
+no bot-wall, different task shape (top-nav click) from the reference/info domains already present.
+
+**Task (page-specific verifier, zero `text_contains`):** `live_hackernews_newest_nav` —
+`assert: url_contains "newest"`.
+
+**Live characterization:** `nominal=True verified=True asked=False blocked=False steps=2` → **VERIFIED**.
+
+**Independent signals:**
+| metric | before | after | how |
+|---|---|---|---|
+| M1 live verified-rate | 8/10 = 0.800 | 9/11 = 0.818 | new row verifies live |
+| M2 distinct real domains | 5 | **6** | +news.ycombinator.com (news) |
+| M3 SILENT_FAILURE count | 0 | **0** | verified, not silent |
+
+**Guards:** G1 offline gate unaffected. G2 planner.py untouched. G3 page-specific `url_contains`, `state.py`
+frozen, zero `text_contains`.
+
+**Decision: KEPT.** +1 distinct human-audited real domain, sound verifier, guards pass, M3 stays 0.
+File changed vs main: `eval/eval_set/live_real_world.yaml`.
+
+---
