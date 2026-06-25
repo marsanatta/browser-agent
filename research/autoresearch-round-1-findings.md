@@ -98,3 +98,35 @@ frozen, zero `text_contains`.
 File changed vs main: `eval/eval_set/live_real_world.yaml`.
 
 ---
+
+## Iteration 4 — Probe B: breadth `amazon.com` (shopping) — **DISCARDED** (named ceiling)
+
+**Why this domain:** a real commercial **shopping** site, the breadth category most likely to bot-wall —
+deliberately probed to surface the route-don't-evade boundary.
+
+**Task probed (not committed):** `live_amazon_search` — search "usb cable", `assert: url_contains "k=usb"`.
+
+**Live characterization:** `nominal=True verified=False asked=False blocked=False steps=5` → **SILENT_FAILURE**.
+Amazon serves a bot/robot-check interstitial to headless automation; `verify.detect_block` does **not**
+recognize that page (it catches Google's `/sorry/` interstitial, not Amazon's robot-check), so the agent
+neither abstained nor reached results — it **silently claimed success** (`nominal=True`) while the
+independent URL check correctly read `verified=False`. (The page-specific verifier did its job: it caught
+the divergence. The defect is upstream — the block detector and the nominal-completion claim.)
+
+**Decision: DISCARDED — the cardinal sin (a silent failure).** Adding this task would push **M3 0→1**, so
+it is **not** committed to the tier; M3 stays 0. This is a route-don't-evade outcome that the agent gets
+*wrong*: it should abstain (BLOCKED), but the block goes undetected.
+
+**Named ceiling (new this round): block-detector coverage gap.** `verify.detect_block` covers Google's
+interstitial but not Amazon-style robot-check / "Continue shopping" walls, so such walls become silent
+failures instead of honest abstains. **Not fixed this round** — and deliberately so: tuning `detect_block`
+to a specific commercial wall is overfitting-prone and **high regression risk** (a too-eager block
+heuristic would *false-abstain* on legitimate pages and **lower M1** on the 6 verified domains). The
+correct fix is a future **Probe A**: a deterministic offline fixture reproducing an Amazon-style block page,
+assert `detect_block` classifies it BLOCKED → agent abstains, **plus** a live regression check that the
+verified domains don't start false-abstaining. Earned in a future round, not rushed here. This belongs in
+the honest `UNSUPPORTED_SITES` disclosure (real commercial bot-walls → unsupported).
+
+**Independent signals:** M1 unchanged (8/10 → not added), M2 unchanged (5 — discarded), M3 **0** (held).
+
+---
