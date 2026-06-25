@@ -182,19 +182,33 @@ unexplained defect → stop. (Conditions 2/3 not reached: M2 still climbing, 5 o
 | 4 | B | amazon.com (shopping) | SILENT_FAILURE (undetected block) | 0.818 | 6 | 0 | **discarded** |
 | 5 | B | gnu.org→Licenses (reference) | ABSTAIN (graceful) | 0.750 | **7** | 0 | kept |
 
-**Headline (the reliability number the project is about):** **M3 SILENT_FAILURE 1 → 0**, and **held at 0**
-through every subsequent probe — including the Amazon probe that *tried* to reintroduce one (discarded
-precisely to keep M3=0). The agent's failures this round are all **safe** (honest abstain) or **caught** by
-the independent verifier — never a silent lie that survived.
+> ⚠️ **CORRECTION (authoritative consolidated re-run).** The per-iteration M3 values in the table above are
+> single-run measurements of the *touched* tasks only; I carried `modal`'s stale baseline tag instead of
+> re-measuring it. The full-tier `run_live_tier` snapshot (below) shows **M3 = 1, not 0** — `live_internet_modal`
+> is itself a SILENT_FAILURE. The headline is corrected accordingly. This is the methodology lesson of the
+> round: **M3 must be read from a full-tier re-run, never inferred from touched tasks** — a silent failure can
+> lurk in a task you didn't change.
 
-**Independent deltas (per-iteration characterizations = the keep basis; live rows are single-run/noisy):**
-- **M3 (silent failures): 1 → 0** — primary, deterministic-test-anchored (iter 1).
+**Headline (corrected, honest):** Iteration 1 **eliminated the lazyload silent failure** — verified two
+independent ways (deterministic offline test green; `lazyload = OK/verified` in the authoritative snapshot).
+But **global M3 = 0 was NOT achieved**: the consolidated re-run shows the pre-existing `modal` task is *also*
+a silent failure (the agent claims success on a planner-emitted navigate-only plan **without grounding the
+modal**; intermittently masked as HONEST_FAIL by transient Copilot gateway errors — see the 3× re-run). So
+the silent-failure **count is unchanged at 1**, but it moved from a *deterministically fixable* defect
+(lazyload, now fixed) to a *planner-rooted* one (modal — the B2 open-loop ceiling, **never-fix** by guard G2).
+Net: one real defect fixed; one pre-existing silent failure newly **named**, not introduced by this round.
+
+**Independent deltas (corrected):**
+- **M3 (silent failures): 1 → 1** — lazyload's silent failure eliminated (real, deterministic + verified),
+  but the consolidated re-run reveals `modal` silent-fails → count holds at 1. **Not a regression** (planner.py
+  + state.py untouched; the modal defect is pre-existing and planner-rooted). *Newly named target* for a
+  future round, not earnable here without touching the planner ceiling.
 - **M2 (distinct real domains): 4 → 7** — +example.com (reference), +news.ycombinator.com (news),
-  +gnu.org (reference); the tier is no longer Wikipedia-dominated. (iana.org is additionally exercised as
-  iter-2's verified destination.)
-- **M1 (verified-rate): 0.667 → 0.750 net** — rose on iters 1–3, then a *deliberate honest dip* at iter 5
-  (the gnu graceful-abstain RED row) — the breadth↔verified tradeoff the plan predicted (§2). Net still up,
-  on a broader, harder tier, with M3=0.
+  +gnu.org (reference); the tier is no longer Wikipedia-dominated. (iana.org additionally exercised as
+  iter-2's verified destination.) **Solid — structural, run-independent.**
+- **M1 (verified-rate): 0.667 → 0.750** — consolidated snapshot confirms **9/12 verified**. Rose on iters
+  1–3, deliberate honest dip at iter 5 (gnu graceful-fail) — the breadth↔verified tradeoff (§2). Net up, on a
+  broader, harder tier.
 
 **Guards held every iteration AND at round end:** G1 offline gate **113** green/network-free; G2
 `planner.py` untouched; G3 `state.py` assertion frozen, zero `text_contains` added. Whole-round diff is
@@ -202,11 +216,17 @@ surgical: `recover.py` + `executor.py` + `test_settle_loading.py` (capability), 
 (breadth), `research/*` (artifacts). Nothing else.
 
 **New named ceilings surfaced (feed `UNSUPPORTED_SITES` / future rounds):**
-1. **Block-detector coverage gap** — `verify.detect_block` catches Google's `/sorry/` interstitial but not
+1. **Modal navigate-only silent failure** (the corrected headline) — on `live_internet_modal` the planner
+   emits a navigate-only plan and the agent declares `nominal=True` **without grounding the modal**, so the
+   modal-title assertion fails → SILENT_FAILURE. Rooted in the planner's open-loop behaviour (**B2 ceiling,
+   never-fix** under G2) compounded by a too-lax nominal-completion claim. A future **Probe A** could tighten
+   nominal-completion (don't claim done when verify-after-act shows the goal element was never grounded)
+   **without** touching planner.py or the assertion — but it is real, deferred, and high-care.
+2. **Block-detector coverage gap** — `verify.detect_block` catches Google's `/sorry/` interstitial but not
    Amazon-style robot-check walls, so those become *silent* failures rather than honest abstains. Future
    **Probe A**: deterministic block-page fixture + `detect_block` classifies it BLOCKED, **gated on** a live
    regression check (a too-eager heuristic false-abstains and lowers M1). Deferred — high regression risk.
-2. **Locate-on-real-nav** — the cascade can miss a nav link on a content-heavy real page; the desirable
+3. **Locate-on-real-nav** — the cascade can miss a nav link on a content-heavy real page; the desirable
    property (demonstrated by gnu) is that the agent **abstains** rather than silently failing.
 
 **Pre-existing named ceilings (unchanged, never touched):** plan-time planner open-loop (`modal`),
@@ -216,8 +236,26 @@ bot-wall route-don't-evade (`google`).
 **Disposition: DO NOT MERGE.** Branch `autoresearch/round-1` off `main`, commits local-only, nothing
 pushed. Awaiting human review before any merge back to `main`.
 
-<!-- Consolidated full-tier snapshot (eval/REPORT.md + eval/AUDIT.md) regenerated at round end; folded in
-below once the run lands. Per plan §5/§7 the keeps do not depend on it — it is the authoritative consolidated
-measurement, subject to live nondeterminism. -->
+### Consolidated authoritative snapshot (`eval/REPORT.md` + `eval/AUDIT.md`, single full-tier `run_live_tier`)
+
+Regenerated at round end — the plan's named source of truth (§8). `attribution_coverage = 1.000`.
+
+- **Live tier: 9/12 verified.** OK rows: helium, pydocs-json, wiki-signin, wiki-search-submit,
+  wiki-autocomplete, **lazyload** (✓ iter-1 fix), **example→iana** (✓ iter-2), **HN→newest** (✓ iter-3),
+  + google (BLOCKED→correct abstain, scored verified). Non-verified: **modal (SILENT_FAILURE, ground-time)**,
+  iframe (HONEST_FAIL, plan-time, abstained), gnu (HONEST_FAIL — this run it honest-failed without asking;
+  still `nominal=False`, M3-safe).
+- **Flag tally (20 = 12 live + 8 day-3 regression batch): OK=16, SILENT_FAILURE=1, BLOCKED=1, HONEST_FAIL=2.**
+- **M3 = 1** (the lone SILENT_FAILURE = `modal`). **This is the authoritative number; it supersedes the
+  per-iteration M3=0 bookkeeping above.**
+- `modal` 3× re-run characterization: HONEST_FAIL (gateway error, steps=0) · **SILENT_FAILURE** (steps=1) ·
+  HONEST_FAIL (gateway error, steps=0) — i.e. **when the gateway responds, modal silent-fails**; the
+  HONEST_FAILs are transient Copilot `send_and_wait` errors, not a different agent behaviour.
+
+**What is solid vs what is corrected:**
+- *Solid:* iter-1 lazyload fix (verified two ways), M2 4→7 (structural), M1→0.750 (9/12), all guards held,
+  surgical diff, the Amazon discard (correctly kept out to protect M3).
+- *Corrected:* the M3=0 / "held at 0" claim. True M3=1; the round did **not** reach global zero silent
+  failures — `modal` is a pre-existing, planner-rooted silent failure the full re-run exposed.
 
 ---

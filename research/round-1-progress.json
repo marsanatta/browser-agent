@@ -48,5 +48,15 @@
     "decision": "kept",
     "reason": "Distinct reference domain. Live ABSTAIN (nominal=False verified=False asked=True blocked=False): locate cascade missed the nav link and the agent abstained gracefully rather than lying -- M3-safe. Honest page-specific verifier (NOT expect_abstain, since the page is reachable); kept as a RED row evidencing a graceful-failure class. +1 distinct domain; M1 drops (breadth<->verified tradeoff, expected); M3 stays 0. Keep basis is structural M2 + audit, not the noisy verified flag.",
     "guards_ok": true
+  },
+  {
+    "iter": 6,
+    "probe_type": "snapshot",
+    "target": "authoritative consolidated full-tier run_live_tier (round-end source of truth) + M3 CORRECTION",
+    "metrics_before": { "M1": 0.750, "M2": 7, "M3": 0 },
+    "metrics_after": { "M1": 0.750, "M2": 7, "M3": 1 },
+    "decision": "correction",
+    "reason": "Full-tier snapshot: 9/12 verified; flag tally OK=16 SILENT_FAILURE=1 BLOCKED=1 HONEST_FAIL=2. The lone SILENT_FAILURE is live_internet_modal (ground-time): agent claims nominal=True on a planner navigate-only plan without grounding the modal. The per-iteration M3=0 values were single-run measurements of touched tasks only and missed this pre-existing, intermittently-gateway-masked silent failure. CORRECTED M3=1 (authoritative). lazyload fix corroborated (OK/verified); example+HN OK; gnu honest-fail (M3-safe). Not a regression: planner.py + state.py untouched. modal silent failure is the B2 planner ceiling (never-fix) + a lax nominal-completion claim -> newly named, deferred.",
+    "guards_ok": true
   }
 ]
