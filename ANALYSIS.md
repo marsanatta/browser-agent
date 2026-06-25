@@ -84,12 +84,17 @@ The differentiator is that **success is never the agent's self-report** — it i
 - **Nominal vs verified (CuP) is the headline silent-failure metric.**
   `eval/scoring.py::silent_failure_gap` counts tasks where the agent claimed
   success (`nominal`) but the independent assertion failed (`verified=False`).
-  Real result: **CuP = 0.000 on n=12** (`eval/REPORT.md`) — no silent failures
-  observed in this run. Directional, not a guarantee (see honesty note).
-- **The one FAIL is honest, not silent.** `books_open_light_in_attic` is
-  `verified=FAIL` *and* `nominal=FAIL` — the agent did not falsely claim success,
-  so it contributes 0 to CuP. TSR = 0.917 ± 0.080 reflects this single real miss
-  (11/12 verified; SE = √(0.917·0.083/12) ≈ 0.080, matching the report).
+  On the current live-tier re-run **CuP / M3 = 1** — the lone silent failure is
+  `live_internet_modal` (`eval/AUDIT.md`; analysed honestly in §6), a pre-existing
+  **planner-rooted** gap, **not** a regression from round-1 (`planner.py` untouched
+  across the merge). Bot-walled / unreachable rows **abstain** (honest
+  non-completion) and so do not inflate CuP. Directional, not a guarantee (see
+  honesty note).
+- **The other non-verified rows are honest, not silent.** On the live tier
+  (9/12 verified, `eval/REPORT.md`) `live_internet_iframe` **abstains**
+  (`asked=True`) and `live_gnu_licenses_nav` reports `nominal=False` — neither
+  falsely claims success, so neither contributes to CuP. Only `live_internet_modal`
+  is a silent failure (§6); the remaining rows are correct abstains or honest fails.
 - **pass^3 for side-effecting tasks.** `eval/scoring.py::pass_hat_k` requires ALL
   3 runs of a side-effecting task to verify; reported **pass^3 = 1.000**
   (`eval/REPORT.md`). This is a reliability check, not a single lucky pass.
@@ -132,7 +137,9 @@ recorded here as a known gap rather than shipped half-done.
 These are surfaced by an overnight live-tier exploration across ~46 distinct real
 public domains (`job/homeworks/autoresearch-findings/browser-findings.md`). They are
 **recorded, not built** — this pass is measurement-only. Each is a real, evidenced
-candidate; none is implemented here.
+candidate; none is implemented here. **Update:** the round-1 autoresearch pass has
+since built + merged the bounded spinner-settle, closing the lazyload ground-time
+silent failure (§6); the six candidates below remain recorded-not-built.
 
 ### Ranked candidate fixes (highest ROI first)
 
@@ -183,7 +190,59 @@ candidate; none is implemented here.
 ### Discipline note (the load-bearing safety property)
 
 The abstain-on-uncertainty policy **undercounts capability** (it can't distinguish "genuinely
-blocked/uncertain" from "hard but doable") but it is what holds the **CuP silent-failure count at 0**
+blocked/uncertain" from "hard but doable") but it is what keeps the **CuP silent-failure count low**
 across a 46-site spread. Undercounting capability is the correct error direction versus a silent
 failure. The one exploration change that converted an honest abstain into a silent failure was
-**discarded** — CuP=0 dominates a nicer-looking capability number.
+**discarded** — a low CuP dominates a nicer-looking capability number.
+
+## 6. Round-1 autoresearch update (merged) — what changed, honestly
+
+An eval-driven Modify→Verify→Keep/Discard round ran in an isolated worktree, now merged to `main`.
+Per-iteration narrative: `research/autoresearch-round-1-findings.md`; machine-readable ledger:
+`research/round-1-progress.json`; per-task attribution: `eval/AUDIT.md`. 5 iterations, **4 kept + 1
+discarded**. Throughout and after the merge the **offline gate stayed green (113 tests, network-free)**,
+**`planner.py` was untouched**, and **no verifier was weakened** (`eval/verify/state.py` assertion frozen).
+
+**Closed — the lazyload ground-time silent failure (attribution-targeted).** The audit tagged
+`live_internet_lazyload` SILENT_FAILURE / **ground-time** (the agent grounds and clicks, then the result
+renders asynchronously behind a spinner and verify-after-act raced it). The fix is a bounded **settle
+before verify-after-act** — `recover.settle_loading` waits a *visible generic* loading indicator to clear,
+one call wired in `executor` — touching verify-after-act **timing only**, never the state-check assertion.
+It was **earned on a deterministic offline test** (`backend/tests/test_settle_loading.py`, network-free,
+part of the 113 gate) and **corroborated by a live verified flip** (`live_internet_lazyload` now
+`nominal=True, verified=True` in `eval/REPORT.md`).
+
+**Eval breadth grew 4 → 7 distinct real domains.** Added real public sites with page-specific verifiers
+(zero `text_contains`): `example.com → iana.org` (reference), `news.ycombinator.com → newest` (news),
+`gnu.org → Licenses` (reference), alongside the existing Wikipedia / docs.python.org / the-internet /
+google. Bot-walls are routed to **abstain** (route-don't-evade); a real-site row that abstains or
+honest-fails is kept as evidence of a failure *class*, not discarded.
+
+**Honest correction — M3 = 1, not 0 (read it as an open limitation, not a regression).** The
+per-iteration single-runs reported M3 = 0, but the **authoritative full-tier re-run** (`eval/AUDIT.md`,
+`attribution_coverage = 1.000`; flag tally **OK=16, SILENT_FAILURE=1, BLOCKED=1, HONEST_FAIL=2**) shows the
+lone silent failure is **`live_internet_modal`**: the planner emits a navigate-only plan and the agent
+declares `nominal=True` **without grounding the modal**, so the modal-title assertion fails
+(`nominal=True, verified=False`). The deterministic audit tag is *ground-time*, but the **root cause is the
+B2 planner open-loop ceiling** (a navigate-only plan for "read the modal title") compounded by a too-lax
+nominal-completion claim. It is **pre-existing and planner-rooted — never introduced by this round**
+(`planner.py` untouched across the merge; confirmed by `git diff`) and **never-fixed by design** (rewriting
+`planner.py` is out of scope, §5). It was intermittently masked as an honest-fail by transient Copilot
+gateway errors; a 3× re-run confirmed it silent-fails whenever the gateway responds. **Methodology lesson
+recorded:** read M3 from a full-tier re-run, never infer it from the tasks you touched — a silent failure
+can lurk in a task you didn't change.
+
+**Named ceilings (honest limitations, all out of scope by design; detail in §5):**
+- **B2 planner open-loop** — the planner names/plans a target without seeing the page (the modal
+  navigate-only plan above; the search-box-strategy ceiling). Never rewritten — `planner.py` is frozen by guard.
+- **Search-box-strategy** — unnamed / verbosely-named / autocomplete-required search boxes defeat exact
+  role+name grounding (§5); the targeted mitigation is the press-Enter preference (§5 candidate #3).
+- **Same-origin iframe-piercing** — `locate` builds against the top frame only (`live_internet_iframe`
+  abstains); the frame-aware verifier (`iframe_text_equals`) is already in place to turn green when a
+  piercing fix lands (§5).
+- **Bot-walls (route-don't-evade)** — CAPTCHA / managed-challenge pages are routed to **abstain**, not
+  evaded (`live_google_search_steam`); `detect_block` still misses modern-Cloudflare and Amazon-style
+  robot-check markers (§5 candidate #1), so those can still silent-fail until that coverage is extended.
+
+Net: one real ground-time defect **closed** (lazyload, verified two ways), breadth **4 → 7**, all guards
+held — and one pre-existing planner-rooted silent failure (`modal`) newly **named and attributed**, not hidden.
