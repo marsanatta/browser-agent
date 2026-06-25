@@ -20,11 +20,28 @@ from urllib.parse import urlparse
 
 from app.agent.models import LLMGateway
 
+from eval import audit
 from eval.harness import _CountingGateway, _run_once
 from eval.loader import EvalTask, load_tasks
 
 LIVE_PATH = Path(__file__).resolve().parent / "eval_set" / "live_real_world.yaml"
 REPORT_PATH = Path(__file__).resolve().parent / "REPORT.md"
+AUDIT_PATH = Path(__file__).resolve().parent / "AUDIT.md"
+
+
+def _trace(task: EvalTask, rec) -> audit.TaskTrace:
+    return audit.build_trace(
+        task.id,
+        plan=rec.plan,
+        steps=rec.audit_steps,
+        tokens=rec.tokens,
+        calls=rec.copilot_calls,
+        nsteps=rec.steps,
+        nominal=rec.nominal,
+        verified=rec.verified,
+        asked=rec.asked,
+        blocked=rec.blocked,
+    )
 
 # Day-3 realistic batch (sandbox), folded in so its proof lives in the repo.
 DAY3_BATCH = [
@@ -50,16 +67,18 @@ def _site(t: EvalTask) -> str:
 async def _run(tasks: list[EvalTask]):
     gw = _CountingGateway(LLMGateway())
     rows = []
+    traces = []
     try:
         for t in tasks:
             try:
                 rec = await _run_once(t, gw, full=True)
                 rows.append((t, rec, None))
+                traces.append(_trace(t, rec))
             except Exception as exc:  # a flaky live site must not abort the batch
                 rows.append((t, None, f"{type(exc).__name__}: {exc}"))
     finally:
         await gw.close()
-    return rows, gw.calls
+    return rows, gw.calls, traces
 
 
 def _table(rows) -> str:
@@ -88,8 +107,8 @@ async def main() -> None:
     by_id = {t.id: t for t in load_tasks()}
     day3 = [by_id[i] for i in DAY3_BATCH if i in by_id]
 
-    live_rows, c1 = await _run(live)
-    day3_rows, c2 = await _run(day3)
+    live_rows, c1, live_traces = await _run(live)
+    day3_rows, c2, day3_traces = await _run(day3)
 
     when = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     body = f"""# Eval Report — live evidence
@@ -160,7 +179,11 @@ genuine agent gaps:
   (`iframe_text_equals`) so an iframe-piercing fix would pass it later.
 """
     REPORT_PATH.write_text(body, encoding="utf-8")
+    all_traces = live_traces + day3_traces
+    AUDIT_PATH.write_text(audit.render_md(all_traces, when), encoding="utf-8")
+    cov = audit.attribution_coverage(all_traces)
     print(f"REPORT written: {REPORT_PATH}")
+    print(f"AUDIT written:  {AUDIT_PATH}  (attribution_coverage={cov:.3f})")
     print(
         f"live tier: {_verified(live_rows)}/{len(live_rows)} verified | "
         f"day-3 batch: {_verified(day3_rows)}/{len(day3_rows)} verified"

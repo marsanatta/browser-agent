@@ -29,6 +29,7 @@ from app.agent.planner import LLMPlanner, SubTask
 from app.browser.provider import PlaywrightProvider
 from app.stream.events import EventType
 
+from eval import audit
 from eval import report as report_mod
 from eval import scoring
 from eval.loader import EvalTask, load_tasks
@@ -45,16 +46,33 @@ class _CountingGateway:
     def __init__(self, inner: LLMGateway) -> None:
         self._inner = inner
         self.calls = 0
+        self.tokens = {"output_tokens": 0, "input_tokens": 0, "reasoning_tokens": 0,
+                       "total_nano_aiu": 0}
+
+    def _accrue(self, resp: Any) -> None:
+        # Prefer the full assistant.usage ledger; fall back to the output_tokens read.
+        usage = getattr(resp, "usage", None)
+        if usage:
+            for k in self.tokens:
+                if usage.get(k):
+                    self.tokens[k] += usage[k]
+        else:
+            ot = getattr(resp, "output_tokens", None)
+            if ot:
+                self.tokens["output_tokens"] += ot
 
     async def complete(self, prompt: str, model: str | None = None) -> Any:
         self.calls += 1
-        if model is None:
-            return await self._inner.complete(prompt)
-        return await self._inner.complete(prompt, model=model)
+        resp = await (self._inner.complete(prompt) if model is None
+                      else self._inner.complete(prompt, model=model))
+        self._accrue(resp)
+        return resp
 
     async def judge(self, prompt: str) -> Any:
         self.calls += 1
-        return await self._inner.judge(prompt)
+        resp = await self._inner.judge(prompt)
+        self._accrue(resp)
+        return resp
 
     async def close(self) -> None:
         await self._inner.close()
@@ -85,6 +103,12 @@ class RunRecord:
     copilot_calls: int
     step_verdicts: list[str] = field(default_factory=list)
     asked: bool = False
+    # Audit instrumentation (observe-only): the planner's plan, the reduced per-step
+    # trace, the real per-task token ledger, and whether a bot-wall was hit.
+    tokens: dict = field(default_factory=dict)
+    blocked: bool = False
+    plan: list = field(default_factory=list)
+    audit_steps: list = field(default_factory=list)
 
 
 async def _run_once(task: EvalTask, gateway: _CountingGateway, *, full: bool) -> RunRecord:
@@ -108,6 +132,7 @@ async def _run_once(task: EvalTask, gateway: _CountingGateway, *, full: bool) ->
         return ok
 
     calls_before = gateway.calls
+    tokens_before = dict(gateway.tokens)
     planner = _StartUrlPlanner(LLMPlanner(gateway), task.start_url)
     executor = Executor(
         PlaywrightProvider(headless=True),
@@ -123,8 +148,10 @@ async def _run_once(task: EvalTask, gateway: _CountingGateway, *, full: bool) ->
     asked = False
     step_verdicts: list[str] = []
     error: str | None = None
+    events_seen: list = []
     try:
         async for ev in executor.run(task.instruction):
+            events_seen.append(ev)
             if ev.type == EventType.STEP_STARTED:
                 steps += 1
             elif ev.type == EventType.STEP_FINISHED:
@@ -139,6 +166,9 @@ async def _run_once(task: EvalTask, gateway: _CountingGateway, *, full: bool) ->
                 error = str(ev.payload.get("error"))
     except Exception as exc:  # harness must survive a single task crashing
         error = f"{type(exc).__name__}: {exc}"
+
+    reduced = audit.reduce_events(events_seen)
+    task_tokens = {k: gateway.tokens[k] - tokens_before.get(k, 0) for k in gateway.tokens}
 
     # Abstain tasks are scored by OUTCOME, not page state: a correct refusal is
     # asking the user without falsely claiming success. This is the primitive that
@@ -158,6 +188,10 @@ async def _run_once(task: EvalTask, gateway: _CountingGateway, *, full: bool) ->
         copilot_calls=gateway.calls - calls_before,
         step_verdicts=step_verdicts,
         asked=asked,
+        tokens=task_tokens,
+        blocked=reduced["blocked"],
+        plan=reduced["plan"],
+        audit_steps=reduced["steps"],
     )
 
 

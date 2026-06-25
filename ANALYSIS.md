@@ -126,3 +126,64 @@ reached only by the confirmation-declined path). Closing this would mean adding 
 M5 but **deliberately not wired**: a mis-predicted `expected_url` would trigger
 spurious replans on every task and destabilize the otherwise-green loop. It is
 recorded here as a known gap rather than shipped half-done.
+
+## 5. Known improvement candidates + limitations (out of scope for now)
+
+These are surfaced by an overnight live-tier exploration across ~46 distinct real
+public domains (`job/homeworks/autoresearch-findings/browser-findings.md`). They are
+**recorded, not built** — this pass is measurement-only. Each is a real, evidenced
+candidate; none is implemented here.
+
+### Ranked candidate fixes (highest ROI first)
+
+1. **Modern-Cloudflare markers in `detect_block`** — `detect_block` matches the older
+   Cloudflare wording but **misses the current "Just a moment…" / "Attention Required!"
+   managed challenge**. ~17% of the diverse real web (8 of ~46 probed: britannica,
+   stackoverflow, npm, coingecko, caniuse, timeanddate, podcastindex, google) bot-walls
+   a headless agent. **ROI: highest** — an undetected block contaminates *both* the
+   capability metric (mis-bucketed as NOT_FOUND) *and* the silent-failure metric. Low effort.
+2. **Settle-before-perceive on JS-first / redirecting sites** (`networkidle`, or "until N
+   interactive elements / target visible"). Recovers ESPN-class navigation-race crashes and
+   JS-hydrated chrome. **ROI: high** (a whole class of modern SPA/redirect sites). Medium effort.
+3. **Prefer press-Enter over click-autocomplete-suggestion for search boxes** — kills the
+   Wikivoyage-class *silent* failure (autocomplete suggestion's name rarely equals the query).
+   Implement as an executor submit-strategy preference, **not** a planner change. **ROI: high**
+   (removes a silent-failure class). Medium effort.
+4. **Deterministic interactability tie-break in `_match` for count-badge twins** — GitHub's
+   real nav link is named `"Issues\n5k+"`; prefer the visible+enabled link over a same-named
+   non-interactable menuitem **BEFORE any L2 route**. NOTE: routing these to L2 was tried in the
+   exploration and **created a silent failure** (it coin-flip mis-picked and claimed success) —
+   so the safe fix is a deterministic tie-break, and it must ship with a regression test that
+   CuP stays 0. **ROI: medium** (cart counts, badges, "5k+" counters share this cliff). Medium effort.
+5. **Honeypot / hidden-input filter in `perceive`** (drop `aria-hidden`, offscreen, or
+   "for robots only" inputs, e.g. GOV.UK's `id=giraffe` trap). Prevents honeypot poisoning +
+   trims noise. **ROI: medium.** Low-medium effort.
+6. **Extend `settle_loading` to "wait for target text/selector present"** for SPA AJAX filters
+   with no spinner (demoblaze-class), where a spinner-settle is a no-op. **ROI: medium.** Medium effort.
+
+### Named ceilings (out of scope — why)
+
+- **Cross-website generalization is WIDGET-determined, not site/domain.** Same engine
+  (MediaWiki: Wikipedia vs Wikivoyage), opposite outcome decided purely by the submit
+  *widget/strategy* (press-Enter vs click-an-autocomplete-suggestion); same category
+  (.gov: data.gov vs weather.gov), opposite outcome by widget. The general guarantee is the
+  **Mind2Web cross-website generalization gap — a research ceiling**, not a bounded fix. The
+  targeted mitigation is candidate #3, but a *general* "strategy proven on site A transfers to
+  near-identical site B" guarantee is out of scope. (Bucket eval results by widget pattern, not site.)
+- **Same-origin iframe-piercing.** `locate` builds against the top frame only; piercing needs
+  `perceive` to enumerate same-origin child frames AND tag elements with their frame AND `locate`
+  to use `frame_locator` AND the cache key to include the frame — a broad cascade change with high
+  regression risk for one widget class. **Out of scope (high effort/risk).** The frame-aware
+  verifier (`iframe_text_equals`) is already in place to turn green when this lands.
+- **B2 planner / search-box-strategy ceiling.** Unnamed (DuckDuckGo HTML), verbosely-named
+  (Bing: "Enter your search here — Search suggestions…"), or autocomplete-required search boxes
+  defeat exact role+name grounding. This is the open-loop "name a target without seeing the page"
+  ceiling; **not solvable without rewriting `planner.py`, which is out of scope by design.**
+
+### Discipline note (the load-bearing safety property)
+
+The abstain-on-uncertainty policy **undercounts capability** (it can't distinguish "genuinely
+blocked/uncertain" from "hard but doable") but it is what holds the **CuP silent-failure count at 0**
+across a 46-site spread. Undercounting capability is the correct error direction versus a silent
+failure. The one exploration change that converted an honest abstain into a silent failure was
+**discarded** — CuP=0 dominates a nicer-looking capability number.

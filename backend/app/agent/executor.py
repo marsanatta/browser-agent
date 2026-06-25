@@ -76,6 +76,8 @@ class Executor:
             yield Event(events.EventType.RUN_ERROR, {"run_id": run_id, "error": str(exc)})
             return
 
+        yield events.plan_ready(run_id, [_args(st) for st in subtasks])
+
         await self._provider.launch()
         page = await self._provider.new_page()
         all_ok = True
@@ -189,7 +191,8 @@ class Executor:
                 page, step_id, st, reground=reground, attempt=attempt
             )
             if located is not None:
-                yield events.locator_resolved(step_id, located.tier, located.strategy)
+                ground = "AMBIGUOUS_L2" if located.via == "l2" else "RESOLVED"
+                yield events.locator_resolved(step_id, located.tier, located.strategy, ground)
             if shot is not None:
                 yield events.screenshot_annotated(shot)
             if result is verify.VerifyResult.CHANGED:

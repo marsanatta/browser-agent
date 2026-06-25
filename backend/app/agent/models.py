@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from typing import Any
 
 from app.obs.tracing import redact
 
@@ -47,6 +48,8 @@ JUDGE_MODEL = "claude-sonnet-4.5"
 class LLMResponse:
     model: str
     content: str
+    output_tokens: int | None = None  # completion tokens (resp.data.output_tokens), nullable
+    usage: dict | None = None  # full ledger from the assistant.usage event, when present
 
 
 class MockGateway:
@@ -61,7 +64,18 @@ class MockGateway:
 
     async def complete(self, prompt: str, model: str = ACTOR_WORKHORSE) -> LLMResponse:
         self.calls.append(prompt)
-        return LLMResponse(model=model, content=self._responder(prompt))
+        content = self._responder(prompt)
+        # Synthetic usage event so the per-task token ledger is offline-testable
+        # (no Copilot, no network) — same shape the real assistant.usage event has.
+        out = len(content.split())
+        inp = len(prompt.split())
+        usage = {
+            "input_tokens": inp,
+            "output_tokens": out,
+            "reasoning_tokens": 0,
+            "total_nano_aiu": (inp + out) * 1000,
+        }
+        return LLMResponse(model=model, content=content, output_tokens=out, usage=usage)
 
     async def judge(self, prompt: str) -> LLMResponse:
         return await self.complete(prompt, model=JUDGE_MODEL)
@@ -125,8 +139,32 @@ class LLMGateway:
         session = await client.create_session(
             on_permission_request=PermissionHandler.approve_all, model=model
         )
+        # Accumulate the real token ledger from the assistant.usage event (input +
+        # output + reasoning + total_nano_aiu). Best-effort: if the SDK surface
+        # differs, the resp.data.output_tokens read below still gives completion tokens.
+        usage: dict = {}
+
+        def _on_event(event: Any) -> None:
+            # CopilotSession.on(handler) delivers EVERY SessionEvent. The usage event's
+            # data is AssistantUsageData (it carries reasoning_tokens, unlike the
+            # message data); accumulate its ledger across the call's events.
+            data = getattr(event, "data", None)
+            if data is not None and hasattr(data, "reasoning_tokens"):
+                for k, v in _usage_from_event(event).items():
+                    usage[k] = usage.get(k, 0) + v
+
+        try:
+            session.on(_on_event)
+        except Exception:
+            pass
+
         resp = await session.send_and_wait(prompt)
-        return LLMResponse(model=model, content=_extract_text(resp))
+        return LLMResponse(
+            model=model,
+            content=_extract_text(resp),
+            output_tokens=_extract_output_tokens(resp),
+            usage=usage or None,
+        )
 
     async def judge(self, prompt: str) -> LLMResponse:
         """Verification call routed to a different model FAMILY than the actor."""
@@ -149,3 +187,46 @@ def _extract_text(resp) -> str:
     src = data if data is not None else resp
     text = getattr(src, "content", None) or ""
     return redact(text)
+
+
+def _extract_output_tokens(resp: Any) -> int | None:
+    """The easy completion-token read: resp.data.output_tokens (nullable)."""
+    data = getattr(resp, "data", None)
+    src = data if data is not None else resp
+    val = getattr(src, "output_tokens", None)
+    try:
+        return int(val) if val is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+_USAGE_KEYS = ("input_tokens", "output_tokens", "reasoning_tokens", "total_nano_aiu")
+
+
+def _usage_from_event(event: Any) -> dict:
+    """Extract a token ledger from an assistant.usage SessionEvent. The real event's
+    `data` is AssistantUsageData (input/output/reasoning_tokens directly, and
+    `copilot_usage.total_nano_aiu` nested). Defensive: also accepts a synthetic
+    object/dict (offline tests) on `event.data`, `event.usage`, or the event itself."""
+    for src in (getattr(event, "data", None), getattr(event, "usage", None), event):
+        if src is None:
+            continue
+        out: dict = {}
+        for key in _USAGE_KEYS:
+            val = src.get(key) if isinstance(src, dict) else getattr(src, key, None)
+            if val is not None:
+                try:
+                    out[key] = int(val)
+                except (TypeError, ValueError):
+                    pass
+        cu = src.get("copilot_usage") if isinstance(src, dict) else getattr(src, "copilot_usage", None)
+        if cu is not None:
+            nano = cu.get("total_nano_aiu") if isinstance(cu, dict) else getattr(cu, "total_nano_aiu", None)
+            if nano is not None:
+                try:
+                    out["total_nano_aiu"] = int(nano)
+                except (TypeError, ValueError):
+                    pass
+        if out:
+            return out
+    return {}

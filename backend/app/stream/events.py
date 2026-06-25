@@ -34,6 +34,7 @@ class EventType(str, Enum):
     LOCATOR_RESOLVED = "LOCATOR_RESOLVED"
     ASK_USER = "ASK_USER"
     RECOVERY = "RECOVERY"
+    PLAN_READY = "PLAN_READY"
 
 
 @dataclass(frozen=True)
@@ -90,13 +91,22 @@ def step_finished(
     return Event(EventType.STEP_FINISHED, payload)
 
 
-def locator_resolved(step_id: str, tier: int, strategy: str) -> Event:
-    """Surface the deterministic-cascade outcome (DESIGN §8: chosen locator +
-    cascade level is part of the inspectable per-step diagnostics)."""
+def locator_resolved(step_id: str, tier: int, strategy: str, ground: str = "RESOLVED") -> Event:
+    """Surface the grounding outcome + chosen locator (DESIGN §8: chosen locator +
+    cascade level is part of the inspectable per-step diagnostics). `ground` is the
+    observe-only grounding outcome: RESOLVED (deterministic cascade) or AMBIGUOUS_L2
+    (resolved by the L2 LLM re-rank). A NOT_FOUND step emits no LOCATOR_RESOLVED."""
     return Event(
         EventType.LOCATOR_RESOLVED,
-        {"step_id": step_id, "tier": tier, "strategy": strategy},
+        {"step_id": step_id, "tier": tier, "strategy": strategy, "ground": ground},
     )
+
+
+def plan_ready(run_id: str, plan: list[dict[str, Any]]) -> Event:
+    """The planner's initial decomposition, emitted by the executor (NOT the
+    planner) right after planning, so the audit/attribution can read it from the
+    event stream without touching planner.py."""
+    return Event(EventType.PLAN_READY, {"run_id": run_id, "plan": plan})
 
 
 def tool_call_start(step_id: str, tool: str, call_id: str) -> Event:

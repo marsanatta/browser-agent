@@ -37,6 +37,7 @@ class Located:
     locator: Any
     tier: int
     strategy: str
+    via: str = "cascade"  # observe-only grounding outcome: "cascade" | "l2"
 
 
 L2Fallback = Callable[[Any, IndexedElement], Awaitable[Located | None]]
@@ -252,7 +253,11 @@ def make_l2_fallback(gateway: Any, candidates: list[IndexedElement]) -> L2Fallba
         # main cascade: if the chosen element is itself ambiguous on the page (e.g.
         # perceive-merged duplicates), this returns None and we abstain instead of
         # silently resolving the first node's attributes.
-        return await _cascade(page, chosen, cache, _page_key(page), el)
+        resolved = await _cascade(page, chosen, cache, _page_key(page), el)
+        if resolved is None:
+            return None
+        # Tag the grounding outcome as L2 (observe-only) for the audit trace.
+        return Located(resolved.locator, resolved.tier, resolved.strategy, via="l2")
 
     return fallback
 

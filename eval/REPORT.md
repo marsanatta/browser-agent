@@ -1,9 +1,9 @@
 # Eval Report — live evidence
 
-Generated **2026-06-24 14:30 UTC** from a REAL harness run. Every "verified" below is an
+Generated **2026-06-25 03:44 UTC** from a REAL harness run. Every "verified" below is an
 INDEPENDENT programmatic state check on the live page (URL / first-h1 / scoped
 selector) — never the agent's self-report, and never a loose `text_contains`.
-Copilot calls this run: 48.
+Copilot calls this run: 43.
 
 ## Test architecture — what gates vs what's evidence
 
@@ -27,7 +27,7 @@ Copilot calls this run: 48.
 | live_wikipedia_search_submit | en.wikipedia.org | action | no (live) | True | True | False |
 | live_wikipedia_autocomplete | en.wikipedia.org | action | no (live) | True | True | False |
 | live_internet_lazyload | the-internet.herokuapp.com | action | no (live) | True | False | False |
-| live_internet_modal | the-internet.herokuapp.com | action | no (live) | True | False | False |
+| live_internet_modal | the-internet.herokuapp.com | action | no (live) | False | False | False |
 | live_internet_iframe | the-internet.herokuapp.com | action | no (live) | False | False | True |
 
 ## Day-3 realistic batch (folded in, reproducible) — 8/8 verified
@@ -78,8 +78,8 @@ genuine agent gaps:
   no explicit wait action, so the state check runs before it appears. (Verifier
   confirmed: click + wait -> `#finish h4` == "Hello World!".)
 - `live_internet_modal`: the modal shows correctly (verifier passes on a fresh
-  page — its title renders UPPERCASE via CSS), but the agent tends to dismiss it
-  rather than just confirm its title — a modal-handling gap.
+  page — note its title renders UPPERCASE via CSS), but the agent tends to dismiss
+  it rather than just confirm its title — a modal-handling gap.
 - `live_internet_iframe`: the locator cascade does not pierce iframes, so the agent
   cannot type into the TinyMCE body. Verified by a frame-aware check
   (`iframe_text_equals`) so an iframe-piercing fix would pass it later.
