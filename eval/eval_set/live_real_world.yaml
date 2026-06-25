@@ -253,3 +253,45 @@ tasks:
       - url_contains: "archive.org"
     assert:
       url_contains: "login"
+
+  # Government — a large, fast public-service site; open its Help page. Distinct domain (gov).
+  - id: live_govuk_help_nav
+    instruction: "On GOV.UK, open the 'Help' page from the site navigation."
+    start_url: "https://www.gov.uk/"
+    domain: government
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "gov.uk"
+    assert:
+      url_contains: "help"
+
+  # Science / preprints — open arXiv's Help page (redirects to info.arxiv.org). Distinct domain (science).
+  - id: live_arxiv_help_nav
+    instruction: "On arXiv, open the 'Help' page."
+    start_url: "https://arxiv.org/"
+    domain: science
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "arxiv.org"
+    assert:
+      url_contains: "help"
+
+  # Finance — open a specific equity quote page. Distinct domain (finance). NOTE: this site
+  # is bot-wall-prone (consent / anti-bot interstitials that detect_block does not yet catch);
+  # it VERIFIED on adoption (reached /quote/AAPL/) but a future run could serve a wall. The
+  # close full-tier run is the M3 arbiter — if it silent-fails there it is discarded.
+  - id: live_yahoofinance_aapl_quote
+    instruction: "On Yahoo Finance, open the quote page for Apple (ticker AAPL)."
+    start_url: "https://finance.yahoo.com/"
+    domain: finance
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "finance.yahoo.com"
+    assert:
+      url_contains: "AAPL"

@@ -38,5 +38,45 @@
     "decision": "kept",
     "reason": "New category media. Live ABSTAIN (nominal=False asked=True; Log In behind a compact menu, locate cascade missed it, agent abstained gracefully) -- M3-safe, not silent. Kept as a RED row + distinct domain (graceful-failure class). +1 distinct domain; M1 dips (breadth<->verified tradeoff); M3 held at 1. Keep basis = structural M2 + audit.",
     "guards_ok": true
+  },
+  {
+    "iter": 5,
+    "probe_type": "B",
+    "target": "www.gov.uk (government) -> Help nav",
+    "metrics_before": { "M1": 0.688, "M2": 11, "M3": 1 },
+    "metrics_after": { "M1": 0.706, "M2": 12, "M3": 1 },
+    "decision": "kept",
+    "reason": "New category government. Live VERIFIED (landed gov.uk/help). Page-specific url_contains help; +1 distinct domain; M3 held at 1.",
+    "guards_ok": true
+  },
+  {
+    "iter": 6,
+    "probe_type": "B",
+    "target": "arxiv.org (science / preprints) -> Help nav",
+    "metrics_before": { "M1": 0.706, "M2": 12, "M3": 1 },
+    "metrics_after": { "M1": 0.722, "M2": 13, "M3": 1 },
+    "decision": "kept",
+    "reason": "New category science. Live VERIFIED (landed info.arxiv.org/help; registrable domain arxiv.org). Page-specific url_contains help; +1 distinct domain; M3 held at 1.",
+    "guards_ok": true
+  },
+  {
+    "iter": 7,
+    "probe_type": "B",
+    "target": "www.w3.org (docs/standards) -> Standards nav",
+    "metrics_before": { "M1": 0.722, "M2": 13, "M3": 1 },
+    "metrics_after": { "M1": 0.722, "M2": 13, "M3": 1 },
+    "decision": "discarded",
+    "reason": "SILENT_FAILURE: nominal=True verified=False, final URL still https://www.w3.org/ -- agent never left the homepage yet claimed success (Standards link not located, lax nominal-completion). Adopting would push M3 1->2 (Amazon rule), so NOT committed -- M3 held at 1. Named-ceiling manifestation (locate-miss + lax nominal-completion, planner-rooted, off-limits).",
+    "guards_ok": true
+  },
+  {
+    "iter": 8,
+    "probe_type": "B",
+    "target": "finance.yahoo.com (finance) -> AAPL quote",
+    "metrics_before": { "M1": 0.722, "M2": 13, "M3": 1 },
+    "metrics_after": { "M1": 0.737, "M2": 14, "M3": 1 },
+    "decision": "kept",
+    "reason": "New category finance. Live VERIFIED (landed finance.yahoo.com/quote/AAPL/); characterize-before-adopt passed. Caveat: bot-wall-prone (consent/anti-bot pages detect_block does not catch); close full-tier run is the M3 arbiter -- if it silent-fails there it is discarded. +1 distinct domain; M3 held at 1.",
+    "guards_ok": true
   }
 ]

@@ -70,5 +70,29 @@ M1 11/15→11/16=0.688 (breadth↔verified tradeoff), M2 10→**11**, M3 1.
 
 **Batch 1 net: M2 7→11 (+maps, +news/lobsters, +docs/mdn, +media/archive), M3 held at 1, no silent failure.**
 
+### Iter 5 — Probe B: `www.gov.uk` → Help (government) — **KEPT** (VERIFIED)
+New category **government**. `verified=True`, landed `gov.uk/help`. M1 11/16→12/17=0.706, M2 11→**12**, M3 1.
+
+### Iter 6 — Probe B: `arxiv.org` → Help (science) — **KEPT** (VERIFIED)
+New category **science / preprints**. `verified=True`, landed `info.arxiv.org/help/…` (registrable domain
+arxiv.org). M1 12/17→13/18=0.722, M2 12→**13**, M3 1.
+
+### Iter 7 — Probe B: `www.w3.org` → Standards (docs/standards) — **DISCARDED** (SILENT_FAILURE)
+`nominal=True verified=False`, but the final URL was still `https://www.w3.org/` — the agent **never left
+the homepage** yet claimed success (the "Standards" link wasn't located; lax nominal-completion). This is the
+**Amazon rule**: adopting it would push **M3 1→2**, so it is **not** committed — M3 stays 1. Named-ceiling
+manifestation (locate-miss + lax nominal-completion, same family as helium/modal — planner-rooted, off-limits).
+Hard gap documented; w3.org standards-nav deferred.
+
+### Iter 8 — Probe B: `finance.yahoo.com` → AAPL quote (finance) — **KEPT** (VERIFIED, caveated)
+New category **finance**. `verified=True`, landed `finance.yahoo.com/quote/AAPL/` — characterize-before-adopt
+passed. **Caveat:** this site is bot-wall-prone (consent / anti-bot interstitials `detect_block` doesn't yet
+catch); a future run could serve a wall. Adopted per the literal rule (it verified), with the **close
+full-tier run as the M3 arbiter** — if it silent-fails there, it is discarded then. M1 13/18→14/19=0.737,
+M2 13→**14**, M3 1.
+
+**Batch 2 net: M2 11→14 (+gov, +science, +finance), one DISCARD (w3.org silent failure, Amazon rule), M3
+held at 1.**
+
 
 
