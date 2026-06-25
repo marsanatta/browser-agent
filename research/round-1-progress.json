@@ -8,5 +8,15 @@
     "decision": "kept",
     "reason": "Deterministic offline test (test_settle_loading.py, 3 passed) is the keep basis: settle_loading waits a visible generic spinner to hidden before the check, so the async result is observed not raced. M3 1->0 (the only silent-failure row now verifies; live-corroborated nominal=True verified=True). Timing-only change; state.py assertion untouched.",
     "guards_ok": true
+  },
+  {
+    "iter": 2,
+    "probe_type": "B",
+    "target": "example.com (reference) -> iana.org cross-domain navigation",
+    "metrics_before": { "M1": 0.778, "M2": 4, "M3": 0 },
+    "metrics_after": { "M1": 0.800, "M2": 5, "M3": 0 },
+    "decision": "kept",
+    "reason": "Structurally-distinct reference domain; clean cross-domain nav (More information... -> iana.org). Live VERIFIED (nominal=True verified=True asked=False). Page-specific url_contains verifier, zero text_contains; +1 distinct domain; M3 stays 0.",
+    "guards_ok": true
   }
 ]

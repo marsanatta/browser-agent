@@ -145,3 +145,21 @@ tasks:
       - url_contains: "/iframe"
     assert:
       iframe_text_equals: { frame: "iframe#mce_0_ifr", css: "body", value: "browser agent was here" }
+
+  # --- Breadth (autoresearch round 1, Probe B): structurally-distinct real domains,
+  # one per iteration, page-specific verifier, zero text_contains, held_out. ---
+
+  # Cross-domain navigation on the canonical reference page: example.com's only link
+  # ("More information...") leaves the site for iana.org. Distinct domain (reference),
+  # ultra-stable, no bot-wall. Independent check: landing on the iana.org URL.
+  - id: live_example_more_info_nav
+    instruction: "On example.com, click the 'More information...' link to follow it to its destination page."
+    start_url: "https://example.com/"
+    domain: reference
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "example.com"
+    assert:
+      url_contains: "iana.org"

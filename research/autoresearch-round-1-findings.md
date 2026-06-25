@@ -45,3 +45,31 @@ all three guards pass. Files changed vs main: `backend/app/agent/recover.py`, `b
 `backend/tests/test_settle_loading.py`.
 
 ---
+
+## Iteration 2 — Probe B: breadth `example.com → iana.org` (reference) — **KEPT**
+
+**Why this domain:** the tier was Wikipedia-heavy (4 domains, en.wikipedia.org ×4). example.com is a
+structurally-distinct **reference** domain whose only link leaves the site (`More information...` →
+`iana.org`) — a clean cross-domain navigation, ultra-stable, no bot-wall.
+
+**Task (page-specific verifier, zero `text_contains`):** `live_example_more_info_nav` —
+`assert: url_contains "iana.org"`. The agent cannot pass by claiming success: the check reads the URL it
+actually landed on.
+
+**Live characterization:** `nominal=True verified=True asked=False blocked=False steps=2` → **VERIFIED**.
+
+**Independent signals:**
+| metric | before | after | how |
+|---|---|---|---|
+| M1 live verified-rate | 7/9 = 0.778 | 8/10 = 0.800 | new row verifies live |
+| M2 distinct real domains | 4 | **5** | +example.com (reference); also exercises iana.org |
+| M3 SILENT_FAILURE count | 0 | **0** | verified, not silent |
+
+**Guards:** G1 offline gate unaffected (live tier is separate from `-m "not live"`; re-confirmed 113 green
+at round end). G2 planner.py untouched. G3 only a YAML add with a page-specific `url_contains` verifier;
+`state.py` frozen, zero `text_contains`.
+
+**Decision: KEPT.** +1 distinct human-audited real domain with a sound page-specific verifier, guards pass,
+M3 stays 0. File changed vs main: `eval/eval_set/live_real_world.yaml`.
+
+---
