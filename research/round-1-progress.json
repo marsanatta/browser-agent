@@ -1,0 +1,12 @@
+[
+  {
+    "iter": 1,
+    "probe_type": "A",
+    "target": "live_internet_lazyload SILENT_FAILURE (ground-time): verify-after-act raced an async loading spinner",
+    "metrics_before": { "M1": 0.667, "M2": 4, "M3": 1 },
+    "metrics_after": { "M1": 0.778, "M2": 4, "M3": 0 },
+    "decision": "kept",
+    "reason": "Deterministic offline test (test_settle_loading.py, 3 passed) is the keep basis: settle_loading waits a visible generic spinner to hidden before the check, so the async result is observed not raced. M3 1->0 (the only silent-failure row now verifies; live-corroborated nominal=True verified=True). Timing-only change; state.py assertion untouched.",
+    "guards_ok": true
+  }
+]

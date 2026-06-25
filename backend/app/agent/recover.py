@@ -15,6 +15,38 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+# Generic loading indicators — settle_loading waits for a VISIBLE one to disappear
+# so an async result rendered after a spinner is observed, not raced. Generic only
+# (no per-site selectors); a fast no-op when none is visible.
+_LOADING_SELECTORS = (
+    "#loading",
+    "[aria-busy='true']",
+    "[role='progressbar']",
+    ".loading",
+    ".spinner",
+    ".loader",
+)
+
+
+async def settle_loading(page: Any, timeout_ms: int = 8000) -> bool:
+    """Bounded wait for a visible generic loading indicator to hide BEFORE the
+    verify check — closes the lazy-load race (the-internet dynamic_loading class:
+    click -> spinner ~5s -> result). This is verify-after-act TIMING/orchestration
+    only; it never touches the independent state-check assertion (plan G3 sub-clause).
+    Returns True if it waited on a spinner, False (fast no-op) if none was visible."""
+    for sel in _LOADING_SELECTORS:
+        try:
+            loc = page.locator(sel).first
+            if await loc.count() and await loc.is_visible():
+                try:
+                    await loc.wait_for(state="hidden", timeout=timeout_ms)
+                except Exception:
+                    pass  # bounded: proceed to the check even if it never settles
+                return True
+        except Exception:
+            continue
+    return False
+
 
 async def wait_scroll_dismiss(page: Any, locator: Any) -> bool:
     """not-interactable: the element exists but is occluded/disabled/off-screen.

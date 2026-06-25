@@ -312,6 +312,7 @@ class Executor:
         except Exception as exc:
             return verify.VerifyResult.NO_CHANGE, classify_exception(exc), located, shot
 
+        await recover.settle_loading(page)  # wait out an async-loading spinner before the check (timing only)
         result = await verify.verify_after_act(page, before, expect)
         if await verify.detect_block(page) is not None:
             # Landed on a bot-wall / CAPTCHA — do NOT claim success even if the DOM
