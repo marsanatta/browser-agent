@@ -161,6 +161,7 @@ class Executor:
             run_id,
             nominal=all_ok,
             verified=all_ok if verified is None else verified,
+            tokens=getattr(self._gateway, "tokens", {}) or {},
         )
 
     async def _run_subtask(

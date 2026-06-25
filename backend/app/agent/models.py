@@ -100,6 +100,18 @@ class LLMGateway:
         self._host = host or os.getenv("COPILOT_HOST")
         self._port = port or (int(os.getenv("COPILOT_PORT")) if os.getenv("COPILOT_PORT") else None)
         self._client = None
+        # Running per-gateway token ledger (a fresh gateway is created per /agent/run,
+        # so this is the real per-run total surfaced to the frontend).
+        self.tokens = {k: 0 for k in _USAGE_KEYS}
+
+    def _accrue(self, resp: Any) -> None:
+        usage = getattr(resp, "usage", None)
+        if usage:
+            for key in self.tokens:
+                if usage.get(key):
+                    self.tokens[key] += usage[key]
+        elif getattr(resp, "output_tokens", None):
+            self.tokens["output_tokens"] += resp.output_tokens
 
     async def _ensure_client(self):
         if self._client is not None:
@@ -159,12 +171,14 @@ class LLMGateway:
             pass
 
         resp = await session.send_and_wait(prompt)
-        return LLMResponse(
+        result = LLMResponse(
             model=model,
             content=_extract_text(resp),
             output_tokens=_extract_output_tokens(resp),
             usage=usage or None,
         )
+        self._accrue(result)
+        return result
 
     async def judge(self, prompt: str) -> LLMResponse:
         """Verification call routed to a different model FAMILY than the actor."""

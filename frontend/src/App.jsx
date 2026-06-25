@@ -31,7 +31,13 @@ function reduce(state, ev) {
   if (type === "RUN_FINISHED") {
     return {
       ...state,
-      run: { ...state.run, status: "finished", nominal: payload.nominal_completion, verified: payload.verified_completion },
+      run: {
+        ...state.run,
+        status: "finished",
+        nominal: payload.nominal_completion,
+        verified: payload.verified_completion,
+        tokens: payload.tokens,
+      },
     };
   }
   if (type === "RUN_ERROR") {
@@ -301,14 +307,44 @@ function RunVerdict({ run }) {
   }
   const silent = run.nominal && !run.verified;
   return (
-    <div className={`verdict ${silent ? "silent" : run.verified ? "ok" : "fail"}`}>
-      <span>
-        Nominal: <strong>{run.nominal ? "complete" : "incomplete"}</strong>
-      </span>
-      <span>
-        Verified: <strong>{run.verified ? "complete" : "incomplete"}</strong>
-      </span>
-      {silent && <span className="flag">⚠ silent failure (nominal ≠ verified)</span>}
+    <>
+      <div className={`verdict ${silent ? "silent" : run.verified ? "ok" : "fail"}`}>
+        <span>
+          Nominal: <strong>{run.nominal ? "complete" : "incomplete"}</strong>
+        </span>
+        <span>
+          Verified: <strong>{run.verified ? "complete" : "incomplete"}</strong>
+        </span>
+        {silent && <span className="flag">⚠ silent failure (nominal ≠ verified)</span>}
+      </div>
+      <TokenPanel tokens={run.tokens} />
+    </>
+  );
+}
+
+function _fmt(n) {
+  if (n == null) return "—";
+  if (n < 1000) return String(n);
+  const k = n / 1000;
+  return k >= 9.95 ? `${Math.round(k)}k` : `${k.toFixed(1)}k`; // round first: 9999 -> "10k", not "10.0k"
+}
+
+function TokenPanel({ tokens }) {
+  const t = tokens || {};
+  const known = ["output_tokens", "input_tokens", "reasoning_tokens", "total_nano_aiu"].some(
+    (k) => t[k]
+  );
+  if (!known) {
+    return <div className="tokens muted">tokens: n/a</div>;
+  }
+  const aiu = (t.total_nano_aiu ?? 0) / 1e9;
+  return (
+    <div className="tokens" title="Real LLM token usage for this run (cost transparency)">
+      <span className="tlabel">tokens</span>
+      <span><strong>{_fmt(t.output_tokens)}</strong> out</span>
+      <span><strong>{_fmt(t.input_tokens)}</strong> in</span>
+      <span><strong>{_fmt(t.reasoning_tokens)}</strong> reasoning</span>
+      <span><strong>{aiu.toFixed(2)}</strong> AIU</span>
     </div>
   );
 }

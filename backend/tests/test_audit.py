@@ -13,7 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from app.agent.executor import Executor
-from app.agent.models import MockGateway, _usage_from_event
+from app.agent.models import LLMGateway, LLMResponse, MockGateway, _usage_from_event
 from app.agent.planner import MockPlanner, SubTask
 from app.browser.provider import PlaywrightProvider
 from app.stream import events
@@ -188,6 +188,53 @@ async def test_executor_emits_plan_and_ground_resolved():
 _SYNONYM = ('<button id="b">Log in</button><div id="out">none</div>'
             "<script>document.getElementById('b').onclick=function(){"
             "document.getElementById('out').textContent='SUBMITTED'};</script>")
+
+
+# --- frontend token surfacing: gateway accrual + RUN_FINISHED carries tokens --------
+
+
+def test_llm_gateway_accrues_token_ledger():
+    gw = LLMGateway()  # lazy; no Copilot connection at construction
+    assert gw.tokens == {"input_tokens": 0, "output_tokens": 0, "reasoning_tokens": 0,
+                         "total_nano_aiu": 0}
+    gw._accrue(LLMResponse("m", "x", output_tokens=5, usage={
+        "input_tokens": 10, "output_tokens": 5, "reasoning_tokens": 2, "total_nano_aiu": 17000}))
+    gw._accrue(LLMResponse("m", "y", output_tokens=3, usage=None))  # output-only fallback
+    assert gw.tokens == {"input_tokens": 10, "output_tokens": 8, "reasoning_tokens": 2,
+                         "total_nano_aiu": 17000}
+
+
+class _FakeGateway:
+    """Gateway double exposing a fixed .tokens ledger (the executor surfaces it)."""
+    tokens = {"output_tokens": 42, "input_tokens": 100, "reasoning_tokens": 7, "total_nano_aiu": 5000}
+
+    async def complete(self, *a, **k):
+        return LLMResponse("m", "")
+
+    async def judge(self, *a, **k):
+        return LLMResponse("m", "")
+
+
+@pytest.mark.anyio
+async def test_run_finished_carries_gateway_tokens():
+    data_url = "data:text/html," + urllib.parse.quote(_CLICK)
+    planner = MockPlanner([SubTask(action="navigate", url=data_url),
+                           SubTask(action="click", target="Go")])
+    ex = Executor(PlaywrightProvider(headless=True), planner, gateway=_FakeGateway())
+    fin = next(ev for ev in [e async for e in ex.run("go")]
+               if ev.type == EventType.RUN_FINISHED)
+    assert fin.payload["tokens"] == _FakeGateway.tokens
+
+
+@pytest.mark.anyio
+async def test_run_finished_tokens_empty_without_gateway():
+    data_url = "data:text/html," + urllib.parse.quote(_CLICK)
+    planner = MockPlanner([SubTask(action="navigate", url=data_url),
+                           SubTask(action="click", target="Go")])
+    ex = Executor(PlaywrightProvider(headless=True), planner)  # gateway=None
+    fin = next(ev for ev in [e async for e in ex.run("go")]
+               if ev.type == EventType.RUN_FINISHED)
+    assert fin.payload["tokens"] == {}
 
 
 @pytest.mark.anyio

@@ -147,8 +147,15 @@ def recovery(step_id: str, failure_class: str, action: str, attempt: int) -> Eve
     )
 
 
-def run_finished(run_id: str, nominal: bool, verified: bool) -> Event:
+def run_finished(
+    run_id: str, nominal: bool, verified: bool, tokens: dict[str, int] | None = None
+) -> Event:
     return Event(
         EventType.RUN_FINISHED,
-        {"run_id": run_id, "nominal_completion": nominal, "verified_completion": verified},
+        {
+            "run_id": run_id,
+            "nominal_completion": nominal,
+            "verified_completion": verified,
+            "tokens": tokens or {},
+        },
     )
