@@ -1,1 +1,42 @@
-[]
+[
+  {
+    "iter": 1,
+    "probe_type": "B",
+    "target": "openstreetmap.org (maps) -> Log In nav",
+    "metrics_before": { "M1": 0.667, "M2": 7, "M3": 1 },
+    "metrics_after": { "M1": 0.692, "M2": 8, "M3": 1 },
+    "decision": "kept",
+    "reason": "New category maps. Live VERIFIED (nominal=True verified=True, landed .../login). Page-specific url_contains login, zero text_contains; +1 distinct domain; M3 held at 1 (not silent).",
+    "guards_ok": true
+  },
+  {
+    "iter": 2,
+    "probe_type": "B",
+    "target": "lobste.rs (news, tech link-aggregator) -> Comments nav",
+    "metrics_before": { "M1": 0.692, "M2": 8, "M3": 1 },
+    "metrics_after": { "M1": 0.714, "M2": 9, "M3": 1 },
+    "decision": "kept",
+    "reason": "Distinct news domain (different from HN). Live VERIFIED (landed lobste.rs/comments). Page-specific url_contains comments; +1 distinct domain; M3 held at 1.",
+    "guards_ok": true
+  },
+  {
+    "iter": 3,
+    "probe_type": "B",
+    "target": "developer.mozilla.org (docs) -> Blog nav",
+    "metrics_before": { "M1": 0.714, "M2": 9, "M3": 1 },
+    "metrics_after": { "M1": 0.733, "M2": 10, "M3": 1 },
+    "decision": "kept",
+    "reason": "Large real docs site, distinct registrable domain from docs.python.org. Live VERIFIED (landed /en-US/blog/). Page-specific url_contains blog; +1 distinct domain; M3 held at 1.",
+    "guards_ok": true
+  },
+  {
+    "iter": 4,
+    "probe_type": "B",
+    "target": "archive.org (media / digital library) -> Log In nav",
+    "metrics_before": { "M1": 0.733, "M2": 10, "M3": 1 },
+    "metrics_after": { "M1": 0.688, "M2": 11, "M3": 1 },
+    "decision": "kept",
+    "reason": "New category media. Live ABSTAIN (nominal=False asked=True; Log In behind a compact menu, locate cascade missed it, agent abstained gracefully) -- M3-safe, not silent. Kept as a RED row + distinct domain (graceful-failure class). +1 distinct domain; M1 dips (breadth<->verified tradeoff); M3 held at 1. Keep basis = structural M2 + audit.",
+    "guards_ok": true
+  }
+]

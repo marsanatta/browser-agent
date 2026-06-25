@@ -45,4 +45,30 @@ breadth-introduced regression.
 
 ## Iterations
 
+> Each iteration = one live characterization of one new site (the per-adoption M3 guard: a silent-failer is
+> caught and discarded *before* it enters the tier). Candidates are characterized with **final-URL capture**
+> so a wrong verifier-substring shows the real landing page rather than mis-flagging a clean run as silent.
+> M3 is re-confirmed by a full-tier re-run at checkpoints (a literal full-tier run per single add is
+> cost-prohibitive — hours; the pre-adoption characterization is what protects M3 each iteration).
+
+### Iter 1 — Probe B: `openstreetmap.org` → Log In (maps) — **KEPT** (VERIFIED)
+New category **maps**. `nominal=True verified=True`, landed `…/login`. M1 8/12→9/13=0.692, M2 7→**8**, M3 1.
+
+### Iter 2 — Probe B: `lobste.rs` → Comments (news) — **KEPT** (VERIFIED)
+Tech link-aggregator, distinct from HN. `verified=True`, landed `lobste.rs/comments`. M1 9/13→10/14=0.714,
+M2 8→**9**, M3 1.
+
+### Iter 3 — Probe B: `developer.mozilla.org` → Blog (docs) — **KEPT** (VERIFIED)
+Large real docs site (distinct registrable domain from docs.python.org). `verified=True`, landed
+`/en-US/blog/`. M1 10/14→11/15=0.733, M2 9→**10**, M3 1.
+
+### Iter 4 — Probe B: `archive.org` → Log In (media) — **KEPT** (graceful ABSTAIN)
+New category **media / digital library**. The "Log In" link sits behind a compact menu; the locate cascade
+missed it and the agent **abstained** (`nominal=False asked=True`, stayed on `archive.org/`) — honest
+non-completion, **M3-safe** (the round-1 gnu-class graceful failure). Kept as a RED row + a distinct domain.
+M1 11/15→11/16=0.688 (breadth↔verified tradeoff), M2 10→**11**, M3 1.
+
+**Batch 1 net: M2 7→11 (+maps, +news/lobsters, +docs/mdn, +media/archive), M3 held at 1, no silent failure.**
+
+
 

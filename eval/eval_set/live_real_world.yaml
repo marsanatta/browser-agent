@@ -195,3 +195,61 @@ tasks:
       - url_contains: "gnu.org"
     assert:
       url_contains: "licenses"
+
+  # --- Breadth (autoresearch round 2, Probe B): more structurally-distinct real
+  # domains across new categories (maps / news / docs / media / ...). Same rules:
+  # page-specific verifier, zero text_contains, characterized live before adoption. ---
+
+  # Maps — a slippy-map app with a persistent "Log In" nav. Distinct domain (maps).
+  - id: live_osm_login_nav
+    instruction: "On OpenStreetMap, click 'Log In' to open the login page."
+    start_url: "https://www.openstreetmap.org/"
+    domain: maps
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "openstreetmap.org"
+    assert:
+      url_contains: "login"
+
+  # News (tech link-aggregator) — top-nav "Comments" page. Distinct domain (news).
+  - id: live_lobsters_comments_nav
+    instruction: "On Lobsters, open the 'Comments' page from the navigation."
+    start_url: "https://lobste.rs/"
+    domain: news
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "lobste.rs"
+    assert:
+      url_contains: "comments"
+
+  # Docs — a large real documentation site; open its Blog. Distinct domain (docs).
+  - id: live_mdn_blog_nav
+    instruction: "On MDN Web Docs, open the Blog."
+    start_url: "https://developer.mozilla.org/"
+    domain: documentation
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "developer.mozilla.org"
+    assert:
+      url_contains: "blog"
+
+  # Media / digital library — the "Log In" link sits behind a compact menu; the locate
+  # cascade can miss it, so the agent ABSTAINS (honest non-completion, M3-safe). Kept
+  # as a graceful-failure class on a NEW distinct domain (media). Page-specific verifier.
+  - id: live_archive_login_nav
+    instruction: "On the Internet Archive, click 'Log In' to open the sign-in page."
+    start_url: "https://archive.org/"
+    domain: media
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "archive.org"
+    assert:
+      url_contains: "login"
