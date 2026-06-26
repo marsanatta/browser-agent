@@ -35,6 +35,7 @@ class EventType(str, Enum):
     ASK_USER = "ASK_USER"
     RECOVERY = "RECOVERY"
     PLAN_READY = "PLAN_READY"
+    PHASE = "PHASE"
 
 
 @dataclass(frozen=True)
@@ -100,6 +101,14 @@ def locator_resolved(step_id: str, tier: int, strategy: str, ground: str = "RESO
         EventType.LOCATOR_RESOLVED,
         {"step_id": step_id, "tier": tier, "strategy": strategy, "ground": ground},
     )
+
+
+def phase(run_id: str, name: str) -> Event:
+    """Observe-only lifecycle marker emitted by the executor to fill the dead air
+    of blocking awaits (planner LLM call, browser launch) that yield no other
+    event. `name` is a stable machine token the frontend translates — never human
+    text — so it carries no secret/PII."""
+    return Event(EventType.PHASE, {"run_id": run_id, "phase": name})
 
 
 def plan_ready(run_id: str, plan: list[dict[str, Any]]) -> Event:

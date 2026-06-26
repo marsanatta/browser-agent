@@ -70,6 +70,7 @@ class Executor:
         run_id = uuid.uuid4().hex[:8]
         yield events.run_started(task, run_id)
 
+        yield events.phase(run_id, "planning")
         try:
             subtasks = await self._planner.plan(task)
         except Exception as exc:  # planner is the LLM seam; surface, don't crash
@@ -78,6 +79,7 @@ class Executor:
 
         yield events.plan_ready(run_id, [_args(st) for st in subtasks])
 
+        yield events.phase(run_id, "launching")
         await self._provider.launch()
         page = await self._provider.new_page()
         all_ok = True
@@ -131,6 +133,7 @@ class Executor:
                 if not replanned:
                     replanned = True
                     yield events.recovery(step_id, outcome.failure_class, Recovery.REPLAN.value, _MAX_ATTEMPTS)
+                    yield events.phase(run_id, "planning")
                     try:
                         new_subtasks = await self._planner.plan(task)
                     except Exception:

@@ -1,6 +1,7 @@
-import { useMemo, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StepDetail } from "./StepDetail.jsx";
+import { LiveActivity } from "./LiveActivity.jsx";
 import { Hint, LanguageSwitcher } from "./Hint.jsx";
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL ?? "";
@@ -19,6 +20,8 @@ const STREAM_EVENTS = [
   "LOCATOR_RESOLVED",
   "ASK_USER",
   "RECOVERY",
+  "PLAN_READY",
+  "PHASE",
 ];
 
 const TERMINAL = new Set(["RUN_FINISHED", "RUN_ERROR"]);
@@ -28,7 +31,18 @@ const initialState = { run: null, steps: [], order: [], notices: [] };
 function reduce(state, ev) {
   const { type, payload } = ev;
   if (type === "RUN_STARTED") {
-    return { run: { id: payload.run_id, task: payload.task, status: "running" }, steps: [], order: [], notices: [] };
+    return {
+      run: { id: payload.run_id, task: payload.task, status: "running", phase: "planning", startedAt: Date.now() },
+      steps: [],
+      order: [],
+      notices: [],
+    };
+  }
+  if (type === "PLAN_READY") {
+    return seedPlan(state, payload.run_id, payload.plan ?? []);
+  }
+  if (type === "PHASE") {
+    return { ...state, run: { ...state.run, phase: payload.phase } };
   }
   if (type === "RUN_FINISHED") {
     return {
@@ -85,6 +99,24 @@ function reduce(state, ev) {
   }
 }
 
+function describePlanned(a) {
+  if (a.action === "navigate") return `navigate to ${a.url ?? ""}`;
+  return `${a.action} '${a.target ?? ""}'`;
+}
+
+function seedPlan(state, runId, plan) {
+  const known = new Set(state.steps.map((s) => s.id));
+  const steps = [...state.steps];
+  const order = [...state.order];
+  plan.forEach((a, i) => {
+    const id = `${runId}-s${i + 1}`;
+    if (known.has(id)) return; // a STEP_STARTED already arrived for this id
+    steps.push({ id, description: describePlanned(a), status: "pending" });
+    order.push(id);
+  });
+  return { ...state, steps, order };
+}
+
 function upsert(state, id, fn) {
   const exists = state.steps.some((s) => s.id === id);
   const steps = exists ? state.steps.map((s) => (s.id === id ? fn(s) : s)) : [...state.steps, fn({ id, status: "running" })];
@@ -101,7 +133,7 @@ function patchCall(state, callId, fn) {
   return { ...state, steps };
 }
 
-const STATUS_KEY = { running: "running", ok: "ok", failed: "failed" };
+const STATUS_KEY = { pending: "pending", running: "running", ok: "ok", failed: "failed" };
 
 export default function App() {
   const { t } = useTranslation();
@@ -117,6 +149,13 @@ export default function App() {
   const steps = state.steps;
   const selectedStep = useMemo(() => steps.find((s) => s.id === selected) ?? null, [steps, selected]);
   const run = state.run;
+  const activeStep = useMemo(() => steps.find((s) => s.status === "running") ?? null, [steps]);
+
+  const tailRef = useRef(null);
+  const stepCount = steps.length;
+  useEffect(() => {
+    if (running) tailRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [stepCount, running]);
 
   async function unlock(token) {
     const res = await fetch(`${BACKEND}/auth`, {
@@ -244,17 +283,21 @@ export default function App() {
         )}
       </form>
 
-      {run && <RunVerdict run={run} />}
+      {run?.status === "running" && (
+        <LiveActivity startedAt={run.startedAt} phase={run.phase} activeStepDescription={activeStep?.description} />
+      )}
+      {run && run.status !== "running" ? <RunVerdict run={run} /> : null}
 
       <section className="board">
         <ol className="timeline" aria-live="polite" aria-label={t("timeline.label")}>
           {steps.length === 0 && <li className="empty">{t("timeline.empty")}</li>}
           {steps.map((s, i) => (
-            <li key={s.id}>
+            <li key={s.id} className={`fade-in ${s.status === "running" ? "is-active" : ""}`}>
               <button
                 className={`steprow ${s.status} ${selected === s.id ? "active" : ""}`}
                 onClick={() => setSelected(s.id)}
                 aria-pressed={selected === s.id}
+                aria-current={s.status === "running" ? "step" : undefined}
               >
                 <span className="num">{i + 1}</span>
                 <span className="desc">{s.description ?? s.id}</span>
@@ -266,6 +309,7 @@ export default function App() {
               </button>
             </li>
           ))}
+          <li ref={tailRef} aria-hidden="true" className="tail" />
         </ol>
 
         <aside className="detail">

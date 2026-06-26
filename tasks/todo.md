@@ -1,3 +1,32 @@
+# Live agent-activity view (feat/live-view) — DONE
+
+## Backend
+- [x] events.py: add `PHASE` to EventType + `phase(run_id, name)` helper
+- [x] executor.py run(): yield phase("planning") before both plan() calls; phase("launching") before launch() — pure additive
+- [x] PHASE payload passes redact() (plain strings, no secret keys) — asserted in test
+- [x] eval/audit.py + eval/harness.py: confirmed if/elif, no exhaustive else → PHASE additive, no change needed
+
+## Backend test
+- [x] test_phase_events.py: order RUN_STARTED → PHASE(planning) → PLAN_READY → PHASE(launching) → STEP_STARTED; PHASE survives to_sse()/redact(). 117 passed / 8 live deselected.
+
+## Frontend
+- [x] App.jsx: PHASE + PLAN_READY in STREAM_EVENTS; reducer seeds pending rows + run.phase; elapsed via LiveActivity
+- [x] LiveActivity.jsx: spinner, activity label (step desc > phase), blinking cursor, m:ss timer (useEffect+setInterval), aria-live, useCallback
+- [x] App.jsx render: LiveActivity while running; auto-scroll tail ref
+- [x] StepDetail.jsx + timeline badge: pending status
+- [x] styles.css: keyframes (spinner/cursor/pulse/row-in/check); reduced-motion covered by existing * rule
+- [x] i18n.js: phase.*, status.pending, live.* keys in en + zh-Hant
+
+## Verify
+- [x] pytest offline green; npm run build exit 0; traces below
+
+## Traces
+- PLAN_READY seeds `${run_id}-s{i+1}` pending rows; STEP_STARTED upsert matches by id (exists=true) → flips to running, desc overwritten. ids identical to backend `f"{run_id}-s{i+1}"`.
+- Timer: LiveActivity mounted only while running; setInterval cleaned in effect return; unmount on RUN_FINISHED/ERROR → clearInterval. Stable tick (useCallback []).
+- aria-live: `.live-text` aria-live=polite aria-atomic=true announces "Agent is working {activity}" on phase/step change; elapsed ticker NOT in live region (silent).
+
+---
+
 # M6 — Dockerize the app
 
 ## Plan

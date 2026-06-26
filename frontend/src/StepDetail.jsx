@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Hint } from "./Hint.jsx";
 
-const STATUS_KEYS = ["running", "ok", "failed"];
+const STATUS_KEYS = ["pending", "running", "ok", "failed"];
 
 export function StepDetail({ step, backend }) {
   const { t } = useTranslation();

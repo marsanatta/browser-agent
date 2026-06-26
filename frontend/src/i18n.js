@@ -43,7 +43,16 @@ const en = {
     detailHint:
       "Select a step to inspect its diagnostics — locator tier, recovery chain, annotated screenshot, and verdict.",
   },
-  status: { running: "running", ok: "passed", failed: "failed" },
+  status: { pending: "pending", running: "running", ok: "passed", failed: "failed" },
+  phase: {
+    planning: "Planning the task…",
+    launching: "Opening browser…",
+    running: "Working…",
+  },
+  live: {
+    working: "Agent is working",
+    elapsed: "Elapsed {{time}}",
+  },
   notices: { askUser: "Ask user: {{question}}" },
   gate: {
     disclosure: "This instance is access-controlled. Enter the access token your operator gave you.",
@@ -132,7 +141,16 @@ const zhHant = {
     empty: "尚無步驟。送出一個任務即可即時觀看 agent 運作。",
     detailHint: "選擇一個步驟以檢視其診斷資訊——定位層級、復原鏈、標註截圖與判定結果。",
   },
-  status: { running: "執行中", ok: "通過", failed: "失敗" },
+  status: { pending: "等待中", running: "執行中", ok: "通過", failed: "失敗" },
+  phase: {
+    planning: "規劃任務中…",
+    launching: "開啟 browser 中…",
+    running: "執行中…",
+  },
+  live: {
+    working: "agent 正在執行",
+    elapsed: "已經過 {{time}}",
+  },
   notices: { askUser: "詢問使用者：{{question}}" },
   gate: {
     disclosure: "此服務受存取權限控管。請輸入操作人員提供給你的存取 token。",
