@@ -38,11 +38,12 @@ def test_resolve_model_keeps_a_valid_override():
 
 def test_resolve_model_validates_against_passed_menu():
     # The live Copilot list is the source of truth: a live-only id (NOT in the
-    # static MODEL_MENU fallback — e.g. a "-preview" suffix) is accepted when it is
-    # in the menu we pass, and rejected when validated against the static fallback.
-    live = ["gemini-3.1-pro-preview", "claude-opus-4.8"]
-    assert resolve_model("gemini-3.1-pro-preview", "plan", live) == "gemini-3.1-pro-preview"
-    assert resolve_model("gemini-3.1-pro-preview", "plan", MODEL_MENU) == PLANNER_MODEL
+    # static MODEL_MENU fallback) is accepted when it is in the menu we pass, and
+    # rejected (-> role default) when validated against the static fallback.
+    live_only = "claude-opus-4.9-preview"  # synthetic id present only in the live menu
+    assert live_only not in MODEL_MENU
+    assert resolve_model(live_only, "plan", [live_only, "claude-opus-4.8"]) == live_only
+    assert resolve_model(live_only, "plan", MODEL_MENU) == PLANNER_MODEL
 
 
 @pytest.mark.anyio
@@ -97,8 +98,8 @@ def test_planner_defaults_and_overrides():
     p0 = LLMPlanner(LLMGateway())
     assert p0._model == PLANNER_MODEL
     assert p0._effort == PLANNER_EFFORT
-    p = LLMPlanner(LLMGateway(), model="gemini-3-flash", reasoning_effort="medium")
-    assert p._model == "gemini-3-flash"
+    p = LLMPlanner(LLMGateway(), model="gemini-3.5-flash", reasoning_effort="medium")
+    assert p._model == "gemini-3.5-flash"
     assert p._effort == "medium"
 
 

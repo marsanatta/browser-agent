@@ -56,12 +56,12 @@ REPLANNER_MODEL = "claude-opus-4.8"    # rare deep replan that drives the browse
 # live Copilot list (`available_models`) can't be queried — no token / offline / $0
 # path. Every ROLE_DEFAULTS value must appear here so the picker shows the default.
 MODEL_MENU = (
-    "gemini-3.1-pro",
+    "gemini-3.1-pro-preview",
     "claude-sonnet-4.6",
     "claude-sonnet-4.5",
     "claude-haiku-4.5",
     "gpt-5-mini",
-    "gemini-3-flash",
+    "gemini-3.5-flash",
     "claude-opus-4.8",
     "gpt-5.5",
     "gpt-5.4",
