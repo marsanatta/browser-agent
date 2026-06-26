@@ -286,7 +286,7 @@ class Executor:
             shot = await self._shot(page, step_id, st, located, pre.value, attempt)
             return verify.VerifyResult.NO_CHANGE, pre, located, shot
 
-        if st.action == "fill" and act.requires_confirmation(act.Action(kind="fill")):
+        if act.requires_confirmation(act.Action(kind=st.action)):
             if not await self._confirm():
                 return verify.VerifyResult.NO_CHANGE, FailureClass.WRONG_PAGE, located, None
 
