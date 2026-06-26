@@ -47,10 +47,16 @@ def task_tcr(r: TaskResult) -> float:
 
 
 def tcr(results: list[TaskResult]) -> float:
-    """Mean key-node completion across tasks (partial credit)."""
-    if not results:
+    """Mean key-node completion over tasks that HAVE key nodes (partial credit).
+
+    Zero-key-node tasks (e.g. abstain rows) carry no key-node signal, so a verified
+    one would otherwise contribute a free 1.0 that inflates the aggregate. They are
+    excluded here; their correctness is reported separately (TSR / abstain). Returns
+    0.0 when no task has key nodes."""
+    keyed = [r for r in results if r.key_nodes_total > 0]
+    if not keyed:
         return 0.0
-    return sum(task_tcr(r) for r in results) / len(results)
+    return sum(task_tcr(r) for r in keyed) / len(keyed)
 
 
 def tsr(results: list[TaskResult]) -> float:
