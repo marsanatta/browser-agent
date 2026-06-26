@@ -76,6 +76,15 @@ def test_resolve_effort_keeps_valid_and_falls_back_otherwise():
     assert resolve_effort(None, "exec") == EXECUTION_EFFORT
 
 
+def test_effort_unsupported_classifier():
+    from app.agent.models import _effort_unsupported
+
+    assert _effort_unsupported(
+        Exception("Model 'claude-haiku-4.5' does not support reasoning effort configuration")
+    )
+    assert not _effort_unsupported(Exception("JSON-RPC Error: connection refused"))
+
+
 def test_gateway_defaults_and_overrides_per_role():
     gw0 = LLMGateway()
     assert gw0.workhorse_model == EXECUTION_MODEL

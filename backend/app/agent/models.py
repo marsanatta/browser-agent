@@ -186,6 +186,10 @@ class LLMGateway:
         self.replanner_model = replanner_model
         self.workhorse_effort = workhorse_effort
         self.replanner_effort = replanner_effort
+        # Models that reject reasoning_effort outright (e.g. Haiku 4.5 is
+        # manual-thinking-only). Learned on first rejection so the hot path stops
+        # re-paying the failed create_session round-trip.
+        self._no_effort_models: set[str] = set()
         # Running per-gateway token ledger (a fresh gateway is created per /agent/run,
         # so this is the real per-run total surfaced to the frontend).
         self.tokens = {k: 0 for k in _USAGE_KEYS}
@@ -239,17 +243,22 @@ class LLMGateway:
         from copilot.session import PermissionHandler
 
         base = dict(on_permission_request=PermissionHandler.approve_all, model=model)
+        want_effort = bool(effort) and model not in self._no_effort_models
         try:
             session = (
                 await client.create_session(reasoning_effort=effort, **base)
-                if effort
+                if want_effort
                 else await client.create_session(**base)
             )
-        except Exception:
-            # Copilot rejects reasoning_effort for models that don't expose it (e.g.
-            # Haiku 4.5 is manual-thinking-only); degrade to the model's default effort
-            # rather than fail the run. A real auth/connection error re-raises on retry.
-            session = await client.create_session(**base)
+        except Exception as exc:
+            # Some models reject reasoning_effort outright (Haiku 4.5 is manual-
+            # thinking-only). Learn it once so the hot path stops re-paying the failed
+            # round-trip, then retry without effort. Re-raise non-effort errors.
+            if want_effort and _effort_unsupported(exc):
+                self._no_effort_models.add(model)
+                session = await client.create_session(**base)
+            else:
+                raise
         # Accumulate the real token ledger from the assistant.usage event (input +
         # output + reasoning + total_nano_aiu). Best-effort: if the SDK surface
         # differs, the resp.data.output_tokens read below still gives completion tokens.
@@ -301,6 +310,12 @@ async def available_models(gateway: LLMGateway) -> list[str]:
     except Exception:
         return list(MODEL_MENU)
     return ids or list(MODEL_MENU)
+
+
+def _effort_unsupported(exc: Exception) -> bool:
+    """True when a create_session error is the model rejecting reasoning_effort
+    (vs an auth/connection failure, which must propagate)."""
+    return "reasoning effort" in str(exc).lower()
 
 
 def _extract_text(resp) -> str:
