@@ -19,8 +19,10 @@ tiers, which would silently resolve the perceive-merged first node's href/id —
 and defer to L2. The first resolving tier wins and is written to a 2-layer
 in-memory cache (hit = 0 work).
 
-L2 (LLM re-rank of a shortlist, then vision) is the documented fallback on a full
-cascade miss; `l2_fallback` is wired in prod (main.py) and the eval harness.
+L2 on a full cascade miss is the LLM re-rank of a <=5-candidate shortlist — that is
+what `make_l2_fallback` implements and is wired in prod (main.py) and the eval
+harness. The heuristic fingerprint pre-rank and the vision tier are documented
+seams (not built); only the LLM re-rank runs.
 """
 
 from __future__ import annotations

@@ -103,10 +103,13 @@ The differentiator is that **success is never the agent's self-report** — it i
   improvement claim cannot hide extra token spend. In this small run the full
   agent and baseline tie on TCR/TSR — reported honestly rather than inventing a
   delta.
-- **Consistency / Semantic-Entropy-style signal.**
+- **What actually runs is the post-action state check + CuP.** Those two are the
+  silent-failure signals computed for every headline number here.
+- **Consistency / Semantic-Entropy-style signal (built, not wired).**
   `eval/verify/consistency.py` runs an extraction 2–3× and flags disagreement
-  (sampling approximation of SEP; the hidden-state probe needs logits the Copilot
-  gateway does not expose and is an explicit seam in `eval/verify/seams.py`).
+  (sampling approximation of SEP); it is unit-tested but the harness does NOT
+  invoke it on these tasks. The hidden-state probe needs logits the Copilot gateway
+  does not expose and is an explicit seam in `eval/verify/seams.py`.
 
 **Honesty note on statistical power.** n = 12 is far below the ~1,000 items needed
 to detect a 3% delta at 80% power (DESIGN §7; `eval/REPORT.md` caveats). These

@@ -98,10 +98,14 @@ REAL (run in this report):
 - Full agent loop (perceive/locate/act/verify) via the Copilot-backed LLM planner.
 - Independent programmatic state assertion on the live final page (`eval/verify/state.py`).
 - Nominal-vs-verified silent-failure gap (CuP).
-- Consistency check (`eval/verify/consistency.py`) — unit-tested; a Semantic-
-  Entropy-style sampling signal (run extraction n times, flag disagreement).
 - Budget-matched vanilla baseline column.
 - pass^{data['k']} for side-effecting tasks.
+
+BUILT & UNIT-TESTED, NOT WIRED into this run (the seam exists and is exercised by
+unit tests, but the harness does not invoke it on these tasks):
+- Consistency check (`eval/verify/consistency.py`) — a Semantic-Entropy-style
+  sampling signal (run extraction n times, flag disagreement). Only the
+  post-action state check + CuP are computed for the headline numbers here.
 
 SEAM (designed-for, not built — `eval/verify/seams.py`, raise NotImplementedError):
 - SVDD trajectory-anomaly trip-wire (needs a normal-trace corpus; eval/01 §4.2).
