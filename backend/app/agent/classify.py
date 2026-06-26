@@ -76,7 +76,7 @@ def classify_exception(exc: BaseException) -> FailureClass:
         return FailureClass.NOT_INTERACTABLE
     if any(h in msg for h in _STALE_HINTS):
         return FailureClass.STALE_TIMING
-    return FailureClass.STALE_TIMING
+    return FailureClass.NOT_FOUND  # unrecognized -> re-perceive (REGROUND), not blind retry
 
 
 def recovery_for(fc: FailureClass) -> Recovery:

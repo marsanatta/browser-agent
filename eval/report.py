@@ -79,8 +79,10 @@ baseline (max_attempts=1, no L2 heal) runs alongside the full agent.
 
 {metric_table}
 
-Definitions: TCR = mean key-nodes hit per task (partial credit); TSR = fraction
-of tasks whose independent assertion passed; silent-failure gap (CuP) = fraction
+Definitions: TCR = mean key-nodes hit per task with key nodes (partial credit;
+zero-key-node tasks such as abstain rows are excluded so they cannot contribute a
+free 1.0); TSR = fraction of tasks whose independent assertion passed; silent-
+failure gap (CuP) = fraction
 where the agent claimed success but verification failed; pass^k = fraction of
 side-effecting tasks that verified on ALL {data['k']} runs (reliability, eval/02 §C1).
 SE is Bernoulli sqrt(p(1-p)/n) — independent-item; clustered SE would be larger
@@ -96,10 +98,14 @@ REAL (run in this report):
 - Full agent loop (perceive/locate/act/verify) via the Copilot-backed LLM planner.
 - Independent programmatic state assertion on the live final page (`eval/verify/state.py`).
 - Nominal-vs-verified silent-failure gap (CuP).
-- Consistency check (`eval/verify/consistency.py`) — unit-tested; a Semantic-
-  Entropy-style sampling signal (run extraction n times, flag disagreement).
 - Budget-matched vanilla baseline column.
 - pass^{data['k']} for side-effecting tasks.
+
+BUILT & UNIT-TESTED, NOT WIRED into this run (the seam exists and is exercised by
+unit tests, but the harness does not invoke it on these tasks):
+- Consistency check (`eval/verify/consistency.py`) — a Semantic-Entropy-style
+  sampling signal (run extraction n times, flag disagreement). Only the
+  post-action state check + CuP are computed for the headline numbers here.
 
 SEAM (designed-for, not built — `eval/verify/seams.py`, raise NotImplementedError):
 - SVDD trajectory-anomaly trip-wire (needs a normal-trace corpus; eval/01 §4.2).
@@ -117,8 +123,10 @@ SEAM (designed-for, not built — `eval/verify/seams.py`, raise NotImplementedEr
   an agent regression. Re-run to distinguish.
 - The judge/LLM is used only for PLANNING here; success is graded programmatically,
   so judge bias does not enter the headline metrics.
-- Key-node TCR counts a checkpoint hit if it was observable at ANY step
-  (step_hook), matching WebCanvas trajectory semantics.
+- Key-node TCR counts a checkpoint hit if it was observable at a step's post-state
+  (the step_hook fires after each sub-task), an approximation of WebCanvas
+  trajectory semantics — not a continuous within-step observation. Tasks with no
+  key nodes are excluded from the TCR aggregate.
 """
     REPORT_PATH.write_text(body, encoding="utf-8")
     return REPORT_PATH

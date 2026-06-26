@@ -38,15 +38,17 @@ Layered pipeline extending the convergent architecture in `[00]`:
 NL Task
   ▼ Planner (hierarchical): decompose → sub-tasks; replan = sub-goal fails N times
   ▼ per sub-task → stateless executor (fresh LLM context + clean page state) [arch/01][arch/03]
-  ├─ OBSERVE-FIRST (prevention, not recovery) [A1]: merge co-labeled elements, render
-  │                tables/lists as Markdown, selective history replay (pivotal nodes only).
+  ├─ OBSERVE-FIRST (prevention, not recovery) [A1]: merge co-labeled elements, keep only
+  │                interactive/pivotal nodes (table/list→Markdown rendering is a designed-for
+  │                seam, not built — the indexed element list is what perceive ships).
   │                No extra LLM call — AgentOccam got WebArena 16.5%→43.1% from this alone [arch/02]
   ├─ PERCEIVE  fused DOM+AX → indexed elements; screenshot/SoM on demand; cache (no rebuild
   │            every step); Semantic Entropy Probe on extraction steps (zero-cost uncertainty) [eval/02]
   ├─ LOCATE    L1 deterministic 10-tier (zero LLM) [A2]: ARIA role+name → role → testid → id
   │            → aria-label(exact) → aria-label(contains) → href → CSS(exact) → CSS(contains)
-  │            → visible text (arXiv:2603.20358). L2 only on L1 miss: fingerprint (LCS+attr)
-  │            → LLM re-rank ≤5 → vision. 2-layer cache (hit = 0 token). No CSS/XPath as primary;
+  │            → visible text (arXiv:2603.20358). L2 only on L1 miss: LLM re-rank ≤5 (wired);
+  │            fingerprint (LCS+attr) pre-rank and vision tier are seams (not built). 2-layer
+  │            cache (hit = 0 token). No CSS/XPath as primary;
   │            `:near()` is deprecated — do not use [arch/02]
   ├─ PREDICT   expected effect (URL/DOM/network)
   ├─ ACT       batch where safe; confirm before write/submit
@@ -60,14 +62,14 @@ NL Task
   ▼ MEMORY     reflection: store failed trajectories (offline induct only, never online) [arch/03]
 ```
 
-**Observability is first-class**: every step logs prompt, model, chosen locator + cascade level, screenshot, predicted-vs-actual diff, and failure class. **Redaction happens before the span is created and before SSE serialization** [C5][infra/02]. An SVDD trajectory trip-wire (trained on normal traces only) flags drift/cycles [00][eval/01].
+**Observability is first-class (SSE built; Langfuse/OTel span pipeline is a seam)**: every step emits prompt, model, chosen locator + cascade level, screenshot, predicted-vs-actual diff, and failure class over SSE, and `redact()` runs before SSE serialization (real). The Langfuse + OTel GenAI span export is designed-for, not built — `init_observability()` is a skeleton that reads env and creates no spans; **redaction still runs at the serialization boundary regardless**. The SVDD trajectory trip-wire (normal-traces-only) is likewise a seam. [C5][infra/02][00][eval/01]
 
 ## 4. Grading-axis coverage
 
 | Grading axis (ASSIGNMENT) | Grounded mechanism | Source |
 |---|---|---|
 | Self-correction (not try/except) | Observe-first prevention + verify-after-act (predict→diff→re-ground) + per-class failure handling + retry→local-switch→replan | [arch/02][00] |
-| Self-maintenance (selector adaptation) | Deterministic 10-tier cascade → fingerprint heal → LLM re-rank → vision; 2-layer cache | [arch/02] |
+| Self-maintenance (selector adaptation) | Deterministic 10-tier cascade → LLM re-rank ≤5 (wired); fingerprint heal + vision are seams; 2-layer cache | [arch/02] |
 | Eval-set depth | Domain×task-type×difficulty tiers; ≥20% held-out unseen sites; block shortcuts; **key-node TCR/TSR** over binary | [eval/01][arch/03] |
 | Silent-failure prevention | **nominal-vs-verified completion (CuP) is the headline metric**; dual-channel verification; pre-exec adversarial check; SEP + consistency + state check; trajectory anomaly; never trust verbalized confidence | [eval/01][eval/02][00] |
 | Cost/latency/scalability | LLM-out-of-hot-path; cache/replay (0-token hits); batched actions; tiered model selection; stateless ephemeral browser per task; **cost bounded by Copilot quota, not per-token** | [infra/01][00] |
@@ -76,7 +78,7 @@ NL Task
 ## 5. Self-correction & self-maintenance (depth)
 
 - **Self-correction is not retry.** First prevent: observe-first alignment (no LLM) [A1]. Then per action: diff observation (DOM/URL/network) → branch by failure class (see diagram) → every retry must be justified by a **new observation** → on exhaustion, local strategy-switch (e.g. search-by-text instead of search-by-class) → global replan → `ask_user`. Write/submit retries require confirmation first. [arch/02]
-- **Self-maintenance (locator healing).** Semantic-first, **zero-cost deterministic 10-tier first** (arXiv:2603.20358), LLM healing only on miss; ARIA role+name is most stable (a user-facing contract); healed locator written back to a 2-layer cache (hit = 0 token). Avoid CSS/XPath as primary; `:near()` is deprecated. [arch/02]
+- **Self-maintenance (locator healing).** Semantic-first, **zero-cost deterministic 10-tier first** (arXiv:2603.20358), LLM healing only on miss — the wired L2 is an LLM re-rank of a ≤5-candidate shortlist; the heuristic fingerprint pre-rank and the vision tier are documented seams, not built. ARIA role+name is most stable (a user-facing contract); healed locator written back to a 2-layer cache (hit = 0 token). Avoid CSS/XPath as primary; `:near()` is deprecated. [arch/02]
 - **Honest limit.** Intent drift (a healed locator clicks a *plausible-but-wrong* element while CI stays green) is an **open research problem**. We mitigate with goal-level verify (predict→diff→re-ground) + CuP; we **do not claim to eliminate false success**. Concrete example: "click the red button" → healed to a different red button → nominal success, verified failure. [00][arch/02]
 
 ## 6. Silent-failure & verification layer (the differentiator)
@@ -85,7 +87,7 @@ NL Task
 - **Per-task dual-channel**: (a) programmatic state assertion where inspectable (DOM/API/extracted field); (b) else a screenshot-grounded judge **scored twice** (action-history-only vs +screenshot) — divergence flags fabrication. [eval/01]
 - **Headline metric = nominal vs verified completion (CuP-style)**; the delta is the silent-failure rate. [eval/02][00]
 - **LLM judge guardrails** (only when unavoidable): different model family from the agent, explicit "Unknown" escape hatch, one dimension per call. **Panels do not fix correlated error** — ~9 judges ≈ 2 effective votes; panel accuracy falls 8–22pp short of true independence; the best single judge ≈ the full panel. Spend extra judges on independent axes. [eval/02]
-- **Three stacked silent-failure signals**: Semantic Entropy Probe on extraction steps + repeat-and-compare consistency sampling + independent post-action state check; plus an SVDD trajectory trip-wire (needs only normal traces). [eval/02][eval/01]
+- **Silent-failure signals (designed as a stack; one wired today)**: the independent post-action state check + the nominal-vs-verified (CuP) gap are what actually run in the harness. Repeat-and-compare consistency sampling is built and unit-tested but not wired into a run; the Semantic Entropy Probe (needs hidden-state logits) and the SVDD trajectory trip-wire (needs a normal-trace corpus) are seams. [eval/02][eval/01]
 - **Never accept verbalized confidence as a success signal** (LLMs are systematically overconfident). [eval/02]
 
 ## 7. Eval set & harness
@@ -102,7 +104,7 @@ NL Task
 - **Input**: NL task box + optional target URL.
 - **Live progress**: SSE (`sse-starlette`) emitting AG-UI events (`STEP_STARTED` / `TOOL_CALL_*` / `INTERRUPT`) plus a **custom `screenshot_annotated`** event (AG-UI has no standard screenshot event) [C6][infra/02].
 - **Inspectable-failure view (Skyvern-style)**, per step: annotated screenshot (highlighted element) · element tree · LLM prompt + raw response + parsed action · chosen locator + cascade level · `failure_category` · retry chain · HAR. [infra/02]
-- **Observability**: Langfuse (inline screenshot spans via `LangfuseMedia`) + OTel GenAI spans. **Langfuse has no built-in redaction — we sanitize before `span.update()`.** [infra/02]
+- **Observability**: Langfuse (inline screenshot spans via `LangfuseMedia`) + OTel GenAI spans are the **designed-for backend, not built (seam)** — `init_observability()` is a skeleton that wires no exporter and emits no spans; the live trace surface today is the SSE stream + the inspectable-failure view. **Langfuse has no built-in redaction — when wired we sanitize before `span.update()`; `redact()` already runs at SSE serialization.** [infra/02]
 - **Implementation aid**: reuse existing skills rather than hand-rolling — `minimax-fullstack-dev` (frontend↔backend integration, SSE streaming), `vercel-react-best-practices`, `vercel-web-design-guidelines`, `minimax-frontend-dev` (polish the failure trace view).
 
 ## 9. Deployment

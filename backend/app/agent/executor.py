@@ -180,11 +180,16 @@ class Executor:
         yield events.tool_call_args(call_id, _args(st))
 
         if st.action == "navigate":
-            await act.navigate(page, st.url or "")
+            response = await act.navigate(page, st.url or "")
             block = await verify.detect_block(page)
             if block is not None:
                 yield events.tool_call_end(call_id, f"navigate -> BLOCKED ({block})")
                 yield _Outcome(False, failure_class=FailureClass.BLOCKED.value)
+                return
+            status = getattr(response, "status", None)
+            if status is not None and status >= 400:
+                yield events.tool_call_end(call_id, f"navigate -> HTTP {status}")
+                yield _Outcome(False, failure_class=FailureClass.NOT_FOUND.value)
                 return
             yield events.tool_call_end(call_id, f"navigated to {page.url}")
             shot = await screenshots.capture_step(page, step_id, None, f"navigated to {page.url}")
@@ -195,6 +200,7 @@ class Executor:
 
         last_class = FailureClass.NOT_FOUND
         reground = False
+        prev_fingerprint = None
         for attempt in range(1, self._max_attempts + 1):
             result, fc, located, shot = await self._attempt(
                 page, step_id, st, reground=reground, attempt=attempt
@@ -231,9 +237,13 @@ class Executor:
 
             # A retry must be justified by a NEW observation (§1.3): apply the
             # per-class recovery and only continue if it actually changed state.
-            progressed = await self._apply_recovery(page, st, rec)
             if rec is Recovery.REGROUND:
+                fingerprint = await self._perception_fingerprint(page)
+                progressed = fingerprint != prev_fingerprint
+                prev_fingerprint = fingerprint
                 reground = True  # local strategy switch: invalidate + re-perceive (+ L2)
+            else:
+                progressed = await self._apply_recovery(page, st, rec)
             if not progressed and attempt >= 2:
                 break  # recovery is a no-op -> stop escalating locally
 
@@ -303,7 +313,7 @@ class Executor:
             shot = await self._shot(page, step_id, st, located, pre.value, attempt)
             return verify.VerifyResult.NO_CHANGE, pre, located, shot
 
-        if st.action == "fill" and act.requires_confirmation(act.Action(kind="fill")):
+        if act.requires_confirmation(act.Action(kind=st.action)):
             if not await self._confirm():
                 return verify.VerifyResult.NO_CHANGE, FailureClass.WRONG_PAGE, located, None
 
@@ -350,9 +360,17 @@ class Executor:
             return await recover.wait_scroll_dismiss(page, located.locator)
         if rec is Recovery.STATE_WAIT and located is not None:
             return await recover.state_wait(page, located.locator)
-        if rec is Recovery.REGROUND:
-            return True  # the next attempt re-perceives with the cache invalidated
         return False
+
+    async def _perception_fingerprint(self, page: Any) -> tuple:
+        """Cheap observable-state digest for the REGROUND no-progress check: the
+        page URL plus the sorted (role, name) set. A re-perception that yields the
+        same digest is NOT a new observation, so REGROUND made no progress."""
+        perception = await perceive(page)
+        return (
+            _page_key(page),
+            tuple(sorted((e.role, e.name) for e in perception.elements)),
+        )
 
     async def _current_locator(self, page: Any, st: SubTask):
         perception = await perceive(page)

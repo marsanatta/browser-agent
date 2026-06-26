@@ -39,6 +39,18 @@ from eval.verify import key_node_check, state_check
 K_SIDE_EFFECT = 3  # pass^k for side-effecting tasks (eval/02 §F2)
 
 
+def score_abstain(abstain_reason: str | None, *, asked: bool, nominal: bool, blocked: bool) -> bool:
+    """Score an expect_abstain task by OUTCOME, not page state. A correct refusal is
+    asking the user without falsely claiming success. When `abstain_reason == "blocked"`
+    the refusal must be caused by a real bot-wall (rec.blocked) — a generic
+    local-exhaustion ask_user does NOT count as a correct blocked-abstain. Default /
+    "impossible" keep the original outcome-only rule (asked AND not nominal)."""
+    correct_refusal = asked and not nominal
+    if abstain_reason == "blocked":
+        return correct_refusal and blocked
+    return correct_refusal
+
+
 class _CountingGateway:
     """Wraps the real LLMGateway to count Copilot calls (the binding cost metric —
     DESIGN §11: requests-per-task, not $/token). Delegates everything else."""
@@ -170,11 +182,12 @@ async def _run_once(task: EvalTask, gateway: _CountingGateway, *, full: bool) ->
     reduced = audit.reduce_events(events_seen)
     task_tokens = {k: gateway.tokens[k] - tokens_before.get(k, 0) for k in gateway.tokens}
 
-    # Abstain tasks are scored by OUTCOME, not page state: a correct refusal is
-    # asking the user without falsely claiming success. This is the primitive that
-    # lets the harness score a correct abstention as success instead of a failure.
+    # Abstain tasks are scored by OUTCOME, not page state (see score_abstain): a
+    # `blocked` task must have actually hit a bot-wall, not just exhausted locally.
     if task.expect_abstain:
-        verified = asked and not nominal
+        verified = score_abstain(
+            task.abstain_reason, asked=asked, nominal=nominal, blocked=reduced["blocked"]
+        )
     else:
         verified = verified_box["v"]
 

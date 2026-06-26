@@ -82,7 +82,11 @@ async def _collect(ex, task, *types):
     ("Element is outside of the viewport", FailureClass.NOT_INTERACTABLE),
     ("Element is not visible", FailureClass.NOT_INTERACTABLE),
     ("locator.click: Timeout 5000ms exceeded", FailureClass.STALE_TIMING),
+    ("Timeout 30000ms exceeded", FailureClass.STALE_TIMING),
     ("element is not attached to the DOM", FailureClass.STALE_TIMING),
+    # UNRECOGNIZED exception text routes to re-perceive (NOT_FOUND -> REGROUND),
+    # not to a state-wait retry of the same broken action.
+    ("strict mode violation: resolved to 3 elements", FailureClass.NOT_FOUND),
 ])
 def test_classify_exception(msg, expected):
     assert classify_exception(Exception(msg)) is expected

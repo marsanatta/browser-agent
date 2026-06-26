@@ -11,8 +11,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-ActionKind = Literal["navigate", "click", "fill", "press", "submit"]
-_WRITE_ACTIONS: frozenset[str] = frozenset({"fill", "submit"})
+ActionKind = Literal["navigate", "click", "fill", "press"]
+# Submit-class actions: a press (Enter submits a form) and a click (submit button).
+# A fill is benign keystroke entry — it does not commit, so it is NOT gated.
+_WRITE_ACTIONS: frozenset[str] = frozenset({"press", "click"})
 
 
 @dataclass(frozen=True)
@@ -26,8 +28,11 @@ def requires_confirmation(action: Action) -> bool:
     return action.kind in _WRITE_ACTIONS
 
 
-async def navigate(page: Any, url: str) -> None:
-    await page.goto(url, wait_until="domcontentloaded")
+async def navigate(page: Any, url: str) -> Any:
+    """Navigate and return the main-frame Response (None for data:/about: URLs,
+    which produce no HTTP response). The caller inspects `response.status` to
+    catch an error page (>=400) instead of treating every goto as success."""
+    return await page.goto(url, wait_until="domcontentloaded")
 
 
 async def click(locator: Any) -> None:

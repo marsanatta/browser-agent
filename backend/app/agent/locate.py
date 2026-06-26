@@ -19,8 +19,10 @@ tiers, which would silently resolve the perceive-merged first node's href/id —
 and defer to L2. The first resolving tier wins and is written to a 2-layer
 in-memory cache (hit = 0 work).
 
-L2 (LLM re-rank of a shortlist, then vision) is the documented fallback on a full
-cascade miss; `l2_fallback` is wired in prod (main.py) and the eval harness.
+L2 on a full cascade miss is the LLM re-rank of a <=5-candidate shortlist — that is
+what `make_l2_fallback` implements and is wired in prod (main.py) and the eval
+harness. The heuristic fingerprint pre-rank and the vision tier are documented
+seams (not built); only the LLM re-rank runs.
 """
 
 from __future__ import annotations
@@ -45,19 +47,42 @@ L2Fallback = Callable[[Any, IndexedElement], Awaitable[Located | None]]
 
 class LocatorCache:
     """2-layer cache seam. M1 ships the in-memory layer; a persistent layer
-    (e.g. sqlite) plugs in behind the same get/put without touching callers."""
+    (e.g. sqlite) plugs in behind the same get/put without touching callers.
+
+    A hit is normally rebuilt from the lookup key's own element. The L2 case is
+    different: the lookup key is the pseudo-target (whose name is unresolvable),
+    so we ALSO record the LLM-chosen real `build_el` and rebuild the locator from
+    THAT — otherwise every re-lookup misses and re-fires the (token-costing) L2."""
 
     def __init__(self) -> None:
         self._mem: dict[tuple[str, str, str], tuple[int, str]] = {}
+        self._build_el: dict[tuple[str, str, str], IndexedElement] = {}
 
     def get(self, page_key: str, el: IndexedElement) -> tuple[int, str] | None:
         return self._mem.get((page_key, el.role, el.name))
 
-    def put(self, page_key: str, el: IndexedElement, tier: int, strategy: str) -> None:
-        self._mem[(page_key, el.role, el.name)] = (tier, strategy)
+    def build_el_for(self, page_key: str, el: IndexedElement) -> IndexedElement | None:
+        return self._build_el.get((page_key, el.role, el.name))
+
+    def put(
+        self,
+        page_key: str,
+        el: IndexedElement,
+        tier: int,
+        strategy: str,
+        build_el: IndexedElement | None = None,
+    ) -> None:
+        k = (page_key, el.role, el.name)
+        self._mem[k] = (tier, strategy)
+        if build_el is not None and build_el is not el:
+            self._build_el[k] = build_el
+        else:
+            self._build_el.pop(k, None)
 
     def invalidate(self, page_key: str, el: IndexedElement) -> None:
-        self._mem.pop((page_key, el.role, el.name), None)
+        k = (page_key, el.role, el.name)
+        self._mem.pop(k, None)
+        self._build_el.pop(k, None)
 
 
 async def _resolves(locator: Any) -> bool:
@@ -85,9 +110,10 @@ async def locate(
     cached = cache.get(key, el)
     if cached is not None:
         tier, strategy = cached
-        loc = _build(page, strategy, el)
+        build_el = cache.build_el_for(key, el)
+        loc = _build(page, strategy, build_el or el)
         if loc is not None and await _resolves(loc):
-            return Located(loc, tier, strategy)
+            return Located(loc, tier, strategy, via="l2" if build_el is not None else "cascade")
         cache.invalidate(key, el)
 
     located = await _cascade(page, el, cache, key, el)
@@ -113,8 +139,15 @@ async def _cascade(
     on genuine ambiguity we STOP (return None) rather than fall through to the
     attribute tiers — those would resolve the perceive-merged element's first-node
     href/id and silently pick the wrong one. The narrowed survivor is position-
-    dependent (not reproducible via `_build`) so it is deliberately not cached."""
-    for tier, strategy in enumerate(_TIERS, start=1):
+    dependent (not reproducible via `_build`) so it is deliberately not cached.
+
+    A pseudo-target (index == -1: ambiguity / synonym placeholder, empty attrs) is
+    restricted to tier-1 EXACT role+name. Its name is the planner's word, which may
+    be a substring of an unrelated element's name (e.g. "Sign In" in "Member Sign In
+    Now"); letting the fuzzy tier-2 role substring (or attribute/text tiers) resolve
+    it would be a SILENT wrong pick. On a tier-1 miss we abstain and route to L2."""
+    tiers = _TIERS[:1] if build_el.index == -1 else _TIERS
+    for tier, strategy in enumerate(tiers, start=1):
         loc = _build(page, strategy, build_el)
         if loc is None:
             continue
@@ -124,7 +157,7 @@ async def _cascade(
             except Exception:
                 n = 0
             if n == 1:
-                cache.put(key, store_el, tier, strategy)
+                cache.put(key, store_el, tier, strategy, build_el=build_el)
                 return Located(loc, tier, strategy)
             if n > 1:
                 live = await _interactable(page, loc)

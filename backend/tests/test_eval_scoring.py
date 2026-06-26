@@ -37,6 +37,19 @@ def test_tcr_mean_across_tasks():
     assert abs(scoring.tcr(rs) - (1.6 / 3)) < 1e-9
 
 
+def test_tcr_excludes_zero_key_node_tasks():
+    # A zero-key-node verified task must NOT contribute a free 1.0 to the key-node
+    # TCR aggregate (that inflated the mean). Aggregate over the keyed task only:
+    # one task with 1/2 key nodes -> TCR = 0.5, NOT (0.5 + 1.0)/2 = 0.75.
+    rs = [_t("zero", True, True, 0, 0), _t("keyed", True, False, 1, 2)]
+    assert scoring.tcr(rs) == 0.5
+
+
+def test_tcr_zero_when_no_keyed_tasks():
+    rs = [_t("zero", True, True, 0, 0)]
+    assert scoring.tcr(rs) == 0.0
+
+
 def test_tsr_is_verified_fraction_not_nominal():
     # 4 tasks, 1 verified. nominal=True on all -> TSR must be 0.25, NOT 1.0.
     rs = [
