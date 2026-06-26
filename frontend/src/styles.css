@@ -194,6 +194,88 @@ input {
   font-style: italic;
 }
 
+.plan {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.plan-heading {
+  margin: 0 0 8px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-tag {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, var(--border));
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.plan-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.plan-steps li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.plan-steps li.is-new {
+  color: var(--accent);
+}
+
+.plan-steps .num {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 1.4em;
+  text-align: right;
+}
+
+.plan-steps .plan-action {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.plan-steps .plan-target {
+  color: var(--text);
+}
+
+.replan-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  content-visibility: visible;
+}
+
+.replan-divider::before,
+.replan-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
 .board {
   display: grid;
   grid-template-columns: minmax(280px, 380px) 1fr;
@@ -435,6 +517,7 @@ input {
 
 .chain li {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   font-size: 13px;
@@ -455,6 +538,26 @@ input {
 
 .chain .arrow {
   color: var(--muted);
+}
+
+.chain .tried code,
+.chain .via code {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.chain .rlabel,
+.chain .via {
+  color: var(--muted);
+}
+
+.chain .why {
+  color: var(--muted);
+}
+
+.chain .tier {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .chain .rec {
@@ -742,8 +845,22 @@ li.is-active .steprow {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * {
+  *,
+  *::before,
+  *::after {
     transition: none !important;
     animation: none !important;
+  }
+
+  /* Keep FUNCTIONAL motion: the spinner and cursor convey live "agent is
+     working" state, not decoration. Re-enabled with matching !important + higher
+     specificity so they win over the blanket rule above. Decorative keyframes
+     (step-pulse, row-in, check-pop) stay disabled. */
+  .live-spinner {
+    animation: live-rotate 0.8s linear infinite !important;
+  }
+
+  .live-cursor {
+    animation: live-blink 1s step-end infinite !important;
   }
 }

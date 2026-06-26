@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StepDetail } from "./StepDetail.jsx";
 import { LiveActivity } from "./LiveActivity.jsx";
@@ -26,7 +26,7 @@ const STREAM_EVENTS = [
 
 const TERMINAL = new Set(["RUN_FINISHED", "RUN_ERROR"]);
 
-const initialState = { run: null, steps: [], order: [], notices: [] };
+const initialState = { run: null, steps: [], order: [], notices: [], plan: null };
 
 function reduce(state, ev) {
   const { type, payload } = ev;
@@ -36,6 +36,7 @@ function reduce(state, ev) {
       steps: [],
       order: [],
       notices: [],
+      plan: null,
     };
   }
   if (type === "PLAN_READY") {
@@ -105,16 +106,46 @@ function describePlanned(a) {
 }
 
 function seedPlan(state, runId, plan) {
-  const known = new Set(state.steps.map((s) => s.id));
-  const steps = [...state.steps];
-  const order = [...state.order];
+  const isReplan = state.plan != null;
+  const planIds = plan.map((_, i) => `${runId}-s${i + 1}`);
+  const byId = new Map(state.steps.map((s) => [s.id, s]));
+
+  // First plain (non-replan) plan: seed any not-yet-known id as pending.
+  if (!isReplan) {
+    const steps = [...state.steps];
+    const order = [...state.order];
+    plan.forEach((a, i) => {
+      const id = planIds[i];
+      if (byId.has(id)) return; // a STEP_STARTED already arrived for this id
+      steps.push({ id, description: describePlanned(a), status: "pending" });
+      order.push(id);
+    });
+    return { ...state, steps, order, plan: { steps: plan, count: plan.length, replanFrom: -1 } };
+  }
+
+  // Replan: the backend emits the FULL reconciled plan (already-done prefix +
+  // new tail). The divergence point is the first index whose existing row is not
+  // an "ok" completion — from there on the rows are the replan's new sub-tasks.
+  const replanFrom = plan.findIndex((_, i) => (byId.get(planIds[i])?.status ?? "pending") !== "ok");
+
+  const steps = [];
+  const order = [];
   plan.forEach((a, i) => {
-    const id = `${runId}-s${i + 1}`;
-    if (known.has(id)) return; // a STEP_STARTED already arrived for this id
-    steps.push({ id, description: describePlanned(a), status: "pending" });
+    const id = planIds[i];
+    const prev = byId.get(id);
+    if (replanFrom >= 0 && i >= replanFrom) {
+      // Replaced by the replan: overwrite description, reset to pending, mark new.
+      steps.push({ ...(prev ?? {}), id, description: describePlanned(a), status: "pending", replanned: true });
+    } else {
+      steps.push(prev ?? { id, description: describePlanned(a), status: "pending" });
+    }
     order.push(id);
   });
-  return { ...state, steps, order };
+  // Orphan rows from a longer original plan that the new plan no longer covers are
+  // dropped by virtue of rebuilding steps/order from the new plan above — but never
+  // a row that already ran (the prefix is all "ok", always within the new plan).
+
+  return { ...state, steps, order, plan: { steps: plan, count: plan.length, replanFrom } };
 }
 
 function upsert(state, id, fn) {
@@ -288,11 +319,19 @@ export default function App() {
       )}
       {run && run.status !== "running" ? <RunVerdict run={run} /> : null}
 
+      {state.plan && <PlanView plan={state.plan} />}
+
       <section className="board">
         <ol className="timeline" aria-live="polite" aria-label={t("timeline.label")}>
           {steps.length === 0 && <li className="empty">{t("timeline.empty")}</li>}
           {steps.map((s, i) => (
-            <li key={s.id} className={`fade-in ${s.status === "running" ? "is-active" : ""}`}>
+            <Fragment key={s.id}>
+              {s.replanned && (steps[i - 1] == null || !steps[i - 1].replanned) && (
+                <li className="replan-divider" aria-label={t("plan.replanned")}>
+                  <span>{t("plan.replanned")}</span>
+                </li>
+              )}
+            <li className={`fade-in ${s.status === "running" ? "is-active" : ""}`}>
               <button
                 className={`steprow ${s.status} ${selected === s.id ? "active" : ""}`}
                 onClick={() => setSelected(s.id)}
@@ -308,6 +347,7 @@ export default function App() {
                 {s.failureCategory && <span className="fcat">{s.failureCategory}</span>}
               </button>
             </li>
+            </Fragment>
           ))}
           <li ref={tailRef} aria-hidden="true" className="tail" />
         </ol>
@@ -378,6 +418,32 @@ function AuthGate({ onUnlock, expired }) {
       </form>
       {error && <p className="notice ask">{error}</p>}
     </main>
+  );
+}
+
+function PlanView({ plan }) {
+  const { t } = useTranslation();
+  const steps = plan.steps ?? [];
+  const replanned = plan.replanFrom >= 0;
+  return (
+    <section className="plan" aria-label={t("plan.heading", { n: steps.length })}>
+      <h2 className="plan-heading">
+        {t("plan.heading", { n: steps.length })}
+        {replanned && <span className="plan-tag">{t("plan.replanned")}</span>}
+      </h2>
+      <ol className="plan-steps">
+        {steps.map((a, i) => (
+          <li key={i} className={replanned && i >= plan.replanFrom ? "is-new" : ""}>
+            <span className="num">{i + 1}</span>
+            <code className="plan-action">{a.action}</code>
+            <span className="plan-target break-words">
+              {a.action === "navigate" ? a.url ?? "" : a.target ?? ""}
+              {a.value != null && a.action !== "navigate" ? ` = ${a.value}` : ""}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 

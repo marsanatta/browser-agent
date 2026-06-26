@@ -55,7 +55,20 @@ export function StepDetail({ step, backend }) {
             {recoveries.map((r, i) => (
               <li key={i}>
                 <span className="attempt">{t("step.attempt", { n: r.attempt })}</span>
+                {r.tried && (
+                  <span className="tried">
+                    <span className="rlabel">{t("step.tried")}</span> <code>{r.tried}</code>
+                  </span>
+                )}
+                {r.strategy && (
+                  <span className="via">
+                    {t("step.via")} <code>{r.strategy}</code>
+                    {r.tier != null && <span className="tier"> · L{r.tier}</span>}
+                  </span>
+                )}
+                <span className="arrow">→</span>
                 <span className="fclass">{r.failure_class}</span>
+                {r.detail && <span className="why">: {detailLabel(t, r.detail)}</span>}
                 <span className="arrow">→</span>
                 <span className="rec">{r.recovery}</span>
               </li>
@@ -120,6 +133,12 @@ function Shot({ shot, backend }) {
       {shot.caption && <figcaption className="break-words">{shot.caption}</figcaption>}
     </figure>
   );
+}
+
+function detailLabel(t, token) {
+  const key = `step.detail.${token}`;
+  const label = t(key);
+  return label === key ? token : label; // unknown token -> show it verbatim, don't blank
 }
 
 function Tag({ label, value, tone, hint }) {

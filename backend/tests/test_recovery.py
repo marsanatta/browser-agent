@@ -67,6 +67,14 @@ async def _drive(provider, plan, task):
     return recoveries, asks, finished
 
 
+async def _collect(ex, task, *types):
+    out = {ty: [] for ty in types}
+    async for ev in ex.run(task):
+        if ev.type in out:
+            out[ev.type].append(ev.payload)
+    return out
+
+
 # ---- unit: exception -> class mapping (Playwright ground-truth text) ----
 
 @pytest.mark.parametrize("msg,expected", [
@@ -137,6 +145,42 @@ async def test_replan_emits_second_planning_phase():
         t == EventType.PHASE and n == "planning" and i > replan_idx
         for i, (t, n) in enumerate(seq)
     ), "the replan's PHASE(planning) must follow the REPLAN recovery"
+
+
+# ---- replan emits a second PLAN_READY carrying the new (reconciled) subtasks ----
+
+@pytest.mark.anyio
+async def test_replan_emits_second_plan_ready():
+    """After local exhaustion, the global replan must surface its output as a
+    second PLAN_READY so the live view can show what the replan produced — the
+    initial PLAN_READY (planning) + one more after the REPLAN recovery."""
+    plan = [SubTask(action="click", target="Place Order", role="button")]
+    ex = Executor(_LocalProvider(_DISABLED), MockPlanner(plan))
+    out = await _collect(ex, "click disabled", EventType.PLAN_READY)
+    plans = out[EventType.PLAN_READY]
+
+    assert len(plans) == 2, "initial plan + replan output"
+    assert all(p["run_id"] == plans[0]["run_id"] for p in plans), "same run, not a fresh run"
+    # MockPlanner re-emits the same fixed plan; i=0 so the reconciled list == new plan.
+    assert plans[1]["plan"] == [{"action": "click", "target": "Place Order"}]
+
+
+# ---- enriched recovery payload carries the per-attempt detail ----
+
+@pytest.mark.anyio
+async def test_recovery_event_carries_attempt_detail():
+    """The recovery event is enriched (observe-only) with what was attempted and a
+    machine 'why' token, plus the locator tier/strategy when one resolved."""
+    plan = [SubTask(action="click", target="Place Order", role="button")]
+    recoveries, _, _ = await _drive(_LocalProvider(_DISABLED), plan, "click disabled")
+
+    local = [r for r in recoveries if r["recovery"] != Recovery.REPLAN.value]
+    assert local, "at least one local-recovery event"
+    r = local[0]
+    assert r["tried"] == "click 'Place Order'"
+    # disabled button -> resolved locator but not interactable -> tier/strategy present
+    assert r["tier"] is not None and r["strategy"]
+    assert r["detail"] == "not_visible_or_enabled"
 
 
 # ---- not-interactable that resolves: recovery succeeds, action retried ----

@@ -1,3 +1,29 @@
+# Live-view: 4 enhancements — DONE
+
+## 1. Spinner under reduced-motion (styles.css)
+- [x] Scoped `* / *::before / *::after { animation:none }` then re-enabled `.live-spinner` (live-rotate) + `.live-cursor` (live-blink) with higher-specificity !important.
+- [x] step-pulse / row-in / check-pop stay disabled (check-pop needed the ::after coverage fix).
+- Verified: computed animationName under emulated reduce-motion — spinner/cursor animate, decorative=none.
+
+## 2. Plan view
+- [x] PlanView: "Plan · N steps" labeled section above the board, action + target/url per step, "replanned" tag.
+- [x] OPTIONAL reasoning forward — SKIPPED: capturing AssistantReasoningData requires changing complete()/Planner protocol = the LLM decision path. Locked decision said skip if so.
+
+## 3. Richer retry-loop detail
+- [x] events.recovery() additive optional fields: tried, tier, strategy, detail (machine token).
+- [x] executor emits them at both recovery points; _tried()/_recovery_detail() helpers. fill VALUE never in `tried`.
+- [x] StepDetail rich per-attempt row + detailLabel() i18n token map.
+
+## 4. Replan output
+- [x] executor emits plan_ready(full reconciled subtasks) after successful replan.
+- [x] seedPlan handles replan: replanFrom = first non-ok index; replaces tail rows (new desc, pending, replanned), keeps ok prefix, prunes orphans, reuses ids. Divider before first replanned row.
+
+## Tests
+- [x] test_replan_emits_second_plan_ready + test_recovery_event_carries_attempt_detail. pytest -m "not live" = 118 passed.
+- [x] npm run build exit 0. Reducer + i18n parity + reduced-motion traced.
+
+---
+
 # Live agent-activity view (feat/live-view) — DONE
 
 ## Backend

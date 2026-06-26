@@ -144,16 +144,35 @@ def ask_user(step_id: str, question: str) -> Event:
     return Event(EventType.ASK_USER, {"step_id": step_id, "question": question})
 
 
-def recovery(step_id: str, failure_class: str, action: str, attempt: int) -> Event:
-    return Event(
-        EventType.RECOVERY,
-        {
-            "step_id": step_id,
-            "failure_class": failure_class,
-            "recovery": action,
-            "attempt": attempt,
-        },
-    )
+def recovery(
+    step_id: str,
+    failure_class: str,
+    action: str,
+    attempt: int,
+    tried: str | None = None,
+    tier: int | None = None,
+    strategy: str | None = None,
+    detail: str | None = None,
+) -> Event:
+    """`action` is the recovery taken; the optional fields are observe-only context
+    for the per-attempt log: `tried` (what the agent attempted this attempt — the
+    sub-task action + target), `tier`/`strategy` (the locator resolved this attempt,
+    when one was), and `detail` (a short result/why for the failure)."""
+    payload: dict[str, Any] = {
+        "step_id": step_id,
+        "failure_class": failure_class,
+        "recovery": action,
+        "attempt": attempt,
+    }
+    if tried is not None:
+        payload["tried"] = tried
+    if tier is not None:
+        payload["tier"] = tier
+    if strategy is not None:
+        payload["strategy"] = strategy
+    if detail is not None:
+        payload["detail"] = detail
+    return Event(EventType.RECOVERY, payload)
 
 
 def run_finished(

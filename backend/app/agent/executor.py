@@ -140,6 +140,11 @@ class Executor:
                         new_subtasks = None
                     if new_subtasks:
                         subtasks = subtasks[:i] + new_subtasks
+                        # Surface the replan's output so the live view shows what
+                        # changed. The ids the frontend seeds (`${run_id}-s${i+1}`)
+                        # are still computed off the FULL `subtasks` list, so emit
+                        # the full reconciled plan, not just the tail.
+                        yield events.plan_ready(run_id, [_args(st) for st in subtasks])
                         continue
                 yield events.ask_user(
                     step_id, f"Could not complete '{_describe(st)}' after recovery; need guidance."
@@ -206,14 +211,23 @@ class Executor:
 
             if fc is FailureClass.BLOCKED:
                 # Bot-wall / CAPTCHA: terminal. Never retry or try to solve it.
-                yield events.recovery(step_id, fc.value, Recovery.ASK_USER.value, attempt)
+                yield events.recovery(
+                    step_id, fc.value, Recovery.ASK_USER.value, attempt,
+                    tried=_tried(st), detail=_recovery_detail(fc, located),
+                )
                 yield events.tool_call_end(call_id, f"{st.action} -> BLOCKED")
                 yield _Outcome(False, failure_class=FailureClass.BLOCKED.value)
                 return
 
             last_class = fc
             rec = recovery_for(fc)
-            yield events.recovery(step_id, fc.value, rec.value, attempt)
+            yield events.recovery(
+                step_id, fc.value, rec.value, attempt,
+                tried=_tried(st),
+                tier=located.tier if located is not None else None,
+                strategy=located.strategy if located is not None else None,
+                detail=_recovery_detail(fc, located),
+            )
 
             # A retry must be justified by a NEW observation (§1.3): apply the
             # per-class recovery and only continue if it actually changed state.
@@ -388,6 +402,31 @@ def _match(
 
 def _page_key(page: Any) -> str:
     return page.url.split("?", 1)[0].split("#", 1)[0]
+
+
+def _tried(st: SubTask) -> str:
+    """Short human-readable note of what the agent attempted this attempt: the
+    sub-task's action + target (or url for navigate). Frontend shows it verbatim."""
+    if st.action == "navigate":
+        return f"navigate {st.url or ''}".strip()
+    return f"{st.action} '{st.target or ''}'"
+
+
+# Stable machine tokens (the frontend translates them, like `phase`): a concise
+# observable "why" for the attempt, grounded in browser state, not the LLM.
+_DETAIL_TOKENS = {
+    FailureClass.NOT_FOUND: "no_element_matched",
+    FailureClass.NOT_INTERACTABLE: "not_visible_or_enabled",
+    FailureClass.WRONG_PAGE: "wrong_page",
+    FailureClass.STALE_TIMING: "stale_or_timeout",
+    FailureClass.BLOCKED: "blocked",
+}
+
+
+def _recovery_detail(fc: FailureClass, located: Any) -> str:
+    if fc is FailureClass.NOT_FOUND and located is not None:
+        return "no_state_change"  # element resolved but the action produced NO_CHANGE
+    return _DETAIL_TOKENS.get(fc, fc.value)
 
 
 def _describe(st: SubTask) -> str:
