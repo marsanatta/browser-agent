@@ -137,8 +137,15 @@ async def _cascade(
     on genuine ambiguity we STOP (return None) rather than fall through to the
     attribute tiers — those would resolve the perceive-merged element's first-node
     href/id and silently pick the wrong one. The narrowed survivor is position-
-    dependent (not reproducible via `_build`) so it is deliberately not cached."""
-    for tier, strategy in enumerate(_TIERS, start=1):
+    dependent (not reproducible via `_build`) so it is deliberately not cached.
+
+    A pseudo-target (index == -1: ambiguity / synonym placeholder, empty attrs) is
+    restricted to tier-1 EXACT role+name. Its name is the planner's word, which may
+    be a substring of an unrelated element's name (e.g. "Sign In" in "Member Sign In
+    Now"); letting the fuzzy tier-2 role substring (or attribute/text tiers) resolve
+    it would be a SILENT wrong pick. On a tier-1 miss we abstain and route to L2."""
+    tiers = _TIERS[:1] if build_el.index == -1 else _TIERS
+    for tier, strategy in enumerate(tiers, start=1):
         loc = _build(page, strategy, build_el)
         if loc is None:
             continue
