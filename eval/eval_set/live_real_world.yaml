@@ -195,3 +195,132 @@ tasks:
       - url_contains: "gnu.org"
     assert:
       url_contains: "licenses"
+
+  # --- Breadth (autoresearch round 2, Probe B): more structurally-distinct real
+  # domains across new categories (maps / news / docs / media / ...). Same rules:
+  # page-specific verifier, zero text_contains, characterized live before adoption. ---
+
+  # Maps — a slippy-map app with a persistent "Log In" nav. Distinct domain (maps).
+  - id: live_osm_login_nav
+    instruction: "On OpenStreetMap, click 'Log In' to open the login page."
+    start_url: "https://www.openstreetmap.org/"
+    domain: maps
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "openstreetmap.org"
+    assert:
+      url_contains: "login"
+
+  # News (tech link-aggregator) — top-nav "Comments" page. Distinct domain (news).
+  - id: live_lobsters_comments_nav
+    instruction: "On Lobsters, open the 'Comments' page from the navigation."
+    start_url: "https://lobste.rs/"
+    domain: news
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "lobste.rs"
+    assert:
+      url_contains: "comments"
+
+  # Docs — a large real documentation site; open its Blog. Distinct domain (docs).
+  - id: live_mdn_blog_nav
+    instruction: "On MDN Web Docs, open the Blog."
+    start_url: "https://developer.mozilla.org/"
+    domain: documentation
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "developer.mozilla.org"
+    assert:
+      url_contains: "blog"
+
+  # Media / digital library — the "Log In" link sits behind a compact menu; the locate
+  # cascade can miss it, so the agent ABSTAINS (honest non-completion, M3-safe). Kept
+  # as a graceful-failure class on a NEW distinct domain (media). Page-specific verifier.
+  - id: live_archive_login_nav
+    instruction: "On the Internet Archive, click 'Log In' to open the sign-in page."
+    start_url: "https://archive.org/"
+    domain: media
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "archive.org"
+    assert:
+      url_contains: "login"
+
+  # Government — a large, fast public-service site; open its Help page. Distinct domain (gov).
+  - id: live_govuk_help_nav
+    instruction: "On GOV.UK, open the 'Help' page from the site navigation."
+    start_url: "https://www.gov.uk/"
+    domain: government
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "gov.uk"
+    assert:
+      url_contains: "help"
+
+  # Science / preprints — open arXiv's Help page (redirects to info.arxiv.org). Distinct domain (science).
+  - id: live_arxiv_help_nav
+    instruction: "On arXiv, open the 'Help' page."
+    start_url: "https://arxiv.org/"
+    domain: science
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "arxiv.org"
+    assert:
+      url_contains: "help"
+
+  # Finance — open a specific equity quote page. Distinct domain (finance). NOTE: this site
+  # is bot-wall-prone (consent / anti-bot interstitials that detect_block does not yet catch);
+  # it VERIFIED on adoption (reached /quote/AAPL/) but a future run could serve a wall. The
+  # close full-tier run is the M3 arbiter — if it silent-fails there it is discarded.
+  - id: live_yahoofinance_aapl_quote
+    instruction: "On Yahoo Finance, open the quote page for Apple (ticker AAPL)."
+    start_url: "https://finance.yahoo.com/"
+    domain: finance
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "finance.yahoo.com"
+    assert:
+      url_contains: "AAPL"
+
+  # Books / digital library — open the sign-in page (distinct registrable domain from archive.org).
+  - id: live_openlibrary_login_nav
+    instruction: "On Open Library, click 'Log In' to open the sign-in page."
+    start_url: "https://openlibrary.org/"
+    domain: media
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "openlibrary.org"
+    assert:
+      url_contains: "login"
+
+  # Q&A — open the Questions listing. Distinct domain (qa). On adoption the agent ABSTAINED
+  # (nominal=False asked=True blocked=False, steps=4) -- a locate/navigation graceful failure
+  # (NOT a detected bot-wall), so scored by the honest page-specific assert (NOT expect_abstain).
+  # A RED abstain row that keeps M3 safe; close full-tier run is the arbiter.
+  - id: live_stackoverflow_questions_nav
+    instruction: "On Stack Overflow, open the 'Questions' page from the navigation."
+    start_url: "https://stackoverflow.com/"
+    domain: qa
+    task_type: action
+    difficulty: single
+    held_out: true
+    key_nodes:
+      - url_contains: "stackoverflow.com"
+    assert:
+      url_contains: "questions"

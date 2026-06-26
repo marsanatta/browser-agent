@@ -1,9 +1,9 @@
 # Eval Report — live evidence
 
-Generated **2026-06-25 09:05 UTC** from a REAL harness run. Every "verified" below is an
+Generated **2026-06-25 12:46 UTC** from a REAL harness run. Every "verified" below is an
 INDEPENDENT programmatic state check on the live page (URL / first-h1 / scoped
 selector) — never the agent's self-report, and never a loose `text_contains`.
-Copilot calls this run: 58.
+Copilot calls this run: 53.
 
 ## Test architecture — what gates vs what's evidence
 
@@ -16,7 +16,7 @@ Copilot calls this run: 58.
   (`python -m eval.run_live_tier`) and reported here. NOT part of the CI gate; a
   red row here is evidence, not a broken build.
 
-## Live real-world tier — 9/12 verified
+## Live real-world tier — 16/21 verified
 
 | task | site | type | deterministic? | nominal | verified | abstained |
 |---|---|---|---|---|---|---|
@@ -27,11 +27,20 @@ Copilot calls this run: 58.
 | live_wikipedia_search_submit | en.wikipedia.org | action | no (live) | True | True | False |
 | live_wikipedia_autocomplete | en.wikipedia.org | action | no (live) | True | True | False |
 | live_internet_lazyload | the-internet.herokuapp.com | action | no (live) | True | True | False |
-| live_internet_modal | the-internet.herokuapp.com | action | no (live) | True | False | False |
+| live_internet_modal | the-internet.herokuapp.com | action | no (live) | False | False | False |
 | live_internet_iframe | the-internet.herokuapp.com | action | no (live) | False | False | True |
 | live_example_more_info_nav | example.com | action | no (live) | True | True | False |
 | live_hackernews_newest_nav | news.ycombinator.com | action | no (live) | True | True | False |
-| live_gnu_licenses_nav | www.gnu.org | action | no (live) | False | False | False |
+| live_gnu_licenses_nav | www.gnu.org | action | no (live) | False | False | True |
+| live_osm_login_nav | www.openstreetmap.org | action | no (live) | True | True | False |
+| live_lobsters_comments_nav | lobste.rs | action | no (live) | True | True | False |
+| live_mdn_blog_nav | developer.mozilla.org | action | no (live) | True | True | False |
+| live_archive_login_nav | archive.org | action | no (live) | False | False | True |
+| live_govuk_help_nav | www.gov.uk | action | no (live) | True | True | False |
+| live_arxiv_help_nav | arxiv.org | action | no (live) | True | True | False |
+| live_yahoofinance_aapl_quote | finance.yahoo.com | action | no (live) | True | True | False |
+| live_openlibrary_login_nav | openlibrary.org | action | no (live) | True | True | False |
+| live_stackoverflow_questions_nav | stackoverflow.com | action | no (live) | False | False | True |
 
 ## Day-3 realistic batch (folded in, reproducible) — 8/8 verified
 
