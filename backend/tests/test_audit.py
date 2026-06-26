@@ -235,6 +235,32 @@ async def test_run_finished_tokens_empty_without_gateway():
 
 
 @pytest.mark.anyio
+async def test_counting_gateway_forwards_effort_and_proxies_attrs():
+    # Regression guard: the harness's counting wrapper must accept/forward
+    # reasoning_effort (a stale signature TypeError silently zeroed every live plan)
+    # and transparently proxy inner-gateway attrs the peek-replan reads.
+    captured: dict = {}
+
+    class _Inner:
+        replanner_model = "claude-opus-4.8"
+        replanner_effort = "xhigh"
+
+        async def complete(self, prompt, model=None, reasoning_effort=None):
+            captured.update(model=model, effort=reasoning_effort)
+            return LLMResponse("m", "ok")
+
+        async def close(self):
+            pass
+
+    gw = _CountingGateway(_Inner())
+    await gw.complete("p", model="claude-opus-4.8", reasoning_effort="high")
+    assert captured == {"model": "claude-opus-4.8", "effort": "high"}
+    assert gw.calls == 1
+    assert gw.replanner_model == "claude-opus-4.8"  # transparent proxy
+    assert gw.replanner_effort == "xhigh"
+
+
+@pytest.mark.anyio
 async def test_executor_ground_ambiguous_l2_via_synonym():
     # "Sign In" matches no element -> zero-candidate -> L2 picks "Log in" -> via=l2.
     data_url = "data:text/html," + urllib.parse.quote(_SYNONYM)

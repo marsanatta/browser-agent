@@ -61,6 +61,14 @@ class _CountingGateway:
         self.tokens = {"output_tokens": 0, "input_tokens": 0, "reasoning_tokens": 0,
                        "total_nano_aiu": 0}
 
+    def __getattr__(self, name: str) -> Any:
+        # Transparent proxy for inner-gateway attributes the executor/planner read
+        # (e.g. replanner_model, replanner_effort, workhorse_model). __getattr__ only
+        # fires for attributes absent on the wrapper, so .calls/.tokens stay local.
+        if name == "_inner":
+            raise AttributeError(name)
+        return getattr(self._inner, name)
+
     def _accrue(self, resp: Any) -> None:
         # Prefer the full assistant.usage ledger; fall back to the output_tokens read.
         usage = getattr(resp, "usage", None)
@@ -73,16 +81,11 @@ class _CountingGateway:
             if ot:
                 self.tokens["output_tokens"] += ot
 
-    async def complete(self, prompt: str, model: str | None = None) -> Any:
+    async def complete(
+        self, prompt: str, model: str | None = None, reasoning_effort: str | None = None
+    ) -> Any:
         self.calls += 1
-        resp = await (self._inner.complete(prompt) if model is None
-                      else self._inner.complete(prompt, model=model))
-        self._accrue(resp)
-        return resp
-
-    async def judge(self, prompt: str) -> Any:
-        self.calls += 1
-        resp = await self._inner.judge(prompt)
+        resp = await self._inner.complete(prompt, model=model, reasoning_effort=reasoning_effort)
         self._accrue(resp)
         return resp
 
