@@ -111,6 +111,34 @@ async def test_not_interactable_bounded_escalation_to_ask_user():
     assert len(recoveries) < 12
 
 
+# ---- replan path emits its own PHASE(planning): the re-plan is a silent LLM gap too ----
+
+@pytest.mark.anyio
+async def test_replan_emits_second_planning_phase():
+    """Local recovery exhaustion triggers a global replan — a second planner LLM
+    call, i.e. another silent gap. It must emit PHASE(planning) before that re-plan,
+    just like the initial plan, so the live view never goes dark during a replan."""
+    plan = [SubTask(action="click", target="Place Order", role="button")]
+    ex = Executor(_LocalProvider(_DISABLED), MockPlanner(plan))
+
+    seq = []
+    async for ev in ex.run("click disabled"):
+        if ev.type in (EventType.PHASE, EventType.RECOVERY):
+            seq.append((ev.type, ev.payload.get("phase") or ev.payload.get("recovery")))
+
+    phases = [name for t, name in seq if t == EventType.PHASE]
+    assert phases.count("planning") == 2  # initial plan + replan
+    assert phases.count("launching") == 1
+
+    replan_idx = next(
+        i for i, (t, n) in enumerate(seq) if t == EventType.RECOVERY and n == Recovery.REPLAN.value
+    )
+    assert any(
+        t == EventType.PHASE and n == "planning" and i > replan_idx
+        for i, (t, n) in enumerate(seq)
+    ), "the replan's PHASE(planning) must follow the REPLAN recovery"
+
+
 # ---- not-interactable that resolves: recovery succeeds, action retried ----
 
 _TRANSIENT = """

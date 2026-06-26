@@ -51,7 +51,6 @@ const en = {
   },
   live: {
     working: "Agent is working",
-    elapsed: "Elapsed {{time}}",
   },
   notices: { askUser: "Ask user: {{question}}" },
   gate: {
@@ -149,7 +148,6 @@ const zhHant = {
   },
   live: {
     working: "agent 正在執行",
-    elapsed: "已經過 {{time}}",
   },
   notices: { askUser: "詢問使用者：{{question}}" },
   gate: {

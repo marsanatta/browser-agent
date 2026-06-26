@@ -34,9 +34,7 @@ export function LiveActivity({ startedAt, phase, activeStepDescription }) {
         <span className="live-activity">{activity}</span>
         <span className="live-cursor" aria-hidden="true" />
       </span>
-      <span className="live-elapsed" aria-label={t("live.elapsed", { time: elapsed })}>
-        <span aria-hidden="true">{elapsed}</span>
-      </span>
+      <span className="live-elapsed" aria-hidden="true">{elapsed}</span>
     </div>
   );
 }
