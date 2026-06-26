@@ -45,19 +45,42 @@ L2Fallback = Callable[[Any, IndexedElement], Awaitable[Located | None]]
 
 class LocatorCache:
     """2-layer cache seam. M1 ships the in-memory layer; a persistent layer
-    (e.g. sqlite) plugs in behind the same get/put without touching callers."""
+    (e.g. sqlite) plugs in behind the same get/put without touching callers.
+
+    A hit is normally rebuilt from the lookup key's own element. The L2 case is
+    different: the lookup key is the pseudo-target (whose name is unresolvable),
+    so we ALSO record the LLM-chosen real `build_el` and rebuild the locator from
+    THAT — otherwise every re-lookup misses and re-fires the (token-costing) L2."""
 
     def __init__(self) -> None:
         self._mem: dict[tuple[str, str, str], tuple[int, str]] = {}
+        self._build_el: dict[tuple[str, str, str], IndexedElement] = {}
 
     def get(self, page_key: str, el: IndexedElement) -> tuple[int, str] | None:
         return self._mem.get((page_key, el.role, el.name))
 
-    def put(self, page_key: str, el: IndexedElement, tier: int, strategy: str) -> None:
-        self._mem[(page_key, el.role, el.name)] = (tier, strategy)
+    def build_el_for(self, page_key: str, el: IndexedElement) -> IndexedElement | None:
+        return self._build_el.get((page_key, el.role, el.name))
+
+    def put(
+        self,
+        page_key: str,
+        el: IndexedElement,
+        tier: int,
+        strategy: str,
+        build_el: IndexedElement | None = None,
+    ) -> None:
+        k = (page_key, el.role, el.name)
+        self._mem[k] = (tier, strategy)
+        if build_el is not None and build_el is not el:
+            self._build_el[k] = build_el
+        else:
+            self._build_el.pop(k, None)
 
     def invalidate(self, page_key: str, el: IndexedElement) -> None:
-        self._mem.pop((page_key, el.role, el.name), None)
+        k = (page_key, el.role, el.name)
+        self._mem.pop(k, None)
+        self._build_el.pop(k, None)
 
 
 async def _resolves(locator: Any) -> bool:
@@ -85,9 +108,10 @@ async def locate(
     cached = cache.get(key, el)
     if cached is not None:
         tier, strategy = cached
-        loc = _build(page, strategy, el)
+        build_el = cache.build_el_for(key, el)
+        loc = _build(page, strategy, build_el or el)
         if loc is not None and await _resolves(loc):
-            return Located(loc, tier, strategy)
+            return Located(loc, tier, strategy, via="l2" if build_el is not None else "cascade")
         cache.invalidate(key, el)
 
     located = await _cascade(page, el, cache, key, el)
@@ -124,7 +148,7 @@ async def _cascade(
             except Exception:
                 n = 0
             if n == 1:
-                cache.put(key, store_el, tier, strategy)
+                cache.put(key, store_el, tier, strategy, build_el=build_el)
                 return Located(loc, tier, strategy)
             if n > 1:
                 live = await _interactable(page, loc)

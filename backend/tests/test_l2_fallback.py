@@ -64,6 +64,28 @@ async def test_l2_fallback_resolves_on_full_miss(page):
 
 
 @pytest.mark.anyio
+async def test_l2_hit_is_cached_second_locate_makes_zero_gateway_calls(page):
+    # The L2 fix: a 2nd locate of the SAME pseudo-target must resolve from cache
+    # with ZERO gateway calls (the cached entry rebuilds from the chosen element,
+    # not the pseudo-target's unresolvable name).
+    perception = await perceive(page)
+    ghost = IndexedElement(-1, "button", "Place the order now", {})  # pseudo-target
+    gateway = MockGateway(lambda _p: "0")  # picks shortlist[0] = "Submit Order"
+    cache = LocatorCache()
+    l2 = make_l2_fallback(gateway, perception.elements)
+
+    first = await locate(page, ghost, cache=cache, l2_fallback=l2)
+    assert first is not None
+    assert await first.locator.inner_text() == "Submit Order"
+    assert len(gateway.calls) == 1
+
+    second = await locate(page, ghost, cache=cache, l2_fallback=l2)
+    assert second is not None
+    assert await second.locator.inner_text() == "Submit Order"
+    assert len(gateway.calls) == 1  # cache hit -> NO second gateway call
+
+
+@pytest.mark.anyio
 async def test_l2_fallback_returns_none_when_llm_declines(page):
     perception = await perceive(page)
     ghost = IndexedElement(99, "button", "Nonexistent control", {})
