@@ -1,10 +1,10 @@
 """PERCEIVE: fused accessibility-tree + DOM -> indexed interactive elements.
 
 Grounded in docs/architecture/02 §2.1 (ARIA role+name is the stable user-facing
-contract) and §1.4 / AgentOccam (observe-first: merge co-labeled elements, render
-tables/lists as Markdown, keep only interactive/pivotal nodes). We never dump raw
-DOM (token blowup); the accessibility snapshot is the spine, the DOM supplies
-locator-grade attributes (id / data-testid / aria-label / href / class).
+contract) and §1.4 / AgentOccam (observe-first: merge co-labeled elements, keep
+only interactive/pivotal nodes). We never dump raw DOM (token blowup); the
+accessibility snapshot is the spine, the DOM supplies locator-grade attributes
+(id / data-testid / aria-label / href / class).
 """
 
 from __future__ import annotations
@@ -41,7 +41,6 @@ class IndexedElement:
 class Perception:
     url: str
     elements: list[IndexedElement]
-    markdown: str
 
 
 async def perceive(page: Any) -> Perception:
@@ -62,8 +61,7 @@ async def perceive(page: Any) -> Perception:
         IndexedElement(i, role, name, attrs_by_key.get((role, name), {}))
         for i, (role, name) in enumerate(merged)
     ]
-    markdown = await _tables_lists_markdown(page)
-    return Perception(url=page.url, elements=elements, markdown=markdown)
+    return Perception(url=page.url, elements=elements)
 
 
 def _merge_co_labeled(items: list[tuple[str, str]]) -> list[tuple[str, str]]:
@@ -124,25 +122,5 @@ async def _scan_interactive(page: Any) -> list[dict[str, str]]:
                 });
             }
             return out;
-        }"""
-    )
-
-
-async def _tables_lists_markdown(page: Any) -> str:
-    """Render tables/lists as Markdown (AgentOccam observe-first), capped to keep
-    the observation compact. Returns '' when the page has none."""
-    return await page.evaluate(
-        """() => {
-            const parts = [];
-            for (const t of Array.from(document.querySelectorAll('table')).slice(0, 3)) {
-                const rows = Array.from(t.querySelectorAll('tr')).slice(0, 30);
-                for (const tr of rows) {
-                    const cells = Array.from(tr.querySelectorAll('th,td'))
-                        .map(c => c.innerText.trim().replace(/\\|/g, ' '));
-                    if (cells.length) parts.push('| ' + cells.join(' | ') + ' |');
-                }
-                parts.push('');
-            }
-            return parts.join('\\n').trim();
         }"""
     )

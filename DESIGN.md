@@ -38,8 +38,9 @@ Layered pipeline extending the convergent architecture in `[00]`:
 NL Task
   ▼ Planner (hierarchical): decompose → sub-tasks; replan = sub-goal fails N times
   ▼ per sub-task → stateless executor (fresh LLM context + clean page state) [arch/01][arch/03]
-  ├─ OBSERVE-FIRST (prevention, not recovery) [A1]: merge co-labeled elements, render
-  │                tables/lists as Markdown, selective history replay (pivotal nodes only).
+  ├─ OBSERVE-FIRST (prevention, not recovery) [A1]: merge co-labeled elements, keep only
+  │                interactive/pivotal nodes (table/list→Markdown rendering is a designed-for
+  │                seam, not built — the indexed element list is what perceive ships).
   │                No extra LLM call — AgentOccam got WebArena 16.5%→43.1% from this alone [arch/02]
   ├─ PERCEIVE  fused DOM+AX → indexed elements; screenshot/SoM on demand; cache (no rebuild
   │            every step); Semantic Entropy Probe on extraction steps (zero-cost uncertainty) [eval/02]
