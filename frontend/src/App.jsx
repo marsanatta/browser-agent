@@ -134,8 +134,10 @@ function seedPlan(state, runId, plan) {
     const id = planIds[i];
     const prev = byId.get(id);
     if (replanFrom >= 0 && i >= replanFrom) {
-      // Replaced by the replan: overwrite description, reset to pending, mark new.
-      steps.push({ ...(prev ?? {}), id, description: describePlanned(a), status: "pending", replanned: true });
+      // Replaced by the replan: a brand-new sub-task reusing this id. Start a fresh
+      // row — do NOT carry over the prior sub-task's recoveries/calls/shots/locator,
+      // or stale diagnostics from the old action show under the new one.
+      steps.push({ id, description: describePlanned(a), status: "pending", replanned: true });
     } else {
       steps.push(prev ?? { id, description: describePlanned(a), status: "pending" });
     }

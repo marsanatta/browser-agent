@@ -183,6 +183,52 @@ async def test_recovery_event_carries_attempt_detail():
     assert r["detail"] == "not_visible_or_enabled"
 
 
+# ---- replan AFTER a completed step: PLAN_READY carries the full reconciled plan ----
+
+class _TwoPlanner:
+    """Returns a different plan on the replan call so a tail-only emission is
+    distinguishable from the full reconciled (prefix + new tail) one."""
+
+    def __init__(self, first, second):
+        self._plans = [first, second]
+        self.calls = 0
+
+    async def plan(self, task):
+        p = self._plans[min(self.calls, len(self._plans) - 1)]
+        self.calls += 1
+        return list(p)
+
+
+_STEP1_OK_STEP2_DISABLED = """
+<html><body>
+<button aria-label="Step One" onclick="document.body.innerHTML += '<p>ok</p>'">Step One</button>
+<button aria-label="Place Order" disabled>Place Order</button>
+</body></html>
+"""
+
+
+@pytest.mark.anyio
+async def test_replan_plan_ready_includes_completed_prefix():
+    """When the replan fires AFTER a completed step (i>0), the second PLAN_READY must
+    carry the FULL reconciled plan — done prefix + new tail — not just the new tail.
+    That prefix is what lets the live view keep the finished rows and append the new
+    ones. A tail-only emission would drop 'Step One' and fail this test."""
+    first = [
+        SubTask(action="click", target="Step One", role="button"),
+        SubTask(action="click", target="Place Order", role="button"),
+    ]
+    second = [SubTask(action="click", target="Retry Order", role="button")]
+    ex = Executor(_LocalProvider(_STEP1_OK_STEP2_DISABLED), _TwoPlanner(first, second))
+    out = await _collect(ex, "two step", EventType.PLAN_READY)
+    plans = out[EventType.PLAN_READY]
+
+    assert len(plans) == 2, "initial plan + replan output"
+    assert plans[1]["plan"] == [
+        {"action": "click", "target": "Step One"},  # completed prefix, preserved
+        {"action": "click", "target": "Retry Order"},  # the replan's new tail
+    ]
+
+
 # ---- not-interactable that resolves: recovery succeeds, action retried ----
 
 _TRANSIENT = """
