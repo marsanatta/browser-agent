@@ -212,11 +212,12 @@ It was **earned on a deterministic offline test** (`backend/tests/test_settle_lo
 part of the 113 gate) and **corroborated by a live verified flip** (`live_internet_lazyload` now
 `nominal=True, verified=True` in `eval/REPORT.md`).
 
-**Eval breadth grew 4 → 7 distinct real domains.** Added real public sites with page-specific verifiers
-(zero `text_contains`): `example.com → iana.org` (reference), `news.ycombinator.com → newest` (news),
-`gnu.org → Licenses` (reference), alongside the existing Wikipedia / docs.python.org / the-internet /
-google. Bot-walls are routed to **abstain** (route-don't-evade); a real-site row that abstains or
-honest-fails is kept as evidence of a failure *class*, not discarded.
+**Eval breadth grew 4 → 7 distinct live-tier domains (6 real + the `the-internet.herokuapp.com` practice
+site).** Added real public sites with page-specific verifiers (zero `text_contains`): `example.com → iana.org`
+(reference), `news.ycombinator.com → newest` (news), `gnu.org → Licenses` (reference), alongside the existing
+Wikipedia / docs.python.org / google and the `the-internet.herokuapp.com` practice site (which backs the
+widget-pattern tasks). Bot-walls are routed to **abstain** (route-don't-evade); a real-site row that abstains
+or honest-fails is kept as evidence of a failure *class*, not discarded.
 
 **Honest correction — M3 = 1, not 0 (read it as an open limitation, not a regression).** The
 per-iteration single-runs reported M3 = 0, but the **authoritative full-tier re-run** (`eval/AUDIT.md`,
@@ -246,3 +247,60 @@ can lurk in a task you didn't change.
 
 Net: one real ground-time defect **closed** (lazyload, verified two ways), breadth **4 → 7**, all guards
 held — and one pre-existing planner-rooted silent failure (`modal`) newly **named and attributed**, not hidden.
+
+## 7. Round-2 autoresearch update (merged) — pure breadth, honest convergence
+
+A second eval-driven round ran in an isolated worktree, now merged. Per-iteration narrative:
+`research/autoresearch-round-2-findings.md`; ledger: `research/round-2-progress.json`; per-task attribution:
+`eval/AUDIT.md`. **11 iterations, 9 kept + 2 discarded.** It was a **pure-breadth round — no `backend/` code
+changed** (planner.py, state.py, executor, recover all untouched); the offline gate stayed **113
+green/network-free** through and after the merge.
+
+**Breadth grew 7 → 16 distinct live-tier domains — honestly: 15 real production sites + 1 carried-over
+practice site.** The practice site is `the-internet.herokuapp.com` (it backs the round-1 lazyload / modal /
+iframe widget-pattern tasks); it is **not** counted as a real production site. The **15 real** sites span
+diverse categories — news (Hacker News, Lobsters), government (GOV.UK), documentation (Python docs, MDN),
+maps (OpenStreetMap), finance (Yahoo Finance), science (arXiv), media / digital library (Internet Archive,
+Open Library), Q&A (Stack Overflow), and reference (Wikipedia, GNU, example.com). Each new site carries a
+page-specific verifier (URL / scoped selector, zero `text_contains`) and was characterized live before
+adoption. (Commerce/shopping is deliberately absent — real shopping sites bot-wall; Amazon was round-1's
+route-don't-evade discard.)
+
+**The M3-protection discipline held — two honest discards.** `w3.org` and `rfc-editor.org` each produced a
+`nominal=True, verified=False` **SILENT_FAILURE candidate** at characterization (the agent claimed success
+while still on the homepage — the target link was never located). By the **automatic-discard rule** (a new
+silent failure is never kept — the "Amazon rule"), both were **kept OUT of the tier**, so round-2 introduced
+**zero new silent failures**. This is the load-bearing evidence that the safety discipline works in practice:
+a silent-failure candidate is caught at characterization and discarded *before* it can enter the eval.
+
+**M3 honesty — the close-run 0 is run-noise, not a fix.** The opening baseline run measured **M3 = 1** (the
+`helium` retrieval silent-failed); the close full-tier snapshot measured **M3 = 0** (`helium` verified that
+run). That delta is **live nondeterminism, not a repair** — `helium` (and `modal`) flip between *silent* and
+*honest-fail / verified* run-to-run. So the honest, stable statement is **"no NEW silent failure was
+introduced this round,"** NOT "M3 was driven to 0." The carried silent-failure risk is **planner-rooted**:
+the planner emits a **navigate-only plan and the agent claims success without grounding the goal** (the
+`modal` case — a navigate-only plan for "read the modal title"; `helium` — a portal search that lands on the
+wrong page) — a **named B2 open-loop ceiling, unfixed by design** (`planner.py` is frozen by guard). Round-2
+neither fixed nor worsened it.
+
+**Named ceilings (the disclosed limits, all off-limits this round; detail in §5):**
+- **Planner open-loop (B2)** — navigate-only / unsighted plans + lax nominal-completion (the `modal`/`helium`
+  silent-failure band; the `w3.org`/`rfc-editor` discards). `planner.py` frozen by guard.
+- **Same-origin iframe-piercing** — `locate` sees the top frame only (`live_internet_iframe`).
+- **Search-box-strategy** — unnamed / verbose / autocomplete-required search boxes defeat exact role+name grounding.
+- **Bot-walls (route-don't-evade)** — CAPTCHA / managed-challenge pages routed to abstain, never solved
+  (`live_google_search_steam` BLOCKED).
+- **`detect_block` coverage gap** — misses modern-Cloudflare "Just a moment…" and Amazon-style robot-check
+  markers, so an *undetected* wall can silent-fail (the round-1 Amazon discard).
+
+**Convergence — this is the honest stopping point; there is no round-3.** Round-2's remaining failure tail
+decomposes **entirely** into the named ceilings above: every non-verified row at close is either a correct
+abstain (`google` BLOCKED; `iframe` / `gnu` / `archive` / `stackoverflow` honest-fail or abstain) or a
+planner-rooted, silent-failure-prone task (`modal` / `helium`). **No new climbable class remains** that the
+guards (planner.py frozen, no verifier weakened, M3 must not rise) would permit fixing — a further round
+would only re-discover the same disclosed ceilings. Per the round's own stop condition (failure tail all
+named-ceiling), the eval-driven loop has **converged**, and the honest move is to stop and disclose, which
+this section does. Full per-task evidence: `eval/AUDIT.md` and `research/autoresearch-round-2-findings.md`.
+
+Net: breadth **7 → 16 domains (15 real + 1 practice)** with **zero new silent failures** and **zero backend
+code change**; the loop has **converged** on the named ceilings — the honest end of the autoresearch program.
