@@ -172,11 +172,16 @@ class Executor:
         yield events.tool_call_args(call_id, _args(st))
 
         if st.action == "navigate":
-            await act.navigate(page, st.url or "")
+            response = await act.navigate(page, st.url or "")
             block = await verify.detect_block(page)
             if block is not None:
                 yield events.tool_call_end(call_id, f"navigate -> BLOCKED ({block})")
                 yield _Outcome(False, failure_class=FailureClass.BLOCKED.value)
+                return
+            status = getattr(response, "status", None)
+            if status is not None and status >= 400:
+                yield events.tool_call_end(call_id, f"navigate -> HTTP {status}")
+                yield _Outcome(False, failure_class=FailureClass.NOT_FOUND.value)
                 return
             yield events.tool_call_end(call_id, f"navigated to {page.url}")
             shot = await screenshots.capture_step(page, step_id, None, f"navigated to {page.url}")
