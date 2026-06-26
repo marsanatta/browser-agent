@@ -54,6 +54,7 @@ tasks:
     difficulty: single
     held_out: false
     expect_abstain: true
+    abstain_reason: blocked
 
   # Synonym / label mismatch on a REAL site: instruction says "Sign In" but the
   # element is labelled "Log in" -> zero-candidate _match -> L2 picks it on a real,

@@ -14,6 +14,7 @@ from typing import Any
 import yaml
 
 _VALID_TYPES = {"action", "retrieval", "side_effect"}
+_VALID_ABSTAIN_REASONS = {"blocked", "impossible"}
 _VALID_PRIMITIVES = {
     "url_contains", "text_contains", "h1_equals", "selector_text_equals", "iframe_text_equals"
 }
@@ -37,6 +38,10 @@ class EvalTask:
     # `assert` is optional. This is what lets the harness score correct refusals
     # as success instead of as a plain failure.
     expect_abstain: bool = False
+    # Why the correct outcome is to abstain. "blocked" = a bot-wall must actually be
+    # hit (scored asked AND not nominal AND blocked), so a generic local-exhaustion
+    # ask_user does NOT count. "impossible"/None keep the outcome-only scoring.
+    abstain_reason: str | None = None
     # A task that is GREEN on the current code tests nothing about today's gaps, but
     # guards against future regressions. Flag it so the harness keeps it OUT of the
     # headline success rate (it would only inflate it) while still running it.
@@ -72,6 +77,12 @@ def load_tasks(path: Path | str = EVAL_SET_PATH) -> list[EvalTask]:
         for node in it.get("key_nodes", []):
             _validate_primitive(f"{tid}.key_nodes", node)
         expect_abstain = bool(it.get("expect_abstain", False))
+        abstain_reason = it.get("abstain_reason")
+        if abstain_reason is not None and abstain_reason not in _VALID_ABSTAIN_REASONS:
+            raise ValueError(
+                f"{tid}: bad abstain_reason {abstain_reason!r} "
+                f"(valid: {_VALID_ABSTAIN_REASONS})"
+            )
         # inline_html builds a controlled data: URL fixture (a deterministic page
         # the agent really perceives/locates/clicks) so a task can reproduce an
         # exact DOM structure - e.g. a silent wrong-pick - without depending on a
@@ -99,6 +110,7 @@ def load_tasks(path: Path | str = EVAL_SET_PATH) -> list[EvalTask]:
                 key_nodes=list(it.get("key_nodes", [])),
                 assertion=assertion,
                 expect_abstain=expect_abstain,
+                abstain_reason=abstain_reason,
                 regression_anchor=bool(it.get("regression_anchor", False)),
             )
         )
