@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { StepDetail } from "./StepDetail.jsx";
 import { LiveActivity } from "./LiveActivity.jsx";
 import { Hint, LanguageSwitcher } from "./Hint.jsx";
+import { maskArgs } from "./mask.js";
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL ?? "";
 
@@ -440,7 +441,7 @@ function PlanView({ plan }) {
             <code className="plan-action">{a.action}</code>
             <span className="plan-target break-words">
               {a.action === "navigate" ? a.url ?? "" : a.target ?? ""}
-              {a.value != null && a.action !== "navigate" ? ` = ${a.value}` : ""}
+              {a.value != null && a.action !== "navigate" ? ` = ${maskArgs(a).value}` : ""}
             </span>
           </li>
         ))}

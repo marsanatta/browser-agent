@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Hint } from "./Hint.jsx";
+import { maskArgs } from "./mask.js";
 
 const STATUS_KEYS = ["pending", "running", "ok", "failed"];
 
@@ -83,7 +84,7 @@ export function StepDetail({ step, backend }) {
           {calls.map((c) => (
             <div key={c.call_id} className="call">
               <code className="tool">{c.tool}</code>
-              {c.args && <code className="args">{JSON.stringify(c.args)}</code>}
+              {c.args && <code className="args">{JSON.stringify(maskArgs(c.args))}</code>}
               {c.result && <span className="result break-words">{c.result}</span>}
             </div>
           ))}
