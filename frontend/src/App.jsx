@@ -177,8 +177,28 @@ export default function App() {
   const [selected, setSelected] = useState(null);
   const [authed, setAuthed] = useState(() => localStorage.getItem("ba_authed") === "1");
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [models, setModels] = useState(null); // { menu, defaults, thinking_levels, thinking_defaults }
+  const [modelSel, setModelSel] = useState(null); // current per-role model selection
+  const [effortSel, setEffortSel] = useState(null); // current per-role thinking level
   const [state, dispatch] = useReducer(reduce, initialState);
   const sourceRef = useRef(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`${BACKEND}/models`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((m) => {
+        if (alive && m?.menu?.length) {
+          setModels(m);
+          setModelSel(m.defaults);
+          setEffortSel(m.thinking_defaults);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const steps = state.steps;
   const selectedStep = useMemo(() => steps.find((s) => s.id === selected) ?? null, [steps, selected]);
@@ -217,6 +237,16 @@ export default function App() {
 
     const params = new URLSearchParams({ task });
     if (url.trim()) params.set("url", url.trim());
+    if (modelSel) {
+      params.set("model_plan", modelSel.plan);
+      params.set("model_exec", modelSel.exec);
+      params.set("model_replanner", modelSel.replanner);
+    }
+    if (effortSel) {
+      params.set("think_plan", effortSel.plan);
+      params.set("think_exec", effortSel.exec);
+      params.set("think_replanner", effortSel.replanner);
+    }
     const es = new EventSource(`${BACKEND}/agent/run?${params.toString()}`, { withCredentials: true });
     sourceRef.current = es;
 
@@ -316,6 +346,45 @@ export default function App() {
           </span>
         )}
       </form>
+
+      {models && modelSel && effortSel && (
+        <details className="models">
+          <summary>{t("models.heading")}</summary>
+          <div className="models-grid">
+            {["plan", "exec", "replanner"].map((role) => (
+              <div key={role} className="model-row">
+                <span className="model-role">{t(`models.${role}`)}</span>
+                <label className="field">
+                  <span>{t("models.model")}</span>
+                  <select
+                    value={modelSel[role]}
+                    onChange={(e) => setModelSel((s) => ({ ...s, [role]: e.target.value }))}
+                  >
+                    {models.menu.map((id) => (
+                      <option key={id} value={id} translate="no">
+                        {id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>{t("models.thinking")}</span>
+                  <select
+                    value={effortSel[role]}
+                    onChange={(e) => setEffortSel((s) => ({ ...s, [role]: e.target.value }))}
+                  >
+                    {models.thinking_levels.map((lv) => (
+                      <option key={lv} value={lv} translate="no">
+                        {lv}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
 
       {run?.status === "running" && (
         <LiveActivity startedAt={run.startedAt} phase={run.phase} activeStepDescription={activeStep?.description} />

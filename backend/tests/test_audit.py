@@ -211,9 +211,6 @@ class _FakeGateway:
     async def complete(self, *a, **k):
         return LLMResponse("m", "")
 
-    async def judge(self, *a, **k):
-        return LLMResponse("m", "")
-
 
 @pytest.mark.anyio
 async def test_run_finished_carries_gateway_tokens():

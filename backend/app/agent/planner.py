@@ -16,7 +16,7 @@ import json
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.agent.models import ACTOR_WORKHORSE, LLMGateway
+from app.agent.models import PLANNER_EFFORT, PLANNER_MODEL, LLMGateway
 
 
 @dataclass(frozen=True)
@@ -59,13 +59,19 @@ User task: __TASK__
 
 
 class LLMPlanner:
-    def __init__(self, gateway: LLMGateway, model: str = ACTOR_WORKHORSE) -> None:
+    def __init__(
+        self,
+        gateway: LLMGateway,
+        model: str = PLANNER_MODEL,
+        reasoning_effort: str = PLANNER_EFFORT,
+    ) -> None:
         self._gateway = gateway
         self._model = model
+        self._effort = reasoning_effort
 
     async def plan(self, task: str) -> list[SubTask]:
         prompt = _PLAN_PROMPT.replace("__TASK__", task)
-        resp = await self._gateway.complete(prompt, model=self._model)
+        resp = await self._gateway.complete(prompt, model=self._model, reasoning_effort=self._effort)
         return _parse_plan(resp.content)
 
 

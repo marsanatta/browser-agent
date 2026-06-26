@@ -20,7 +20,15 @@ from starlette.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
 from app.agent.executor import Executor
-from app.agent.models import LLMGateway
+from app.agent.models import (
+    EFFORT_DEFAULTS,
+    ROLE_DEFAULTS,
+    THINKING_LEVELS,
+    LLMGateway,
+    available_models,
+    resolve_effort,
+    resolve_model,
+)
 from app.agent.planner import LLMPlanner, SubTask
 from app.browser.provider import PlaywrightProvider
 from app.obs.tracing import init_observability
@@ -108,17 +116,86 @@ class _StartUrlPlanner:
         return [SubTask(action="navigate", url=self._start_url, description="open start URL"), *subtasks]
 
 
+_MODEL_MENU_CACHE: list[str] | None = None
+
+
+async def _model_menu() -> list[str]:
+    """The active model dropdown, cached per process: the live Copilot list when a
+    token is configured, else the MODEL_MENU fallback. A short-lived gateway is
+    started just to query the list (mirrors the run's own gateway lifecycle)."""
+    global _MODEL_MENU_CACHE
+    if _MODEL_MENU_CACHE is None:
+        gateway = LLMGateway()
+        try:
+            _MODEL_MENU_CACHE = await available_models(gateway)
+        finally:
+            await gateway.close()
+    return _MODEL_MENU_CACHE
+
+
+@app.get("/models")
+async def models() -> dict:
+    """The selectable model menu, thinking levels, and per-role defaults, so the UI
+    picker stays in sync with the backend's routing. The menu is the live Copilot
+    list when a token is configured, else the static fallback. Public (no secrets)
+    — the picker renders before a run."""
+    return {
+        "menu": await _model_menu(),
+        "defaults": ROLE_DEFAULTS,
+        "thinking_levels": list(THINKING_LEVELS),
+        "thinking_defaults": EFFORT_DEFAULTS,
+    }
+
+
+def _build_executor(
+    url: str | None,
+    *,
+    plan_model: str,
+    exec_model: str,
+    replanner_model: str,
+    plan_effort: str,
+    exec_effort: str,
+    replanner_effort: str,
+) -> Executor:
+    gateway = LLMGateway(
+        workhorse_model=exec_model,
+        replanner_model=replanner_model,
+        workhorse_effort=exec_effort,
+        replanner_effort=replanner_effort,
+    )
+    planner: object = LLMPlanner(gateway, model=plan_model, reasoning_effort=plan_effort)
+    if url:
+        planner = _StartUrlPlanner(planner, url)
+    return Executor(PlaywrightProvider(headless=True), planner, gateway=gateway)
+
+
 @app.get("/agent/run")
-async def agent_run(task: str, url: str | None = None):
+async def agent_run(
+    task: str,
+    url: str | None = None,
+    model_plan: str | None = None,
+    model_exec: str | None = None,
+    model_replanner: str | None = None,
+    think_plan: str | None = None,
+    think_exec: str | None = None,
+    think_replanner: str | None = None,
+):
     """Drive the real M1 loop. The planner lazy-connects to Copilot on first use;
     without a live Copilot server it emits a RUN_ERROR event (the stream still
     opens — no auth needed to reach this endpoint). An optional `url` seeds a
-    navigate sub-task so the run starts from the user-provided page."""
-    gateway = LLMGateway()
-    planner = LLMPlanner(gateway)
-    if url:
-        planner = _StartUrlPlanner(planner, url)
-    executor = Executor(PlaywrightProvider(headless=True), planner, gateway=gateway)
+    navigate sub-task so the run starts from the user-provided page. Per-role model
+    and thinking-level overrides are validated (MODEL_MENU / THINKING_LEVELS) and
+    fall back to the role default when unknown."""
+    menu = await _model_menu()
+    executor = _build_executor(
+        url,
+        plan_model=resolve_model(model_plan, "plan", menu),
+        exec_model=resolve_model(model_exec, "exec", menu),
+        replanner_model=resolve_model(model_replanner, "replanner", menu),
+        plan_effort=resolve_effort(think_plan, "plan"),
+        exec_effort=resolve_effort(think_exec, "exec"),
+        replanner_effort=resolve_effort(think_replanner, "replanner"),
+    )
 
     async def gen():
         async for event in executor.run(task):

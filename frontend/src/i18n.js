@@ -18,6 +18,14 @@ const en = {
     run: "Run",
     stop: "Stop",
   },
+  models: {
+    heading: "Models (advanced) — route each role to a model + thinking level",
+    plan: "Planner",
+    exec: "Execution",
+    replanner: "Replanner",
+    model: "model",
+    thinking: "thinking",
+  },
   verdict: {
     runError: "Run error: {{error}}",
     connectionLost: "connection lost — your access session may have expired",
@@ -129,6 +137,14 @@ const zhHant = {
     startUrl: "起始網址（選填）",
     run: "執行",
     stop: "停止",
+  },
+  models: {
+    heading: "Models（進階）——為每個角色指定 model 與 thinking level",
+    plan: "Planner（規劃）",
+    exec: "Execution（執行）",
+    replanner: "Replanner（重新規劃）",
+    model: "model（模型）",
+    thinking: "thinking（思考強度）",
   },
   verdict: {
     runError: "執行錯誤：{{error}}",
