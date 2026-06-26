@@ -197,10 +197,14 @@ class _TwoPlanner:
         self._plans = [first, second]
         self.calls = 0
 
-    async def plan(self, task):
+    async def plan(self, task, start_url=None):
         p = self._plans[min(self.calls, len(self._plans) - 1)]
         self.calls += 1
         return list(p)
+
+    async def replan(self, task, failed, failure_class, observation):
+        # The peek-replan path returns the second plan (the page-grounded retry).
+        return list(self._plans[1])
 
 
 _STEP1_OK_STEP2_DISABLED = """

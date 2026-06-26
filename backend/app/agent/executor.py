@@ -134,8 +134,16 @@ class Executor:
                     replanned = True
                     yield events.recovery(step_id, outcome.failure_class, Recovery.REPLAN.value, _MAX_ATTEMPTS)
                     yield events.phase(run_id, "planning")
+                    # Peek the page: feed the planner the failed step + failure class
+                    # + the current page's REAL elements, and re-plan the suffix from
+                    # here. Closes the open loop where the original plan's words
+                    # matched no element on the live page (vs blindly re-issuing the
+                    # same from-scratch plan, which fails identically).
                     try:
-                        new_subtasks = await self._planner.plan(task)
+                        observation = _format_observation(await perceive(page))
+                        new_subtasks = await self._planner.replan(
+                            task, _describe(st), outcome.failure_class, observation
+                        )
                     except Exception:
                         new_subtasks = None
                     if new_subtasks:
@@ -144,7 +152,7 @@ class Executor:
                         # changed. The ids the frontend seeds (`${run_id}-s${i+1}`)
                         # are still computed off the FULL `subtasks` list, so emit
                         # the full reconciled plan, not just the tail.
-                        yield events.plan_ready(run_id, [_args(st) for st in subtasks])
+                        yield events.plan_ready(run_id, [_args(s) for s in subtasks])
                         continue
                 yield events.ask_user(
                     step_id, f"Could not complete '{_describe(st)}' after recovery; need guidance."
@@ -391,6 +399,20 @@ class _Outcome:
     def __init__(self, ok: bool, failure_class: str = "") -> None:
         self.ok = ok
         self.failure_class = failure_class
+
+
+def _format_observation(perception: Any, limit: int = 40) -> str:
+    """Compact role|name(+href) list of the live page for the peek-replan — never
+    raw DOM (token blowup); the same indexed-element vocabulary perceive/locate use."""
+    lines = []
+    for e in perception.elements[:limit]:
+        href = (e.attrs or {}).get("href")
+        tail = f" -> {href}" if href else ""
+        lines.append(f'{e.role} "{e.name}"{tail}')
+    extra = len(perception.elements) - limit
+    if extra > 0:
+        lines.append(f"... (+{extra} more elements)")
+    return "\n".join(lines) if lines else "(no interactive elements found)"
 
 
 def _match(

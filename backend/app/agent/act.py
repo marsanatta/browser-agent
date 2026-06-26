@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Literal
+from urllib.parse import urljoin
 
 ActionKind = Literal["navigate", "click", "fill", "press"]
 # Submit-class actions: a press (Enter submits a form) and a click (submit button).
@@ -28,11 +29,22 @@ def requires_confirmation(action: Action) -> bool:
     return action.kind in _WRITE_ACTIONS
 
 
+def _resolve_url(page: Any, url: str) -> str:
+    """Resolve a site-relative URL (e.g. "library/json.html") against the current
+    page so a planner that emits relative navigations works. Absolute (scheme://) and
+    data:/about:/mailto:/tel: URLs pass through unchanged. page.goto rejects a bare
+    relative URL ("Cannot navigate to invalid URL"), so this must run first."""
+    if "://" in url or url.startswith(("data:", "about:", "mailto:", "tel:", "#")):
+        return url
+    base = getattr(page, "url", "") or ""
+    return urljoin(base, url) if "://" in base else url
+
+
 async def navigate(page: Any, url: str) -> Any:
     """Navigate and return the main-frame Response (None for data:/about: URLs,
     which produce no HTTP response). The caller inspects `response.status` to
     catch an error page (>=400) instead of treating every goto as success."""
-    return await page.goto(url, wait_until="domcontentloaded")
+    return await page.goto(_resolve_url(page, url), wait_until="domcontentloaded")
 
 
 async def click(locator: Any) -> None:

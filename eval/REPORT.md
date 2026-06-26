@@ -1,9 +1,9 @@
 # Eval Report — live evidence
 
-Generated **2026-06-25 12:46 UTC** from a REAL harness run. Every "verified" below is an
+Generated **2026-06-26 15:28 UTC** from a REAL harness run. Every "verified" below is an
 INDEPENDENT programmatic state check on the live page (URL / first-h1 / scoped
 selector) — never the agent's self-report, and never a loose `text_contains`.
-Copilot calls this run: 53.
+Copilot calls this run: 44.
 
 ## Test architecture — what gates vs what's evidence
 
@@ -16,22 +16,22 @@ Copilot calls this run: 53.
   (`python -m eval.run_live_tier`) and reported here. NOT part of the CI gate; a
   red row here is evidence, not a broken build.
 
-## Live real-world tier — 16/21 verified
+## Live real-world tier — 14/21 verified
 
 | task | site | type | deterministic? | nominal | verified | abstained |
 |---|---|---|---|---|---|---|
 | live_wikipedia_helium_retrieval | en.wikipedia.org | retrieval | no (live) | True | True | False |
-| live_pydocs_json_nav | docs.python.org | action | no (live) | True | True | False |
+| live_pydocs_json_nav | docs.python.org | action | no (live) | False | False | True |
 | live_google_search_steam | www.google.com | action | no (live) | False | True | True |
 | live_wikipedia_signin_synonym | en.wikipedia.org | action | no (live) | True | True | False |
 | live_wikipedia_search_submit | en.wikipedia.org | action | no (live) | True | True | False |
 | live_wikipedia_autocomplete | en.wikipedia.org | action | no (live) | True | True | False |
 | live_internet_lazyload | the-internet.herokuapp.com | action | no (live) | True | True | False |
-| live_internet_modal | the-internet.herokuapp.com | action | no (live) | False | False | False |
+| live_internet_modal | the-internet.herokuapp.com | action | no (live) | True | False | False |
 | live_internet_iframe | the-internet.herokuapp.com | action | no (live) | False | False | True |
-| live_example_more_info_nav | example.com | action | no (live) | True | True | False |
+| live_example_more_info_nav | example.com | action | no (live) | False | False | True |
 | live_hackernews_newest_nav | news.ycombinator.com | action | no (live) | True | True | False |
-| live_gnu_licenses_nav | www.gnu.org | action | no (live) | False | False | True |
+| live_gnu_licenses_nav | www.gnu.org | action | no (live) | False | False | False |
 | live_osm_login_nav | www.openstreetmap.org | action | no (live) | True | True | False |
 | live_lobsters_comments_nav | lobste.rs | action | no (live) | True | True | False |
 | live_mdn_blog_nav | developer.mozilla.org | action | no (live) | True | True | False |
@@ -42,7 +42,7 @@ Copilot calls this run: 53.
 | live_openlibrary_login_nav | openlibrary.org | action | no (live) | True | True | False |
 | live_stackoverflow_questions_nav | stackoverflow.com | action | no (live) | False | False | True |
 
-## Day-3 realistic batch (folded in, reproducible) — 8/8 verified
+## Day-3 realistic batch (folded in, reproducible) — 7/8 verified
 
 | task | site | type | deterministic? | nominal | verified | abstained |
 |---|---|---|---|---|---|---|
@@ -51,7 +51,7 @@ Copilot calls this run: 53.
 | books_open_light_in_attic | books.toscrape.com | retrieval | no (live) | True | True | False |
 | books_open_travel_category | books.toscrape.com | action | no (live) | True | True | False |
 | books_price_visible | books.toscrape.com | retrieval | no (live) | True | True | False |
-| quotes_open_einstein_author | quotes.toscrape.com | retrieval | no (live) | True | True | False |
+| quotes_open_einstein_author | quotes.toscrape.com | retrieval | no (live) | False | False | True |
 | quotes_open_login | quotes.toscrape.com | action | no (live) | True | True | False |
 | synonym_label_signin_vs_login | (inline data: URL) | action | yes (inline) | True | True | False |
 

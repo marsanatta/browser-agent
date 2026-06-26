@@ -30,31 +30,86 @@ class SubTask:
 
 
 class Planner(Protocol):
-    async def plan(self, task: str) -> list[SubTask]: ...
+    async def plan(self, task: str, start_url: str | None = None) -> list[SubTask]: ...
+
+    async def replan(
+        self, task: str, failed: str, failure_class: str, observation: str
+    ) -> list[SubTask]: ...
 
 
 class MockPlanner:
-    """Test double: returns a fixed plan, no LLM/auth required."""
+    """Test double: returns a fixed plan, no LLM/auth required. `replan_subtasks`
+    lets a test return a DIFFERENT plan on replan (the peek-the-page path); it
+    records each replan call so a test can assert the page observation was passed."""
 
-    def __init__(self, subtasks: list[SubTask]) -> None:
+    def __init__(
+        self, subtasks: list[SubTask], replan_subtasks: list[SubTask] | None = None
+    ) -> None:
         self._subtasks = subtasks
+        self._replan_subtasks = replan_subtasks
+        self.replan_calls: list[tuple[str, str, str, str]] = []
 
-    async def plan(self, task: str) -> list[SubTask]:
+    async def plan(self, task: str, start_url: str | None = None) -> list[SubTask]:
         return list(self._subtasks)
+
+    async def replan(
+        self, task: str, failed: str, failure_class: str, observation: str
+    ) -> list[SubTask]:
+        self.replan_calls.append((task, failed, failure_class, observation))
+        src = self._replan_subtasks if self._replan_subtasks is not None else self._subtasks
+        return list(src)
 
 
 _PLAN_PROMPT = """You are the planner for a browser-automation agent.
 Decompose the user task into an ordered list of atomic sub-tasks.
-Each sub-task is one of: navigate (needs "url"), click (needs "target": the
-visible label/accessible name), fill (needs "target" and "value"), press (needs
-"target" and "value": a key such as "Enter" — use it AFTER fill to submit a
-search box or form when there is no obvious submit button).
+Each sub-task is one of: navigate (needs "url": an ABSOLUTE https:// URL, never a
+relative path), click (needs "target": the visible label/accessible name), fill
+(needs "target" and "value"), press (needs "target" and "value": a key such as
+"Enter" — use it AFTER fill to submit a search box or form when there is no obvious
+submit button).
 Respond with ONLY a JSON array, no prose. Example:
 [{"action":"navigate","url":"https://www.google.com"},
  {"action":"fill","target":"Search","value":"steam"},
  {"action":"press","target":"Search","value":"Enter"}]
 
 User task: __TASK__
+"""
+
+
+# Start-context (planner-sees-start-url): the planner only gets the task, so it would
+# otherwise invent a navigate to a site's generic portal (e.g. www.wikipedia.org)
+# instead of acting on the page the agent actually starts on. Telling it the start URL
+# keeps it on the right page.
+_START_CONTEXT = (
+    "The browser is ALREADY loaded on this page: {url}\n"
+    "Plan your steps FROM that page. Do NOT navigate to a different site — in "
+    "particular do NOT navigate to a site's generic home/portal — unless the task "
+    "clearly requires leaving the current page.\n\n"
+)
+
+
+# Peek-the-page replan (docs/architecture/02 §1.3, the close-the-loop fix): on local
+# recovery exhaustion the agent spends tokens to SHOW the planner the current page's
+# real elements and asks for a revised plan from here — closing the open loop where
+# the original plan's words matched no element on the live page.
+_REPLAN_PROMPT = """You are the planner for a browser-automation agent, RE-PLANNING
+after a step failed. The agent has already run the earlier steps and is CURRENTLY on a
+page. It tried the failed step below but could not complete it. Produce a NEW plan to
+finish the task FROM THE CURRENT PAGE, using ONLY the elements actually present (listed
+below). Prefer the visible element whose label best matches the intent even if the
+wording differs (e.g. click "Log in" when the goal said "Sign In"). If a listed link's
+target path already satisfies the goal, navigate to it directly.
+
+Each sub-task is one of: navigate (needs "url"), click (needs "target": the visible
+label), fill (needs "target" and "value"), press (needs "target" and "value": a key
+such as "Enter"). Respond with ONLY a JSON array of the REMAINING steps from here, no
+prose.
+
+User task: __TASK__
+Failed step: __FAILED__ (failure class: __CLASS__)
+
+Elements currently on the page:
+__OBSERVATION__
 """
 
 
@@ -69,9 +124,28 @@ class LLMPlanner:
         self._model = model
         self._effort = reasoning_effort
 
-    async def plan(self, task: str) -> list[SubTask]:
+    async def plan(self, task: str, start_url: str | None = None) -> list[SubTask]:
         prompt = _PLAN_PROMPT.replace("__TASK__", task)
+        if start_url:
+            prompt = _START_CONTEXT.format(url=start_url) + prompt
         resp = await self._gateway.complete(prompt, model=self._model, reasoning_effort=self._effort)
+        return _parse_plan(resp.content)
+
+    async def replan(
+        self, task: str, failed: str, failure_class: str, observation: str
+    ) -> list[SubTask]:
+        prompt = (
+            _REPLAN_PROMPT.replace("__TASK__", task)
+            .replace("__FAILED__", failed)
+            .replace("__CLASS__", failure_class)
+            .replace("__OBSERVATION__", observation)
+        )
+        # The deep replan is the gated escalation tier: use the gateway's replanner
+        # model/effort (a stronger model thinking harder), falling back to this
+        # planner's own model when the gateway doesn't route a separate tier.
+        model = getattr(self._gateway, "replanner_model", None) or self._model
+        effort = getattr(self._gateway, "replanner_effort", None) or self._effort
+        resp = await self._gateway.complete(prompt, model=model, reasoning_effort=effort)
         return _parse_plan(resp.content)
 
 

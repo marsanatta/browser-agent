@@ -1,0 +1,39 @@
+{
+  "baseline": {
+    "model": "opus-4.8/high planner, haiku-4.5/low execution (per-role routing on main)",
+    "targets_failing_pre": ["pydocs_json_nav", "wikipedia_search_submit", "wikipedia_signin_synonym", "gnu_licenses_nav"],
+    "google_search_steam": "abstain (correct, bot-wall)"
+  },
+  "pieces": [
+    {
+      "id": "A", "name": "peek-the-page replan", "decision": "KEEP",
+      "files": ["executor.py", "planner.py", "harness.py", "main.py"],
+      "anchor": "test_peek_replan.py (2 passed)",
+      "evidence": "replaces the context-free no-op replan with a page-grounded suffix; wires the previously-inert replanner tier (opus-4.8/xhigh); improves pydocs 0->~40% but NOT reproducibly; no regression; M3 flat",
+      "reproducible_target_flip": false
+    },
+    {
+      "id": "B", "name": "planner-sees-start-url", "decision": "KEEP",
+      "files": ["planner.py", "main.py", "harness.py"],
+      "anchor": "test_planner_start_context.py (2 passed)",
+      "evidence": "tells the planner the start page so it stops navigating to a site's generic portal; flips wikipedia_search_submit + wikipedia_signin_synonym F->T (3/3 each); recovers the opus portal-navigation regression; no regression; M3 flat",
+      "reproducible_target_flip": true
+    },
+    {
+      "id": "C", "name": "relative-URL resolution", "decision": "KEEP",
+      "files": ["act.py", "planner.py (prompt)"],
+      "anchor": "test_navigate_resolve.py (3 passed)",
+      "evidence": "resolves site-relative navigate URLs against the current page; fixes the relative-URL regression B induced on pydocs; absolute/data: pass through unchanged",
+      "reproducible_target_flip": false
+    }
+  ],
+  "offline_gate": "163 passed, network-free",
+  "reproducible_verified_flips": ["wikipedia_search_submit (3/3)", "wikipedia_signin_synonym (3/3)"],
+  "hard_gaps": [
+    "pydocs_json_nav: flaky ~40% (A helps but not reliably)",
+    "gnu_licenses_nav: gnu.org UNREACHABLE from this environment (HTTP 000) - cannot validate here",
+    "google_search_steam: bot-wall -> abstain (correct, not evaded)"
+  ],
+  "separate_finding_for_user": "The opus-4.8 planner upgrade (already merged to main, NOT round-3) is a MIXED tradeoff vs gpt-5.4: better synonym planning, but it navigates to site portals (broke wikipedia, recovered by B) and completes the wrong modal action -> a NEW silent failure on internet_modal (nominal=T verified=F, 2/2 on main). Decision point: keep opus+B+C, or reconsider the planner default / test sonnet-4.6. Mitigation for the modal silent failure = predict-then-verify (a future piece).",
+  "discipline": "honesty gates kept: state_check frozen; no assert loosened; M3 not raised by A/B/C; kept only on independent verified-flips (wikipedia 3/3); pydocs not claimed as fixed; never pushed (worktree branch)."
+}
