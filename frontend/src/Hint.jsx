@@ -1,20 +1,12 @@
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 export function Hint({ k }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const tipId = useId();
-  const closeTimer = useRef(null);
 
-  const show = useCallback(() => {
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-    setOpen(true);
-  }, []);
-
+  const show = useCallback(() => setOpen(true), []);
   const hide = useCallback(() => setOpen(false), []);
 
   const onBlur = useCallback((e) => {
@@ -35,7 +27,7 @@ export function Hint({ k }) {
       <button
         type="button"
         className="hintmark"
-        aria-label={text}
+        aria-label={t("a11y.moreInfo")}
         aria-describedby={open ? tipId : undefined}
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
@@ -63,7 +55,7 @@ export function LanguageSwitcher() {
   const current = i18n.resolvedLanguage ?? i18n.language;
 
   return (
-    <div className="langswitch" role="group" aria-label={t("lang.switchTo", { lang: "" }).trim()}>
+    <div className="langswitch" role="group" aria-label={t("lang.groupLabel")}>
       {LANGS.map(({ code, labelKey }) => {
         const label = t(labelKey);
         const active = current === code;

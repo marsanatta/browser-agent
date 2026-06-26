@@ -5,11 +5,12 @@ const STORAGE_KEY = "ba_lang";
 
 const en = {
   brand: "browser-agent",
+  a11y: { moreInfo: "More info" },
   header: {
     disclosure:
       "Supported: bot-wall-free public sites (search, browse, forms, extraction). Login / MFA / CAPTCHA / anti-bot walls are routed to “unsupported” — never evaded.",
   },
-  lang: { en: "EN", zhHant: "繁體中文", switchTo: "Switch language to {{lang}}" },
+  lang: { en: "EN", zhHant: "繁體中文", groupLabel: "Language", switchTo: "Switch language to {{lang}}" },
   runbar: {
     task: "Task",
     taskPlaceholder: "Describe a task in natural language",
@@ -92,11 +93,12 @@ const en = {
 
 const zhHant = {
   brand: "browser-agent",
+  a11y: { moreInfo: "更多說明" },
   header: {
     disclosure:
       "支援：沒有 bot 防護牆的公開網站（搜尋、瀏覽、填表、擷取資料）。需要登入／MFA／CAPTCHA／反 bot 防護牆的網站會被歸類為「不支援」——絕不繞過。",
   },
-  lang: { en: "EN", zhHant: "繁體中文", switchTo: "切換語言至 {{lang}}" },
+  lang: { en: "EN", zhHant: "繁體中文", groupLabel: "語言", switchTo: "切換語言至 {{lang}}" },
   runbar: {
     task: "任務",
     taskPlaceholder: "用自然語言描述一個任務",
@@ -130,13 +132,13 @@ const zhHant = {
   status: { running: "執行中", ok: "通過", failed: "失敗" },
   notices: { askUser: "詢問使用者：{{question}}" },
   gate: {
-    disclosure: "此服務受存取權限控管。請輸入操作人員提供給你的存取權杖。",
-    token: "存取權杖",
-    tokenPlaceholder: "存取權杖",
+    disclosure: "此服務受存取權限控管。請輸入操作人員提供給你的存取 token。",
+    token: "存取 token",
+    tokenPlaceholder: "存取 token",
     unlock: "解鎖",
     unlocking: "解鎖中…",
-    noTokenConfigured: "伺服器尚未設定存取權杖。",
-    invalidToken: "存取權杖無效。",
+    noTokenConfigured: "伺服器尚未設定存取 token。",
+    invalidToken: "存取 token 無效。",
     unreachable: "無法連線到伺服器。",
   },
   step: {
@@ -173,13 +175,15 @@ const zhHant = {
   },
 };
 
+const SUPPORTED = ["en", "zh-Hant"];
 const stored = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-const initialLng = stored || "en";
+const initialLng = SUPPORTED.includes(stored) ? stored : "en";
 
 i18n.use(initReactI18next).init({
   resources: { en: { translation: en }, "zh-Hant": { translation: zhHant } },
   lng: initialLng,
   fallbackLng: "en",
+  supportedLngs: SUPPORTED,
   interpolation: { escapeValue: false },
 });
 

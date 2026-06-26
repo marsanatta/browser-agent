@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Hint } from "./Hint.jsx";
 
+const STATUS_KEYS = ["running", "ok", "failed"];
+
 export function StepDetail({ step, backend }) {
   const { t } = useTranslation();
   const shots = step.shots ?? [];
@@ -12,7 +14,11 @@ export function StepDetail({ step, backend }) {
     <div className="stepdetail">
       <h2 className="break-words">{step.description ?? step.id}</h2>
       <div className="meta">
-        <Tag label={t("step.statusLabel")} value={step.status} tone={step.status} />
+        <Tag
+          label={t("step.statusLabel")}
+          value={STATUS_KEYS.includes(step.status) ? t(`status.${step.status}`) : step.status}
+          tone={step.status}
+        />
         {step.tier != null && (
           <Tag
             label={t("step.locatorLabel")}
