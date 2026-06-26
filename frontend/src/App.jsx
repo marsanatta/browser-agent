@@ -110,6 +110,7 @@ export default function App() {
   const [running, setRunning] = useState(false);
   const [selected, setSelected] = useState(null);
   const [authed, setAuthed] = useState(() => localStorage.getItem("ba_authed") === "1");
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [state, dispatch] = useReducer(reduce, initialState);
   const sourceRef = useRef(null);
 
@@ -132,7 +133,7 @@ export default function App() {
     return res.status === 503 ? t("gate.noTokenConfigured") : t("gate.invalidToken");
   }
 
-  if (!authed) return <AuthGate onUnlock={unlock} />;
+  if (!authed) return <AuthGate onUnlock={unlock} expired={sessionExpired} />;
 
   function start() {
     if (!task.trim() || running) return;
@@ -146,18 +147,31 @@ export default function App() {
     const es = new EventSource(`${BACKEND}/agent/run?${params.toString()}`, { withCredentials: true });
     sourceRef.current = es;
 
+    let opened = false;
+    let terminated = false;
+    es.onopen = () => { opened = true; };
     const onAny = (e) => {
       const parsed = JSON.parse(e.data);
       dispatch(parsed);
       if (TERMINAL.has(parsed.type)) {
+        terminated = true;
         es.close();
         setRunning(false);
       }
     };
     STREAM_EVENTS.forEach((name) => es.addEventListener(name, onAny));
     es.onerror = () => {
+      if (terminated) return; // clean end: server closed the stream after a terminal event
       es.close();
       setRunning(false);
+      // surface the failure instead of freezing the UI on "executing"
+      dispatch({ type: "RUN_ERROR", payload: { error: t("verdict.connectionLost") } });
+      if (!opened) {
+        // never connected -> almost always an expired/invalid access cookie; re-show the gate
+        localStorage.removeItem("ba_authed");
+        setSessionExpired(true);
+        setAuthed(false);
+      }
     };
   }
 
@@ -276,7 +290,7 @@ export default function App() {
   );
 }
 
-function AuthGate({ onUnlock }) {
+function AuthGate({ onUnlock, expired }) {
   const { t } = useTranslation();
   const [token, setToken] = useState("");
   const [error, setError] = useState(null);
@@ -301,6 +315,7 @@ function AuthGate({ onUnlock }) {
         </div>
         <p className="disclosure">{t("gate.disclosure")}</p>
       </header>
+      {expired && <p className="notice ask">{t("gate.sessionExpired")}</p>}
       <form className="runbar" onSubmit={submit}>
         <label className="field">
           <span>{t("gate.token")}</span>

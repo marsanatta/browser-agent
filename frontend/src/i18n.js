@@ -20,6 +20,7 @@ const en = {
   },
   verdict: {
     runError: "Run error: {{error}}",
+    connectionLost: "connection lost — your access session may have expired",
     running: "Running…",
     nominal: "Nominal",
     verified: "Verified",
@@ -53,6 +54,7 @@ const en = {
     noTokenConfigured: "Server has no access token configured.",
     invalidToken: "Invalid access token.",
     unreachable: "Could not reach the server.",
+    sessionExpired: "Your access session expired. Re-enter the access token to continue.",
   },
   step: {
     statusLabel: "status",
@@ -108,6 +110,7 @@ const zhHant = {
   },
   verdict: {
     runError: "執行錯誤：{{error}}",
+    connectionLost: "連線中斷——你的存取工作階段可能已過期",
     running: "執行中…",
     nominal: "宣稱結果",
     verified: "驗證結果",
@@ -140,6 +143,7 @@ const zhHant = {
     noTokenConfigured: "伺服器尚未設定存取 token。",
     invalidToken: "存取 token 無效。",
     unreachable: "無法連線到伺服器。",
+    sessionExpired: "你的存取工作階段已過期。請重新輸入存取 token 以繼續。",
   },
   step: {
     statusLabel: "狀態",
