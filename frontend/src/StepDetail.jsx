@@ -1,6 +1,9 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Hint } from "./Hint.jsx";
 
 export function StepDetail({ step, backend }) {
+  const { t } = useTranslation();
   const shots = step.shots ?? [];
   const calls = step.calls ?? [];
   const recoveries = step.recoveries ?? [];
@@ -9,14 +12,25 @@ export function StepDetail({ step, backend }) {
     <div className="stepdetail">
       <h2 className="break-words">{step.description ?? step.id}</h2>
       <div className="meta">
-        <Tag label="status" value={step.status} tone={step.status} />
-        {step.tier != null && <Tag label="locator" value={`tier ${step.tier} · ${step.strategy}`} />}
-        {step.failureCategory && <Tag label="failure" value={step.failureCategory} tone="failed" />}
+        <Tag label={t("step.statusLabel")} value={step.status} tone={step.status} />
+        {step.tier != null && (
+          <Tag
+            label={t("step.locatorLabel")}
+            value={t("step.locatorValue", { tier: step.tier, strategy: step.strategy })}
+            hint="locatorTier"
+          />
+        )}
+        {step.failureCategory && (
+          <Tag label={t("step.failureLabel")} value={step.failureCategory} tone="failed" hint="failureCategory" />
+        )}
       </div>
 
       {shots.length > 0 && (
         <section className="block">
-          <h3>Annotated screenshots</h3>
+          <h3>
+            {t("step.screenshots")}
+            <Hint k="screenshot" />
+          </h3>
           <div className="shots">
             {shots.map((shot, i) => (
               <Shot key={i} shot={shot} backend={backend} />
@@ -27,11 +41,14 @@ export function StepDetail({ step, backend }) {
 
       {recoveries.length > 0 && (
         <section className="block">
-          <h3>Recovery / retry chain</h3>
+          <h3>
+            {t("step.recoveryChain")}
+            <Hint k="recovery" />
+          </h3>
           <ol className="chain">
             {recoveries.map((r, i) => (
               <li key={i}>
-                <span className="attempt">attempt {r.attempt}</span>
+                <span className="attempt">{t("step.attempt", { n: r.attempt })}</span>
                 <span className="fclass">{r.failure_class}</span>
                 <span className="arrow">→</span>
                 <span className="rec">{r.recovery}</span>
@@ -43,7 +60,7 @@ export function StepDetail({ step, backend }) {
 
       {calls.length > 0 && (
         <section className="block">
-          <h3>Tool calls</h3>
+          <h3>{t("step.toolCalls")}</h3>
           {calls.map((c) => (
             <div key={c.call_id} className="call">
               <code className="tool">{c.tool}</code>
@@ -54,12 +71,18 @@ export function StepDetail({ step, backend }) {
         </section>
       )}
 
-      {step.askUser && <p className="ask">Ask user: {step.askUser}</p>}
+      {step.askUser && (
+        <p className="ask">
+          {t("notices.askUser", { question: step.askUser })}
+          <Hint k="askUser" />
+        </p>
+      )}
     </div>
   );
 }
 
 function Shot({ shot, backend }) {
+  const { t } = useTranslation();
   const [box, setBox] = useState(null);
   const h = shot.highlight ?? {};
   const hasBox = h.width > 0 && h.height > 0;
@@ -79,7 +102,7 @@ function Shot({ shot, backend }) {
   return (
     <figure className="shot">
       <div className="shotframe">
-        <img src={`${backend}${shot.screenshot_ref}`} alt={shot.caption ?? "step screenshot"} onLoad={onLoad} loading="lazy" />
+        <img src={`${backend}${shot.screenshot_ref}`} alt={shot.caption ?? t("step.fallbackCaption")} onLoad={onLoad} loading="lazy" />
         {hasBox && box && (
           <span
             className="highlight"
@@ -93,10 +116,13 @@ function Shot({ shot, backend }) {
   );
 }
 
-function Tag({ label, value, tone }) {
+function Tag({ label, value, tone, hint }) {
   return (
     <span className={`tag ${tone ?? ""}`}>
-      <span className="tlabel">{label}</span>
+      <span className="tlabel">
+        {label}
+        {hint && <Hint k={hint} />}
+      </span>
       <span className="tval">{value}</span>
     </span>
   );

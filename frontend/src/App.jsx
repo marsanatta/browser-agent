@@ -1,5 +1,7 @@
 import { useMemo, useReducer, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { StepDetail } from "./StepDetail.jsx";
+import { Hint, LanguageSwitcher } from "./Hint.jsx";
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL ?? "";
 
@@ -99,9 +101,10 @@ function patchCall(state, callId, fn) {
   return { ...state, steps };
 }
 
-const STATUS_LABEL = { running: "running", ok: "passed", failed: "failed" };
+const STATUS_KEY = { running: "running", ok: "ok", failed: "failed" };
 
 export default function App() {
+  const { t } = useTranslation();
   const [task, setTask] = useState("");
   const [url, setUrl] = useState("");
   const [running, setRunning] = useState(false);
@@ -126,7 +129,7 @@ export default function App() {
       setAuthed(true);
       return null;
     }
-    return res.status === 503 ? "Server has no access token configured." : "Invalid access token.";
+    return res.status === 503 ? t("gate.noTokenConfigured") : t("gate.invalidToken");
   }
 
   if (!authed) return <AuthGate onUnlock={unlock} />;
@@ -166,10 +169,13 @@ export default function App() {
   return (
     <main className="app">
       <header className="head">
-        <h1>browser-agent</h1>
+        <div className="headrow">
+          <h1 translate="no">{t("brand")}</h1>
+          <LanguageSwitcher />
+        </div>
         <p className="disclosure">
-          Supported: bot-wall-free public sites (search, browse, forms, extraction). Login / MFA / CAPTCHA /
-          anti-bot walls are routed to “unsupported” — never evaded.
+          {t("header.disclosure")}
+          <Hint k="unsupported" />
         </p>
       </header>
 
@@ -181,17 +187,23 @@ export default function App() {
         }}
       >
         <label className="field">
-          <span>Task</span>
+          <span>
+            {t("runbar.task")}
+            <Hint k="task" />
+          </span>
           <input
             value={task}
             onChange={(e) => setTask(e.target.value)}
-            placeholder="Describe a task in natural language"
+            placeholder={t("runbar.taskPlaceholder")}
             autoComplete="off"
             spellCheck={false}
           />
         </label>
         <label className="field url">
-          <span>Start URL (optional)</span>
+          <span>
+            {t("runbar.startUrl")}
+            <Hint k="startUrl" />
+          </span>
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -202,21 +214,27 @@ export default function App() {
           />
         </label>
         {running ? (
-          <button type="button" className="btn ghost" onClick={stop}>
-            Stop
-          </button>
+          <span className="btnwrap">
+            <button type="button" className="btn ghost" onClick={stop}>
+              {t("runbar.stop")}
+            </button>
+            <Hint k="stop" />
+          </span>
         ) : (
-          <button type="submit" className="btn" disabled={!task.trim()}>
-            Run
-          </button>
+          <span className="btnwrap">
+            <button type="submit" className="btn" disabled={!task.trim()}>
+              {t("runbar.run")}
+            </button>
+            <Hint k="run" />
+          </span>
         )}
       </form>
 
       {run && <RunVerdict run={run} />}
 
       <section className="board">
-        <ol className="timeline" aria-live="polite" aria-label="Step timeline">
-          {steps.length === 0 && <li className="empty">No steps yet. Submit a task to watch the agent work.</li>}
+        <ol className="timeline" aria-live="polite" aria-label={t("timeline.label")}>
+          {steps.length === 0 && <li className="empty">{t("timeline.empty")}</li>}
           {steps.map((s, i) => (
             <li key={s.id}>
               <button
@@ -226,7 +244,9 @@ export default function App() {
               >
                 <span className="num">{i + 1}</span>
                 <span className="desc">{s.description ?? s.id}</span>
-                <span className={`badge ${s.status}`}>{STATUS_LABEL[s.status] ?? s.status}</span>
+                <span className={`badge ${s.status}`}>
+                  {STATUS_KEY[s.status] ? t(`status.${STATUS_KEY[s.status]}`) : s.status}
+                </span>
                 {s.tier != null && <span className="tier">L{s.tier}</span>}
                 {s.failureCategory && <span className="fcat">{s.failureCategory}</span>}
               </button>
@@ -238,7 +258,7 @@ export default function App() {
           {selectedStep ? (
             <StepDetail step={selectedStep} backend={BACKEND} />
           ) : (
-            <p className="hint">Select a step to inspect its diagnostics — locator tier, recovery chain, annotated screenshot, and verdict.</p>
+            <p className="hint">{t("timeline.detailHint")}</p>
           )}
         </aside>
       </section>
@@ -247,7 +267,7 @@ export default function App() {
         <section className="notices">
           {state.notices.map((n, i) => (
             <p key={i} className={`notice ${n.kind}`}>
-              {n.kind === "ask" ? `Ask user: ${n.question}` : n.content}
+              {n.kind === "ask" ? t("notices.askUser", { question: n.question }) : n.content}
             </p>
           ))}
         </section>
@@ -257,6 +277,7 @@ export default function App() {
 }
 
 function AuthGate({ onUnlock }) {
+  const { t } = useTranslation();
   const [token, setToken] = useState("");
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -266,7 +287,7 @@ function AuthGate({ onUnlock }) {
     if (!token.trim() || busy) return;
     setBusy(true);
     setError(null);
-    const err = await onUnlock(token.trim()).catch(() => "Could not reach the server.");
+    const err = await onUnlock(token.trim()).catch(() => t("gate.unreachable"));
     setBusy(false);
     if (err) setError(err);
   }
@@ -274,23 +295,26 @@ function AuthGate({ onUnlock }) {
   return (
     <main className="app gate">
       <header className="head">
-        <h1>browser-agent</h1>
-        <p className="disclosure">This instance is access-controlled. Enter the access token your operator gave you.</p>
+        <div className="headrow">
+          <h1 translate="no">{t("brand")}</h1>
+          <LanguageSwitcher />
+        </div>
+        <p className="disclosure">{t("gate.disclosure")}</p>
       </header>
       <form className="runbar" onSubmit={submit}>
         <label className="field">
-          <span>Access token</span>
+          <span>{t("gate.token")}</span>
           <input
             type="password"
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            placeholder="access token"
+            placeholder={t("gate.tokenPlaceholder")}
             autoComplete="off"
             spellCheck={false}
           />
         </label>
         <button type="submit" className="btn" disabled={!token.trim() || busy}>
-          {busy ? "Unlocking…" : "Unlock"}
+          {busy ? t("gate.unlocking") : t("gate.unlock")}
         </button>
       </form>
       {error && <p className="notice ask">{error}</p>}
@@ -299,23 +323,31 @@ function AuthGate({ onUnlock }) {
 }
 
 function RunVerdict({ run }) {
+  const { t } = useTranslation();
   if (run.status === "error") {
-    return <div className="verdict error">Run error: {run.error}</div>;
+    return <div className="verdict error">{t("verdict.runError", { error: run.error })}</div>;
   }
   if (run.status !== "finished") {
-    return <div className="verdict running">Running…</div>;
+    return <div className="verdict running">{t("verdict.running")}</div>;
   }
   const silent = run.nominal && !run.verified;
   return (
     <>
       <div className={`verdict ${silent ? "silent" : run.verified ? "ok" : "fail"}`}>
         <span>
-          Nominal: <strong>{run.nominal ? "complete" : "incomplete"}</strong>
+          {t("verdict.nominal")}
+          <Hint k="nominal" />: <strong>{run.nominal ? t("verdict.complete") : t("verdict.incomplete")}</strong>
         </span>
         <span>
-          Verified: <strong>{run.verified ? "complete" : "incomplete"}</strong>
+          {t("verdict.verified")}
+          <Hint k="verified" />: <strong>{run.verified ? t("verdict.complete") : t("verdict.incomplete")}</strong>
         </span>
-        {silent && <span className="flag">⚠ silent failure (nominal ≠ verified)</span>}
+        {silent && (
+          <span className="flag">
+            {t("verdict.silentFlag")}
+            <Hint k="silent" />
+          </span>
+        )}
       </div>
       <TokenPanel tokens={run.tokens} />
     </>
@@ -330,21 +362,26 @@ function _fmt(n) {
 }
 
 function TokenPanel({ tokens }) {
-  const t = tokens || {};
+  const { t } = useTranslation();
+  const tok = tokens || {};
   const known = ["output_tokens", "input_tokens", "reasoning_tokens", "total_nano_aiu"].some(
-    (k) => t[k]
+    (k) => tok[k]
   );
   if (!known) {
-    return <div className="tokens muted">tokens: n/a</div>;
+    return <div className="tokens muted">{t("tokens.na")}</div>;
   }
-  const aiu = (t.total_nano_aiu ?? 0) / 1e9;
+  const aiu = (tok.total_nano_aiu ?? 0) / 1e9;
   return (
-    <div className="tokens" title="Real LLM token usage for this run (cost transparency)">
-      <span className="tlabel">tokens</span>
-      <span><strong>{_fmt(t.output_tokens)}</strong> out</span>
-      <span><strong>{_fmt(t.input_tokens)}</strong> in</span>
-      <span><strong>{_fmt(t.reasoning_tokens)}</strong> reasoning</span>
-      <span><strong>{aiu.toFixed(2)}</strong> AIU</span>
+    <div className="tokens" title={t("tokens.title")}>
+      <span className="tlabel">{t("tokens.label")}</span>
+      <Hint k="tokens" />
+      <span><strong>{_fmt(tok.output_tokens)}</strong> {t("tokens.out")}</span>
+      <span><strong>{_fmt(tok.input_tokens)}</strong> {t("tokens.in")}</span>
+      <span><strong>{_fmt(tok.reasoning_tokens)}</strong> {t("tokens.reasoning")}</span>
+      <span>
+        <strong>{aiu.toFixed(2)}</strong> {t("tokens.aiu")}
+        <Hint k="aiu" />
+      </span>
     </div>
   );
 }
