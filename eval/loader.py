@@ -52,6 +52,10 @@ class EvalTask:
     # sealed = the once-only honest final metric, scored a single time at the very end and
     # never used for any keep decision. Splits are disjoint BY SITE.
     split: str = "dev"
+    # The DISTINCT capability or failure-mode this case exists to test (e.g. intent_drift_decoy,
+    # modal_handling, synonym_locate, loginwall_abstain). Makes the set self-documenting and
+    # lets the harness report purpose coverage; redundant same-purpose-same-site filler is out.
+    purpose: str = ""
 
 
 def _validate_primitive(where: str, spec: dict[str, Any]) -> None:
@@ -130,6 +134,7 @@ def load_tasks(path: Path | str = EVAL_SET_PATH) -> list[EvalTask]:
                 abstain_reason=abstain_reason,
                 regression_anchor=bool(it.get("regression_anchor", False)),
                 split=split,
+                purpose=str(it.get("purpose", "")),
             )
         )
     return tasks

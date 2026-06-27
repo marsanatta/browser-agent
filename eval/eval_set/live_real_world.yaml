@@ -1,1686 +1,936 @@
-# Live real-world eval tier — REAL public sites, diverse domains + task types.
+# Live real-world eval tier — REAL public sites, CURATED BY PURPOSE.
 #
-# This tier is deliberately SEPARATE from eval_set/tasks.yaml and is NOT part of
-# the 93 offline pytest CI gate: it hits real public sites (flaky, and they
-# change) and needs Copilot. Run it ON DEMAND and report results to eval/REPORT.md:
-#     GH_TOKEN=$(gh auth token) PYTHONPATH=backend python -m eval.run_live_tier
-#
-# Every assertion is a PAGE-SPECIFIC independent check (URL / first-h1 / scoped
-# selector) — never a loose `text_contains`, which false-passed the books-price
-# task off the catalog grid. Same schema + same harness as the sandbox set.
+# Each case carries a `purpose`: the ONE distinct capability or failure-mode it tests
+# (e.g. intent_drift_decoy, modal_handling, synonym_locate, loginwall_abstain). Redundant
+# same-purpose-same-site filler was removed so every case earns its place; a few cross-site
+# samples per generic purpose are kept for held-out statistical power. `split` =
+# dev|holdout|sealed (disjoint BY SITE). Every assertion is an INDEPENDENT page-state check
+# (URL / first-h1 / scoped selector); abstain cases are scored by honest (asked AND not
+# nominal). NOT part of the offline CI gate — run on demand: python -m eval.run_live_tier
 
 tasks:
-  # Information retrieval on Wikipedia — find a specific article (its atomic number
-  # lives on that page). Independent check: the article's first <h1>.
-  - id: live_wikipedia_helium_retrieval
-    instruction: "On Wikipedia, find and open the article about the chemical element Helium to read its atomic number."
-    start_url: "https://en.wikipedia.org/wiki/Main_Page"
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    held_out: false
-    key_nodes:
-      - url_contains: "wikipedia.org"
-    assert:
-      h1_equals: "Helium"
-
-  # Multi-step navigation on a real documentation site — walk a few menu levels.
-  # Independent check: the json module page URL.
-  - id: live_pydocs_json_nav
-    instruction: "On docs.python.org, open The Python Standard Library, then open the documentation page for the json module."
-    start_url: "https://docs.python.org/3/"
-    domain: documentation
-    task_type: action
-    difficulty: multi_same_domain
-    held_out: false
-    key_nodes:
-      - url_contains: "docs.python.org"
-    assert:
-      url_contains: "library/json"
-
-  # Bot-wall demonstrator (the day-3 Google case). Google serves an anti-bot /sorry/
-  # CAPTCHA to headless automation; the press/Enter DOES submit (its /sorry/ `continue=`
-  # URL is /search?q=steam) but it never reaches results. With interstitial detection
-  # (verify.detect_block) the agent must NOT claim success — it abstains and routes
-  # blocked-unsupported (route, don't evade). So the CORRECT outcome is an honest
-  # abstain: expect_abstain scores `asked AND not nominal`. The press/submit action
-  # itself is proven by tests/...::test_press_action_submits_form and by
-  # live_wikipedia_search_submit below (a site that does not bot-block).
-  - id: live_google_search_steam
-    instruction: "On google.com, search for steam and submit the search."
-    start_url: "https://www.google.com"
-    domain: search
-    task_type: action
-    difficulty: single
-    held_out: false
-    expect_abstain: true
-    abstain_reason: blocked
-
-  # Synonym / label mismatch on a REAL site: instruction says "Sign In" but the
-  # element is labelled "Log in" -> zero-candidate _match -> L2 picks it on a real,
-  # content-heavy page. Verified by reaching the login page URL (no credentials).
-  - id: live_wikipedia_signin_synonym
-    instruction: "On Wikipedia, click the Sign In link to go to the login page."
-    start_url: "https://en.wikipedia.org/wiki/Main_Page"
-    domain: information
-    task_type: action
-    difficulty: single
-    held_out: false
-    key_nodes:
-      - url_contains: "wikipedia.org"
-    assert:
-      url_contains: "UserLogin"
-
-  # Search-submit on a non-bot-blocking real site — proves fill + press Enter actually
-  # submits and reaches the result. (DuckDuckGo HTML's search box has no accessible
-  # name and Bing's autocomplete intercepts the submit, both probed-and-failed
-  # headless, so Wikipedia's nameable search box is the reliable proof.)
-  - id: live_wikipedia_search_submit
-    instruction: "On Wikipedia, type 'Oxygen' in the search box and press Enter to open the article."
-    start_url: "https://en.wikipedia.org/wiki/Main_Page"
-    domain: information
-    task_type: action
-    difficulty: single
-    held_out: false
-    key_nodes:
-      - url_contains: "wikipedia.org"
-    assert:
-      h1_equals: "Oxygen"
-
-  # --- Widget interaction coverage (patterns the rest of the eval never touches) ---
-
-  # Combobox / autocomplete on a real third-party site: type a prefix, then SELECT from
-  # the live suggestions popup. Independent check: the chosen article's h1.
-  - id: live_wikipedia_autocomplete
-    instruction: "On Wikipedia, type 'Argon' into the search box and choose 'Argon' from the autocomplete suggestions that appear, to open its article."
-    start_url: "https://en.wikipedia.org/wiki/Main_Page"
-    domain: information
-    task_type: action
-    difficulty: multi_same_domain
-    held_out: false
-    key_nodes:
-      - url_contains: "wikipedia.org"
-    assert:
-      h1_equals: "Argon"
-
-  # Lazy-load: the result is rendered asynchronously after a click (not in the initial
-  # DOM). Independent check: the late-rendered element's exact text.
-  - id: live_internet_lazyload
-    instruction: "On this Dynamic Loading page, click Start and wait for the hidden text to finish loading."
-    start_url: "https://the-internet.herokuapp.com/dynamic_loading/2"
-    domain: widgets
-    task_type: action
-    difficulty: single
-    held_out: false
-    key_nodes:
-      - url_contains: "dynamic_loading"
-    assert:
-      selector_text_equals: { css: "#finish h4", value: "Hello World!" }
-
-  # Modal dialog: a modal owns the page on entry; confirm the modal's OWN state.
-  - id: live_internet_modal
-    instruction: "Open this page where a modal window appears, and read the modal window's title."
-    start_url: "https://the-internet.herokuapp.com/entry_ad"
-    domain: widgets
-    task_type: action
-    difficulty: single
-    held_out: false
-    key_nodes:
-      - url_contains: "entry_ad"
-    # The title renders uppercase (CSS text-transform), and inner_text returns the
-    # RENDERED text — so the exact value is the uppercased form, not the HTML source.
-    assert:
-      selector_text_equals: { css: ".modal-title h3", value: "THIS IS A MODAL WINDOW" }
-
-  # Iframe: act on an element INSIDE a real iframe (the TinyMCE editor), verified by a
-  # frame-aware check. The locator cascade does not pierce iframes today, so this is
-  # expected to fail honestly — it documents the gap with a correct page-specific verifier.
-  - id: live_internet_iframe
-    instruction: "On this page, type 'browser agent was here' into the rich-text editor inside the iframe."
-    start_url: "https://the-internet.herokuapp.com/iframe"
-    domain: widgets
-    task_type: action
-    difficulty: single
-    held_out: false
-    key_nodes:
-      - url_contains: "/iframe"
-    assert:
-      iframe_text_equals: { frame: "iframe#mce_0_ifr", css: "body", value: "browser agent was here" }
-
-  # --- Breadth (autoresearch round 1, Probe B): structurally-distinct real domains,
-  # one per iteration, page-specific verifier, zero text_contains, held_out. ---
-
-  # Cross-domain navigation on the canonical reference page: example.com's only link
-  # ("More information...") leaves the site for iana.org. Distinct domain (reference),
-  # ultra-stable, no bot-wall. Independent check: landing on the iana.org URL.
-  - id: live_example_more_info_nav
-    instruction: "On example.com, click the 'More information...' link to follow it to its destination page."
-    start_url: "https://example.com/"
-    domain: reference
-    task_type: action
-    difficulty: single
-    held_out: true
-    key_nodes:
-      - url_contains: "example.com"
-    assert:
-      url_contains: "iana.org"
-
-  # News aggregator (server-rendered, automation-tolerant): click the top-nav "new"
-  # link to reach the newest-submissions page. Distinct domain (news). Independent
-  # check: the newest page URL.
-  - id: live_hackernews_newest_nav
-    instruction: "On Hacker News, click the 'new' link in the top navigation to open the newest submissions page."
-    start_url: "https://news.ycombinator.com/"
-    domain: news
-    task_type: action
-    difficulty: single
-    split: dev  # news.ycombinator.com is a dev site (batch-1 added 7 dev cases here); keep the site disjoint
-    key_nodes:
-      - url_contains: "ycombinator.com"
-    assert:
-      url_contains: "newest"
-
-  # Distinct reference/org domain with a sidebar-nav "Licenses" link. NOT a bot-wall
-  # (public page); scored by the honest page-specific check (NOT expect_abstain — the
-  # agent should be able to reach it). Documents a graceful-failure class: on a real
-  # nav the locate cascade can miss the link and the agent ABSTAINS (asks the user)
-  # rather than silently claiming success — a RED row that keeps M3 at 0.
-  - id: live_gnu_licenses_nav
-    instruction: "On gnu.org, click the 'Licenses' link in the navigation to open the licenses page."
-    start_url: "https://www.gnu.org/"
-    domain: reference
-    task_type: action
-    difficulty: single
-    held_out: true
-    key_nodes:
-      - url_contains: "gnu.org"
-    assert:
-      url_contains: "licenses"
-
-  # --- Breadth (autoresearch round 2, Probe B): more structurally-distinct real
-  # domains across new categories (maps / news / docs / media / ...). Same rules:
-  # page-specific verifier, zero text_contains, characterized live before adoption. ---
-
-  # Maps — a slippy-map app with a persistent "Log In" nav. Distinct domain (maps).
-  - id: live_osm_login_nav
-    instruction: "On OpenStreetMap, click 'Log In' to open the login page."
-    start_url: "https://www.openstreetmap.org/"
-    domain: maps
-    task_type: action
-    difficulty: single
-    held_out: true
-    key_nodes:
-      - url_contains: "openstreetmap.org"
-    assert:
-      url_contains: "login"
-
-  # News (tech link-aggregator) — top-nav "Comments" page. Distinct domain (news).
-  - id: live_lobsters_comments_nav
-    instruction: "On Lobsters, open the 'Comments' page from the navigation."
-    start_url: "https://lobste.rs/"
-    domain: news
-    task_type: action
-    difficulty: single
-    held_out: true
-    key_nodes:
-      - url_contains: "lobste.rs"
-    assert:
-      url_contains: "comments"
-
-  # Docs — a large real documentation site; open its Blog. Distinct domain (docs).
-  - id: live_mdn_blog_nav
-    instruction: "On MDN Web Docs, open the Blog."
-    start_url: "https://developer.mozilla.org/"
-    domain: documentation
-    task_type: action
-    difficulty: single
-    held_out: true
-    key_nodes:
-      - url_contains: "developer.mozilla.org"
-    assert:
-      url_contains: "blog"
-
-  # Media / digital library — the "Log In" link sits behind a compact menu; the locate
-  # cascade can miss it, so the agent ABSTAINS (honest non-completion, M3-safe). Kept
-  # as a graceful-failure class on a NEW distinct domain (media). Page-specific verifier.
-  - id: live_archive_login_nav
-    instruction: "On the Internet Archive, click 'Log In' to open the sign-in page."
-    start_url: "https://archive.org/"
-    domain: media
-    task_type: action
-    difficulty: single
-    held_out: true
-    key_nodes:
-      - url_contains: "archive.org"
-    assert:
-      url_contains: "login"
-
-  # Government — a large, fast public-service site; open its Help page. Distinct domain (gov).
-  - id: live_govuk_help_nav
-    instruction: "On GOV.UK, open the 'Help' page from the site navigation."
-    start_url: "https://www.gov.uk/"
-    domain: government
-    task_type: action
-    difficulty: single
-    held_out: true
-    key_nodes:
-      - url_contains: "gov.uk"
-    assert:
-      url_contains: "help"
-
-  # Science / preprints — open arXiv's Help page (redirects to info.arxiv.org). Distinct domain (science).
-  - id: live_arxiv_help_nav
-    instruction: "On arXiv, open the 'Help' page."
-    start_url: "https://arxiv.org/"
-    domain: science
-    task_type: action
-    difficulty: single
-    held_out: true
-    key_nodes:
-      - url_contains: "arxiv.org"
-    assert:
-      url_contains: "help"
-
-  # Finance — open a specific equity quote page. Distinct domain (finance). NOTE: this site
-  # is bot-wall-prone (consent / anti-bot interstitials that detect_block does not yet catch);
-  # it VERIFIED on adoption (reached /quote/AAPL/) but a future run could serve a wall. The
-  # close full-tier run is the M3 arbiter — if it silent-fails there it is discarded.
-  - id: live_yahoofinance_aapl_quote
-    instruction: "On Yahoo Finance, open the quote page for Apple (ticker AAPL)."
-    start_url: "https://finance.yahoo.com/"
-    domain: finance
-    task_type: action
-    difficulty: single
-    held_out: true
-    key_nodes:
-      - url_contains: "finance.yahoo.com"
-    assert:
-      url_contains: "AAPL"
-
-  # Books / digital library — open the sign-in page (distinct registrable domain from archive.org).
-  - id: live_openlibrary_login_nav
-    instruction: "On Open Library, click 'Log In' to open the sign-in page."
-    start_url: "https://openlibrary.org/"
-    domain: media
-    task_type: action
-    difficulty: single
-    held_out: true
-    key_nodes:
-      - url_contains: "openlibrary.org"
-    assert:
-      url_contains: "login"
-
-  # Q&A — open the Questions listing. Distinct domain (qa). On adoption the agent ABSTAINED
-  # (nominal=False asked=True blocked=False, steps=4) -- a locate/navigation graceful failure
-  # (NOT a detected bot-wall), so scored by the honest page-specific assert (NOT expect_abstain).
-  # A RED abstain row that keeps M3 safe; close full-tier run is the arbiter.
-  - id: live_stackoverflow_questions_nav
-    instruction: "On Stack Overflow, open the 'Questions' page from the navigation."
-    start_url: "https://stackoverflow.com/"
-    domain: qa
-    task_type: action
-    difficulty: single
-    held_out: true
-    key_nodes:
-      - url_contains: "stackoverflow.com"
-    assert:
-      url_contains: "questions"
-
-  # --- batch 1 (dev): two-pass validated (A4 probe + independent reviewer) ---
-  - id: live_internet_status_code_200
-    instruction: Start on the Status Codes page and click the link for the 200 status code, then confirm the resulting page.
-    start_url: https://the-internet.herokuapp.com/status_codes
-    domain: navigation
-    task_type: action
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /status_codes/200
-    assert:
-      text_contains: This page returned a 200 status code
-  - id: live_internet_redirector_to_status
-    instruction: On the Redirection page, click the 'here' link to follow the redirect to the status codes page.
-    start_url: https://the-internet.herokuapp.com/redirector
-    domain: navigation
-    task_type: action
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - text_contains: status code
-    assert:
-      url_contains: /status_codes
-  - id: live_internet_challenging_dom_intro
-    instruction: Open the Challenging DOM page and report the static introductory description shown about finding the best locators.
-    start_url: https://the-internet.herokuapp.com/challenging_dom
-    domain: tables
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: /challenging_dom
-    assert:
-      text_contains: The hardest part in automated web testing is finding the best locators
-  - id: live_books_sapiens_price
-    instruction: 'Find the book ''Sapiens: A Brief History of Humankind'' and report its price.'
-    start_url: https://books.toscrape.com/
-    domain: extraction
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: sapiens-a-brief-history-of-humankind_996
-    assert:
-      text_contains: £54.23
-  - id: live_books_open_mystery_category
-    instruction: Open the Mystery book category from the homepage sidebar.
-    start_url: https://books.toscrape.com/
-    domain: ecommerce
-    task_type: action
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: category/books/mystery_3
-    assert:
-      h1_equals: Mystery
-  - id: live_books_sapiens_stock
-    instruction: 'Open the product page for ''Sapiens: A Brief History of Humankind'' and report how many copies are in stock.'
-    start_url: https://books.toscrape.com/
-    domain: extraction
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - text_contains: 20 available
-    assert:
-      text_contains: In stock (20 available)
-  - id: live_books_grand_design_price
-    instruction: Find the price of the book 'The Grand Design' by Stephen Hawking on this site.
-    start_url: https://books.toscrape.com/catalogue/the-grand-design_405/index.html
-    domain: extraction
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: the-grand-design_405
-    assert:
-      text_contains: £13.76
-  - id: live_books_open_science_fiction
-    instruction: Navigate to the Science Fiction category and confirm the category page has loaded.
-    start_url: https://books.toscrape.com/
-    domain: ecommerce
-    task_type: action
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: science-fiction_16
-    assert:
-      h1_equals: Science Fiction
-  - id: live_books_dune_price
-    instruction: 'Go to the Science Fiction category, find ''Dune (Dune #1)'', and report its price.'
-    start_url: https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html
-    domain: extraction
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: dune-dune-1
-    assert:
-      text_contains: £54.86
-  - id: live_books_page2_pagination
-    instruction: From the catalogue, go to the second page of the full book listing.
-    start_url: https://books.toscrape.com/catalogue/page-1.html
-    domain: ecommerce
-    task_type: action
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: page-2.html
-    assert:
-      text_contains: Page 2 of 50
-  - id: live_books_classics_secret_garden
-    instruction: Open the Classics category and find the price of 'The Secret Garden'.
-    start_url: https://books.toscrape.com/catalogue/category/books/classics_6/index.html
-    domain: extraction
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: the-secret-garden
-    assert:
-      text_contains: £15.08
-  - id: live_books_travel_count
-    instruction: Open the Travel category and report how many books (results) it contains.
-    start_url: https://books.toscrape.com/
-    domain: extraction
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: travel_2
-    assert:
-      text_contains: 11 results
-  - id: live_books_poetry_olio_price
-    instruction: Open the Poetry category and report the price of the book 'Olio'.
-    start_url: https://books.toscrape.com/catalogue/category/books/poetry_23/index.html
-    domain: extraction
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: olio_984
-    assert:
-      text_contains: £23.88
-  - id: live_books_grand_design_stock
-    instruction: Open the product page for 'The Grand Design' and report how many copies are in stock.
-    start_url: https://books.toscrape.com/catalogue/the-grand-design_405/index.html
-    domain: extraction
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - text_contains: 5 available
-    assert:
-      text_contains: In stock (5 available)
-  - id: live_wikipedia_oxygen_search
-    instruction: Use Wikipedia's search to find the chemical element with atomic number 8 and open its article.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Oxygen
-    assert:
-      h1_equals: Oxygen
-  - id: live_wikipedia_photosynthesis_search
-    instruction: Search Wikipedia for the biological process by which plants convert light energy into chemical energy and open the resulting article.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Photosynthesis
-    assert:
-      h1_equals: Photosynthesis
-  - id: live_wikipedia_everest_retrieval
-    instruction: Find and open the Wikipedia article for the highest mountain on Earth above sea level.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Mount_Everest
-    assert:
-      h1_equals: Mount Everest
-  - id: live_wikipedia_japan_country
-    instruction: Search Wikipedia for the island country in East Asia whose capital is Tokyo and open its article.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Japan
-    assert:
-      h1_equals: Japan
-  - id: live_wikipedia_periodic_table_nav
-    instruction: Open Wikipedia's article on Oxygen, then from there navigate via a link to the article describing the tabular arrangement of all the chemical elements.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Periodic_table
-    assert:
-      h1_equals: Periodic table
-  - id: live_wikipedia_dna_search
-    instruction: Search Wikipedia for the molecule that carries genetic instructions in living organisms, abbreviated as deoxyribonucleic acid, and open its article.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/DNA
-    assert:
-      h1_equals: DNA
-  - id: live_wikipedia_einstein_via_gravity
-    instruction: Open Wikipedia's article on Gravity, then follow a link to the article about the physicist who developed the general theory of relativity.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Albert_Einstein
-    assert:
-      h1_equals: Albert Einstein
-  - id: live_wikipedia_great_barrier_reef
-    instruction: Search Wikipedia for the world's largest coral reef system, located off the coast of Queensland, Australia, and open its article.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Great_Barrier_Reef
-    assert:
-      h1_equals: Great Barrier Reef
-  - id: live_wikipedia_volcano_via_everest
-    instruction: Open Wikipedia's article on Mount Everest, then use search to find and open the article about a rupture in a planetary crust that allows lava to escape, titled Volcano.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Volcano
-    assert:
-      h1_equals: Volcano
-  - id: live_wikipedia_einstein_body_text
-    instruction: Search Wikipedia for the person famous for the equation E = mc^2 and open his article.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - h1_equals: Albert Einstein
-    assert:
-      url_contains: /wiki/Albert_Einstein
-  - id: live_pydocs_os_nav
-    instruction: From the Python 3 documentation home page, navigate to The Python Standard Library index and open the documentation page for the 'os' module (miscellaneous operating system interfaces).
-    start_url: https://docs.python.org/3/
-    domain: reference
-    task_type: action
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: library/os
-    assert:
-      h1_equals: os — Miscellaneous operating system interfaces
-  - id: live_pydocs_pathlib_nav
-    instruction: Starting at the Python 3 documentation home, go through the standard library index and open the 'pathlib' module page about object-oriented filesystem paths.
-    start_url: https://docs.python.org/3/
-    domain: reference
-    task_type: action
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: library/pathlib
-    assert:
-      h1_equals: pathlib — Object-oriented filesystem paths
-  - id: live_pydocs_datetime_nav
-    instruction: From the Python 3 docs home page, navigate via the standard library to the 'datetime' module documentation page covering basic date and time types.
-    start_url: https://docs.python.org/3/
-    domain: reference
-    task_type: action
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: library/datetime
-    assert:
-      h1_equals: datetime — Basic date and time types
-  - id: live_pydocs_collections_nav
-    instruction: Beginning at the Python 3 documentation home, use the standard library index to reach the 'collections' module page on container datatypes.
-    start_url: https://docs.python.org/3/
-    domain: reference
-    task_type: action
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: library/collections
-    assert:
-      h1_equals: collections — Container datatypes
-  - id: live_pydocs_re_nav
-    instruction: From the Python 3 documentation home page, navigate through the standard library to open the 're' module documentation about regular expression operations.
-    start_url: https://docs.python.org/3/
-    domain: reference
-    task_type: action
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: library/re
-    assert:
-      h1_equals: re — Regular expression operations
-  - id: live_pydocs_itertools_nav
-    instruction: Starting from the Python 3 docs home, navigate via the standard library index to the 'itertools' module page about functions creating iterators for efficient looping.
-    start_url: https://docs.python.org/3/
-    domain: reference
-    task_type: action
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: library/itertools
-    assert:
-      h1_equals: itertools — Functions creating iterators for efficient looping
-  - id: live_pydocs_sys_nav
-    instruction: From the Python 3 documentation home page, go to the standard library index and open the 'sys' module page on system-specific parameters and functions.
-    start_url: https://docs.python.org/3/
-    domain: reference
-    task_type: action
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: library/sys
-    assert:
-      h1_equals: sys — System-specific parameters and functions
-  - id: live_pydocs_builtins_nav
-    instruction: From the Python 3 documentation home, navigate through the standard library to the 'Built-in Functions' reference page that lists functions such as abs(), len(), and zip().
-    start_url: https://docs.python.org/3/
-    domain: reference
-    task_type: action
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: library/functions
-    assert:
-      h1_equals: Built-in Functions
-  - id: live_pydocs_tutorial_nav
-    instruction: From the Python 3 documentation home page, open 'The Python Tutorial' index page.
-    start_url: https://docs.python.org/3/
-    domain: docs
-    task_type: action
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: tutorial/index
-    assert:
-      h1_equals: The Python Tutorial
-  - id: live_pydocs_stdlib_index_nav
-    instruction: From the Python 3 documentation home page, open 'The Python Standard Library' index page.
-    start_url: https://docs.python.org/3/
-    domain: docs
-    task_type: action
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: library/index
-    assert:
-      h1_equals: The Python Standard Library
-  - id: live_hackernews_ask_nav
-    instruction: From the Hacker News front page, click the navigation link that opens the Ask HN section.
-    start_url: https://news.ycombinator.com/
-    domain: news
-    task_type: action
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: ask
-    assert:
-      url_contains: /ask
-  - id: live_hackernews_comments_nav
-    instruction: From the Hacker News front page, open the newest comments feed by clicking the 'comments' link in the top navigation bar.
-    start_url: https://news.ycombinator.com/
-    domain: news
-    task_type: action
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: newcomments
-    assert:
-      url_contains: /newcomments
-  - id: live_hackernews_past_front_nav
-    instruction: From the Hacker News front page, click the 'past' link in the top navigation bar to view the front page of previous days.
-    start_url: https://news.ycombinator.com/
-    domain: news
-    task_type: action
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: front
-    assert:
-      url_contains: /front
-  - id: live_hackernews_show_then_ask
-    instruction: Starting from the Hacker News front page, first open the Show HN section, then from there navigate to the Ask HN section.
-    start_url: https://news.ycombinator.com/
-    domain: news
-    task_type: action
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: show
-    assert:
-      url_contains: /ask
-  - id: live_hackernews_show_nav
-    instruction: From the Hacker News front page, navigate to the Show HN section using the top navigation bar.
-    start_url: https://news.ycombinator.com/
-    domain: news
-    task_type: action
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: show
-    assert:
-      url_contains: /show
-  - id: live_hackernews_jobs_nav
-    instruction: From the Hacker News front page, click the navigation link to view the Jobs page.
-    start_url: https://news.ycombinator.com/
-    domain: news
-    task_type: action
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: jobs
-    assert:
-      url_contains: /jobs
-  - id: live_hackernews_newest_to_jobs
-    instruction: Starting from the Hacker News front page, click 'new' to view the newest submissions, then click 'jobs' to reach the Jobs page.
-    start_url: https://news.ycombinator.com/
-    domain: news
-    task_type: action
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: newest
-    assert:
-      url_contains: /jobs
-
-  # --- batch 2 (holdout + sealed): two-pass validated (A4 probe + independent reviewer) ---
-  - id: live_mdn_html_input
-    instruction: On MDN Web Docs, navigate to the reference page for the HTML <input> element.
-    start_url: https://developer.mozilla.org/en-US/
-    domain: reference
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: holdout
-    key_nodes:
-    - url_contains: Elements/input
-    assert:
-      url_contains: Elements/input
-  - id: live_mdn_css_flex
-    instruction: On MDN Web Docs, find the reference page for the CSS flex shorthand property.
-    start_url: https://developer.mozilla.org/en-US/
-    domain: reference
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: holdout
-    key_nodes:
-    - url_contains: Properties/flex
-    assert:
-      url_contains: Properties/flex
-  - id: live_mdn_array_map
-    instruction: On MDN Web Docs, navigate to the JavaScript reference page for the Array.prototype.map() method.
-    start_url: https://developer.mozilla.org/en-US/
-    domain: reference
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: holdout
-    key_nodes:
-    - url_contains: Global_Objects/Array/map
-    assert:
-      h1_equals: Array.prototype.map()
-  - id: live_mdn_http_get
-    instruction: On MDN Web Docs, go to the HTTP reference page documenting the GET request method.
-    start_url: https://developer.mozilla.org/en-US/
-    domain: reference
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: holdout
-    key_nodes:
-    - url_contains: Methods/GET
-    assert:
-      url_contains: Methods/GET
-  - id: live_mdn_fetch_api
-    instruction: On MDN Web Docs, open the Web API overview page for the Fetch API.
-    start_url: https://developer.mozilla.org/en-US/
-    domain: reference
-    task_type: retrieval
-    difficulty: single
-    split: holdout
-    key_nodes:
-    - url_contains: Web/API/Fetch_API
-    assert:
-      h1_equals: Fetch API
-  - id: live_mdn_grid_template_columns
-    instruction: On MDN Web Docs, find the CSS reference page for the grid-template-columns property.
-    start_url: https://developer.mozilla.org/en-US/
-    domain: reference
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: holdout
-    key_nodes:
-    - url_contains: Properties/grid-template-columns
-    assert:
-      url_contains: Properties/grid-template-columns
-  - id: live_mdn_promise_all
-    instruction: On MDN Web Docs, navigate to the JavaScript reference page for the Promise.all() static method.
-    start_url: https://developer.mozilla.org/en-US/
-    domain: reference
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: holdout
-    key_nodes:
-    - url_contains: Global_Objects/Promise/all
-    assert:
-      h1_equals: Promise.all()
-  - id: live_mdn_http_404
-    instruction: On MDN Web Docs, go to the HTTP reference page for the 404 Not Found status code.
-    start_url: https://developer.mozilla.org/en-US/
-    domain: reference
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: holdout
-    key_nodes:
-    - url_contains: Status/404
-    assert:
-      h1_equals: 404 Not Found
-  - id: live_govuk_bank_holidays
-    instruction: Go to GOV.UK and find the page listing the upcoming UK bank holidays for England and Wales, Scotland, and Northern Ireland.
-    start_url: https://www.gov.uk/
-    domain: government
-    task_type: retrieval
-    difficulty: single
-    split: holdout
-    key_nodes:
-    - text_contains: England and Wales
-    assert:
-      url_contains: bank-holidays
-  - id: live_govuk_vat_rates
-    instruction: On GOV.UK, navigate to the guidance page that explains the different VAT rates (standard, reduced and zero rates) and what they apply to.
-    start_url: https://www.gov.uk/
-    domain: government
-    task_type: retrieval
-    difficulty: single
-    split: holdout
-    key_nodes:
-    - url_contains: vat-rates
-    assert:
-      h1_equals: VAT rates
-  - id: live_govuk_min_wage
-    instruction: Find the GOV.UK guidance page that gives the current National Minimum Wage and National Living Wage rates.
-    start_url: https://www.gov.uk/
-    domain: government
-    task_type: retrieval
-    difficulty: single
-    split: holdout
-    key_nodes:
-    - url_contains: national-minimum-wage-rates
-    assert:
-      h1_equals: National Minimum Wage and National Living Wage rates
-  - id: live_govuk_check_uk_visa
-    instruction: On GOV.UK, reach the tool that lets you check whether you need a UK visa based on your nationality and reason for travel.
-    start_url: https://www.gov.uk/
-    domain: government
-    task_type: action
-    difficulty: single
-    split: holdout
-    key_nodes:
-    - url_contains: check-uk-visa
-    assert:
-      h1_equals: Check if you need a UK visa
-  - id: live_govuk_contact_dvla
-    instruction: Navigate GOV.UK to the page that provides contact details for the DVLA (Driver and Vehicle Licensing Agency).
-    start_url: https://www.gov.uk/
-    domain: government
-    task_type: action
-    difficulty: single
-    split: holdout
-    key_nodes:
-    - url_contains: contact-the-dvla
-    assert:
-      h1_equals: Contact DVLA
-  - id: live_govuk_driving_licences
-    instruction: Starting from the GOV.UK homepage, open the 'Driving and transport' browse section, then go into its 'Driving licences' subtopic.
-    start_url: https://www.gov.uk/
-    domain: government
-    task_type: action
-    difficulty: multi_same_domain
-    split: holdout
-    key_nodes:
-    - h1_equals: Driving and transport
-    assert:
-      url_contains: browse/driving/driving-licences
-  - id: live_govuk_provisional_licence
-    instruction: From the GOV.UK homepage, work through the driving section to reach the page for applying for your first provisional driving licence.
-    start_url: https://www.gov.uk/
-    domain: government
-    task_type: action
-    difficulty: multi_same_domain
-    split: holdout
-    key_nodes:
-    - url_contains: browse/driving
-    assert:
-      h1_equals: Apply for your first provisional driving licence
-  - id: live_scrapethissite_goto_simple
-    instruction: 'From the Web Scraping Sandbox page list, open the ''Countries of the World: A Simple Example'' sandbox page.'
-    start_url: https://www.scrapethissite.com/pages/
-    domain: navigation
-    task_type: action
-    difficulty: single
-    split: sealed
-    key_nodes:
-    - url_contains: pages/simple
-    assert:
-      url_contains: pages/simple
-  - id: live_scrapethissite_goto_forms
-    instruction: 'From the sandbox page list, open the ''Hockey Teams: Forms, Searching and Pagination'' page.'
-    start_url: https://www.scrapethissite.com/pages/
-    domain: navigation
-    task_type: action
-    difficulty: single
-    split: sealed
-    key_nodes:
-    - url_contains: pages/forms
-    assert:
-      url_contains: pages/forms
-  - id: live_scrapethissite_search_boston
-    instruction: Open the Hockey Teams sandbox page and use the 'Search for Teams' box to search for the team 'Boston'. Submit the search.
-    start_url: https://www.scrapethissite.com/pages/
-    domain: navigation
-    task_type: action
-    difficulty: multi_same_domain
-    split: sealed
-    key_nodes:
-    - url_contains: q=Boston
-    assert:
-      url_contains: q=Boston
-  - id: live_scrapethissite_forms_page2
-    instruction: Open the Hockey Teams sandbox page and navigate to the second page of results using the pagination controls.
-    start_url: https://www.scrapethissite.com/pages/
-    domain: navigation
-    task_type: action
-    difficulty: multi_same_domain
-    split: sealed
-    key_nodes:
-    - url_contains: page_num=2
-    assert:
-      url_contains: page_num=2
-  - id: live_scrapethissite_goto_ajax
-    instruction: 'From the sandbox page list, open the ''Oscar Winning Films: AJAX and Javascript'' page.'
-    start_url: https://www.scrapethissite.com/pages/
-    domain: navigation
-    task_type: action
-    difficulty: single
-    split: sealed
-    key_nodes:
-    - url_contains: pages/ajax-javascript
-    assert:
-      text_contains: Oscar Winning Films
-  - id: live_scrapethissite_frames_topic
-    instruction: 'From the sandbox page list, open the ''Turtles All the Way Down: Frames & iFrames'' page and confirm it is about turtles.'
-    start_url: https://www.scrapethissite.com/pages/
-    domain: navigation
-    task_type: retrieval
-    difficulty: single
-    split: sealed
-    key_nodes:
-    - url_contains: pages/frames
-    assert:
-      text_contains: Turtles All the Way Down
-  - id: live_rfceditor_open_http11
-    instruction: On the RFC Editor site, open the information page for RFC 2616.
-    start_url: https://www.rfc-editor.org/
-    domain: reference
-    task_type: action
-    difficulty: single
-    split: sealed
-    key_nodes:
-    - url_contains: info/rfc2616
-    assert:
-      url_contains: info/rfc2616
-  - id: live_rfceditor_title_rfc8259
-    instruction: Find the title of RFC 8259 on the RFC Editor site and open its info page.
-    start_url: https://www.rfc-editor.org/
-    domain: reference
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: sealed
-    key_nodes:
-    - url_contains: info/rfc8259
-    assert:
-      text_contains: The JavaScript Object Notation (JSON) Data Interchange Format
-  - id: live_rfceditor_open_ip
-    instruction: Navigate to the RFC Editor information page for RFC 791 (the Internet Protocol specification).
-    start_url: https://www.rfc-editor.org/
-    domain: reference
-    task_type: action
-    difficulty: single
-    split: sealed
-    key_nodes:
-    - url_contains: info/rfc791
-    assert:
-      url_contains: info/rfc791
-  - id: live_rfceditor_title_rfc1149
-    instruction: Look up RFC 1149 on the RFC Editor site and open its info page to read its title.
-    start_url: https://www.rfc-editor.org/
-    domain: reference
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: sealed
-    key_nodes:
-    - url_contains: info/rfc1149
-    assert:
-      text_contains: A Standard for the Transmission of IP Datagrams on Avian Carriers
-  - id: live_rfceditor_open_uri
-    instruction: On the RFC Editor site, open the information page for RFC 3986, the URI generic syntax standard.
-    start_url: https://www.rfc-editor.org/
-    domain: reference
-    task_type: action
-    difficulty: single
-    split: sealed
-    key_nodes:
-    - url_contains: info/rfc3986
-    assert:
-      url_contains: info/rfc3986
-  - id: live_rfceditor_title_rfc3986
-    instruction: Find the official title of RFC 3986 on the RFC Editor site and open its info page.
-    start_url: https://www.rfc-editor.org/
-    domain: reference
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: sealed
-    key_nodes:
-    - url_contains: info/rfc3986
-    assert:
-      text_contains: 'Uniform Resource Identifier (URI): Generic Syntax'
-  - id: live_rfceditor_open_ftp
-    instruction: Navigate to the RFC Editor information page for RFC 959.
-    start_url: https://www.rfc-editor.org/
-    domain: reference
-    task_type: action
-    difficulty: single
-    split: sealed
-    key_nodes:
-    - url_contains: info/rfc959
-    assert:
-      url_contains: info/rfc959
-  - id: live_rfceditor_title_rfc2046
-    instruction: Look up RFC 2046 on the RFC Editor site and open its info page to read its title.
-    start_url: https://www.rfc-editor.org/
-    domain: reference
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: sealed
-    key_nodes:
-    - url_contains: info/rfc2046
-    assert:
-      text_contains: 'Multipurpose Internet Mail Extensions (MIME) Part Two: Media Types'
-  - id: live_webscraper_nav_laptops
-    instruction: From the e-commerce test site home page, navigate to the Computers category and then open the Laptops subcategory listing.
-    start_url: https://webscraper.io/test-sites/e-commerce/allinone
-    domain: ecommerce
-    task_type: action
-    difficulty: multi_same_domain
-    split: sealed
-    key_nodes:
-    - url_contains: computers/laptops
-    assert:
-      url_contains: computers/laptops
-  - id: live_webscraper_nav_tablets
-    instruction: From the e-commerce test site home page, navigate to the Computers category and then open the Tablets subcategory listing.
-    start_url: https://webscraper.io/test-sites/e-commerce/allinone
-    domain: ecommerce
-    task_type: action
-    difficulty: multi_same_domain
-    split: sealed
-    key_nodes:
-    - url_contains: computers/tablets
-    assert:
-      url_contains: computers/tablets
-  - id: live_webscraper_nav_phones
-    instruction: From the e-commerce test site home page, open the Phones category listing.
-    start_url: https://webscraper.io/test-sites/e-commerce/allinone
-    domain: ecommerce
-    task_type: action
-    difficulty: single
-    split: sealed
-    key_nodes:
-    - url_contains: /phones
-    assert:
-      url_contains: /phones
-  - id: live_webscraper_open_ipad_mini_product
-    instruction: Navigate to the Computers > Tablets subcategory and open the product page for the 'IdeaTab A3500L' tablet, then confirm you are on its product detail page.
-    start_url: https://webscraper.io/test-sites/e-commerce/allinone
-    domain: ecommerce
-    task_type: action
-    difficulty: multi_same_domain
-    split: sealed
-    key_nodes:
-    - url_contains: /product/15
-    assert:
-      url_contains: /product/15
-  - id: live_webscraper_open_iphone_product
-    instruction: Go to the Phones category and open the product detail page for the 'Iphone' product.
-    start_url: https://webscraper.io/test-sites/e-commerce/allinone
-    domain: ecommerce
-    task_type: action
-    difficulty: multi_same_domain
-    split: sealed
-    key_nodes:
-    - url_contains: /product/7
-    assert:
-      url_contains: /product/7
-  - id: live_webscraper_nav_phones_touch
-    instruction: Navigate to the Phones category and then open its 'Touch' subcategory listing of touchscreen phones.
-    start_url: https://webscraper.io/test-sites/e-commerce/allinone
-    domain: ecommerce
-    task_type: action
-    difficulty: multi_same_domain
-    split: sealed
-    key_nodes:
-    - url_contains: phones/touch
-    assert:
-      url_contains: phones/touch
-
-  # --- batch 3 (supported fill: dev/holdout/sealed): two-pass validated ---
-  - id: live_wikipedia_iron_element
-    instruction: Search Wikipedia for the chemical element with atomic number 26 and symbol Fe, then open its article.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Iron
-    assert:
-      h1_equals: Iron
-  - id: live_wikipedia_jupiter
-    instruction: Find and open the Wikipedia article for the largest planet in the Solar System, the fifth planet from the Sun.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Jupiter
-    assert:
-      h1_equals: Jupiter
-  - id: live_wikipedia_brazil
-    instruction: Search Wikipedia for the largest country in South America and open its article.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Brazil
-    assert:
-      h1_equals: Brazil
-  - id: live_wikipedia_isaac_newton
-    instruction: Find the Wikipedia article for the English physicist and mathematician who formulated the laws of motion and universal gravitation, and open it.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Isaac_Newton
-    assert:
-      h1_equals: Isaac Newton
-  - id: live_wikipedia_bengal_tiger_via_brazil
-    instruction: Open the Wikipedia article for the largest country in South America, then from there navigate to the article about the tiger population native to the Indian subcontinent (Bengal tiger).
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Bengal_tiger
-    assert:
-      h1_equals: Bengal tiger
-  - id: live_wikipedia_mitochondrion_via_iron
-    instruction: Open the Wikipedia article for the chemical element iron, then navigate to the article about the cell organelle that uses aerobic respiration to generate ATP (the mitochondrion).
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Mitochondrion
-    assert:
-      h1_equals: Mitochondrion
-  - id: live_wikipedia_pacific_ocean_via_jupiter
-    instruction: Open the Wikipedia article for the planet Jupiter, then navigate to the article about the largest and deepest of Earth's five oceanic divisions (the Pacific Ocean).
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Pacific_Ocean
-    assert:
-      h1_equals: Pacific Ocean
-  - id: live_books_romance_category
-    instruction: Open the 'Romance' book category from the homepage sidebar.
-    start_url: https://books.toscrape.com/
-    domain: ecommerce
-    task_type: action
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: romance_8
-    assert:
-      h1_equals: Romance
-  - id: live_books_music_category
-    instruction: Navigate to the 'Music' book category.
-    start_url: https://books.toscrape.com/
-    domain: ecommerce
-    task_type: action
-    difficulty: single
-    split: dev
-    key_nodes:
-    - url_contains: music_14
-    assert:
-      h1_equals: Music
-  - id: live_books_how_music_works_price
-    instruction: In the Music category, open the book 'How Music Works' and report its price.
-    start_url: https://books.toscrape.com/
-    domain: extraction
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: how-music-works_979
-    assert:
-      text_contains: £37.32
-  - id: live_books_sophies_world_price
-    instruction: In the Philosophy category, open the book 'Sophie's World' and report its price.
-    start_url: https://books.toscrape.com/
-    domain: extraction
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: sophies-world_966
-    assert:
-      text_contains: £15.94
-  - id: live_books_rip_it_up_price
-    instruction: Find the book 'Rip it Up and Start Again' in the Music category and report the price on its product page.
-    start_url: https://books.toscrape.com/
-    domain: extraction
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: rip-it-up-and-start-again_986
-    assert:
-      text_contains: £35.02
-  - id: live_books_fiction_page2
-    instruction: Open the 'Fiction' category, then go to the second page of results using the 'next' button.
-    start_url: https://books.toscrape.com/
-    domain: ecommerce
-    task_type: action
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: page-2
-    assert:
-      url_contains: fiction_10/page-2.html
-  - id: live_arxiv_attention_paper
-    instruction: Open the abstract page for the paper 'Attention Is All You Need' on arXiv.
-    start_url: https://arxiv.org/
-    domain: academic
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: holdout
-    key_nodes:
-    - text_contains: Attention Is All You Need
-    assert:
-      url_contains: abs/1706.03762
-  - id: live_arxiv_bert_paper
-    instruction: 'Find and open the arXiv abstract page for the BERT paper titled ''BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding''.'
-    start_url: https://arxiv.org/
-    domain: academic
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: holdout
-    key_nodes:
-    - url_contains: abs/1810.04805
-    assert:
-      text_contains: 'BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding'
-  - id: live_arxiv_cs_ai_listing
-    instruction: Navigate from the arXiv home page to the recent submissions listing for Computer Science > Artificial Intelligence (cs.AI).
-    start_url: https://arxiv.org/
-    domain: academic
-    task_type: action
-    difficulty: single
-    split: holdout
-    key_nodes:
-    - url_contains: list/cs.AI
-    assert:
-      url_contains: list/cs.AI
-  - id: live_arxiv_cs_lg_listing
-    instruction: Navigate from the arXiv home page to the recent submissions listing for the Computer Science > Machine Learning (cs.LG) category.
-    start_url: https://arxiv.org/
-    domain: academic
-    task_type: action
-    difficulty: single
-    split: holdout
-    key_nodes:
-    - url_contains: list/cs.LG
-    assert:
-      url_contains: list/cs.LG
-  - id: live_rfceditor_websocket_open
-    instruction: Open the RFC Editor info page for RFC 6455.
-    start_url: https://www.rfc-editor.org/
-    domain: reference
-    task_type: action
-    difficulty: single
-    split: sealed
-    key_nodes:
-    - url_contains: info/rfc6455
-    assert:
-      url_contains: info/rfc6455
-  - id: live_rfceditor_smtp_open
-    instruction: Navigate to the RFC Editor info page for RFC 5321.
-    start_url: https://www.rfc-editor.org/
-    domain: reference
-    task_type: action
-    difficulty: single
-    split: sealed
-    key_nodes:
-    - url_contains: info/rfc5321
-    assert:
-      url_contains: info/rfc5321
-  - id: live_rfceditor_udp_open
-    instruction: Open the info page for RFC 768 on the RFC Editor site.
-    start_url: https://www.rfc-editor.org/
-    domain: reference
-    task_type: action
-    difficulty: single
-    split: sealed
-    key_nodes:
-    - url_contains: info/rfc768
-    assert:
-      url_contains: info/rfc768
-  - id: live_rfceditor_rfc1918_title
-    instruction: Find the title of RFC 1918 and report it.
-    start_url: https://www.rfc-editor.org/
-    domain: reference
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: sealed
-    key_nodes:
-    - url_contains: info/rfc1918
-    assert:
-      text_contains: Address Allocation for Private Internets
-  - id: live_rfceditor_rfc793_title
-    instruction: Find the title of RFC 793 and report it.
-    start_url: https://www.rfc-editor.org/
-    domain: reference
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: sealed
-    key_nodes:
-    - url_contains: info/rfc793
-    assert:
-      text_contains: Transmission Control Protocol
-
-  # --- abstain batch (unsupported: login/auth-gated -> honest abstain): A4 auth-wall validated ---
-  - id: live_wikipedia_preferences_abstain
-    instruction: On Wikipedia, open your account's Preferences page and change your interface language setting.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: action
-    difficulty: single
-    split: dev
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_wikipedia_watchlist_abstain
-    instruction: On Wikipedia, open your personal watchlist to see your tracked pages.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: action
-    difficulty: single
-    split: dev
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_github_settings_abstain
-    instruction: On GitHub, open your account settings page and update your profile bio.
-    start_url: https://github.com/
-    domain: developer
-    task_type: action
-    difficulty: single
-    split: dev
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_github_notifications_abstain
-    instruction: On GitHub, open your notifications inbox and mark all as read.
-    start_url: https://github.com/
-    domain: developer
-    task_type: action
-    difficulty: single
-    split: dev
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_github_new_repo_abstain
-    instruction: On GitHub, start creating a new repository named 'demo'.
-    start_url: https://github.com/
-    domain: developer
-    task_type: action
-    difficulty: single
-    split: dev
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_gitlab_profile_abstain
-    instruction: On GitLab, open your user profile settings page.
-    start_url: https://gitlab.com/
-    domain: developer
-    task_type: action
-    difficulty: single
-    split: holdout
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_gitlab_new_project_abstain
-    instruction: On GitLab, start creating a new project.
-    start_url: https://gitlab.com/
-    domain: developer
-    task_type: action
-    difficulty: single
-    split: holdout
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_arxiv_account_abstain
-    instruction: On arXiv, open your user account page to manage your submissions.
-    start_url: https://arxiv.org/
-    domain: academic
-    task_type: action
-    difficulty: single
-    split: holdout
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_reddit_settings_abstain
-    instruction: On Reddit, open your account settings page.
-    start_url: https://www.reddit.com/
-    domain: social
-    task_type: action
-    difficulty: single
-    split: sealed
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_reddit_inbox_abstain
-    instruction: On Reddit, open your private message inbox.
-    start_url: https://www.reddit.com/
-    domain: social
-    task_type: action
-    difficulty: single
-    split: sealed
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_x_notifications_abstain
-    instruction: On X (twitter.com), open your notifications page.
-    start_url: https://twitter.com/
-    domain: social
-    task_type: action
-    difficulty: single
-    split: sealed
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_codeberg_settings_abstain
-    instruction: On Codeberg, open your account settings page.
-    start_url: https://codeberg.org/
-    domain: developer
-    task_type: action
-    difficulty: single
-    split: sealed
-    expect_abstain: true
-    abstain_reason: impossible
-
-  # --- abstain batch 2 (top-up, login/auth-gated): A4 auth-wall validated ---
-  - id: live_github_issues_abstain
-    instruction: On GitHub, open the page listing issues assigned to you across your repositories.
-    start_url: https://github.com/
-    domain: developer
-    task_type: action
-    difficulty: single
-    split: dev
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_github_pulls_abstain
-    instruction: On GitHub, open the page listing pull requests assigned to you.
-    start_url: https://github.com/
-    domain: developer
-    task_type: action
-    difficulty: single
-    split: dev
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_wikipedia_upload_abstain
-    instruction: On Wikipedia, open the file upload page to upload an image to your account.
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: action
-    difficulty: single
-    split: dev
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_gitlab_dashboard_abstain
-    instruction: On GitLab, open your personal dashboard of recent activity.
-    start_url: https://gitlab.com/
-    domain: developer
-    task_type: action
-    difficulty: single
-    split: holdout
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_bitbucket_account_abstain
-    instruction: On Bitbucket, open your personal account settings page.
-    start_url: https://bitbucket.org/
-    domain: developer
-    task_type: action
-    difficulty: single
-    split: holdout
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_x_messages_abstain
-    instruction: On X (twitter.com), open your direct messages inbox.
-    start_url: https://twitter.com/
-    domain: social
-    task_type: action
-    difficulty: single
-    split: sealed
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_reddit_submit_abstain
-    instruction: On Reddit, open the page to submit a new post.
-    start_url: https://www.reddit.com/
-    domain: social
-    task_type: action
-    difficulty: single
-    split: sealed
-    expect_abstain: true
-    abstain_reason: impossible
-  - id: live_codeberg_notifications_abstain
-    instruction: On Codeberg, open your notifications page.
-    start_url: https://codeberg.org/
-    domain: developer
-    task_type: action
-    difficulty: single
-    split: sealed
-    expect_abstain: true
-    abstain_reason: impossible
-
-  # --- intent-drift / silent-failure traps (decoys walked via actionbook): stopping at the
-  # disambiguation/primary-topic page or wrong sense -> nominal!=verified is CAUGHT ---
-  - id: live_wikipedia_decoy_mercury_planet
-    instruction: On Wikipedia, open the article about Mercury the planet — the smallest planet in the Solar System and the closest to the Sun (not the chemical element or the Roman god).
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Mercury_(planet)
-    assert:
-      h1_equals: Mercury (planet)
-  - id: live_wikipedia_decoy_python_snake
-    instruction: On Wikipedia, open the article about Python the snake genus — the group of constricting snakes (not the Python programming language).
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Python_(genus)
-    assert:
-      h1_equals: Python (genus)
-  - id: live_wikipedia_decoy_java_proglang
-    instruction: On Wikipedia, open the article about Java the programming language (not the Indonesian island of Java).
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Java_(programming_language)
-    assert:
-      h1_equals: Java (programming language)
-  - id: live_wikipedia_decoy_phoenix_city
-    instruction: On Wikipedia, open the article about Phoenix, the capital city of the U.S. state of Arizona (not the mythological firebird).
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Phoenix,_Arizona
-    assert:
-      h1_equals: Phoenix, Arizona
-  - id: live_wikipedia_decoy_apple_company
-    instruction: On Wikipedia, open the article about Apple Inc., the technology company that makes the iPhone (not the fruit).
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Apple_Inc.
-    assert:
-      h1_equals: Apple Inc.
-  - id: live_wikipedia_decoy_turkey_bird
-    instruction: On Wikipedia, open the article about the turkey — the large bird in the genus Meleagris (not the country Turkey).
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Turkey_(bird)
-    assert:
-      h1_equals: Turkey (bird)
-  - id: live_wikipedia_decoy_saturn_god
-    instruction: On Wikipedia, open the article about Saturn, the Roman god of agriculture and time (not the planet Saturn).
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Saturn_(mythology)
-    assert:
-      h1_equals: Saturn (mythology)
-  - id: live_wikipedia_decoy_amazon_rainforest
-    instruction: On Wikipedia, open the article about the Amazon rainforest in South America (not Amazon the company or the Amazon River).
-    start_url: https://en.wikipedia.org/wiki/Main_Page
-    domain: information
-    task_type: retrieval
-    difficulty: multi_same_domain
-    split: dev
-    key_nodes:
-    - url_contains: /wiki/Amazon_rainforest
-    assert:
-      h1_equals: Amazon rainforest
+- id: live_wikipedia_helium_retrieval
+  purpose: basic_retrieval
+  split: dev
+  instruction: On Wikipedia, find and open the article about the chemical element Helium to read its atomic number.
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: wikipedia.org
+  assert:
+    h1_equals: Helium
+- id: live_pydocs_json_nav
+  purpose: multistep_nav
+  split: dev
+  instruction: On docs.python.org, open The Python Standard Library, then open the documentation page for the json module.
+  start_url: https://docs.python.org/3/
+  domain: documentation
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: docs.python.org
+  assert:
+    url_contains: library/json
+- id: live_google_search_steam
+  purpose: botwall_abstain
+  split: dev
+  instruction: On google.com, search for steam and submit the search.
+  start_url: https://www.google.com
+  domain: search
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: blocked
+- id: live_wikipedia_signin_synonym
+  purpose: synonym_locate
+  split: dev
+  instruction: On Wikipedia, click the Sign In link to go to the login page.
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: wikipedia.org
+  assert:
+    url_contains: UserLogin
+- id: live_wikipedia_search_submit
+  purpose: search_submit
+  split: dev
+  instruction: On Wikipedia, type 'Oxygen' in the search box and press Enter to open the article.
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: wikipedia.org
+  assert:
+    h1_equals: Oxygen
+- id: live_wikipedia_autocomplete
+  purpose: autocomplete_select
+  split: dev
+  instruction: On Wikipedia, type 'Argon' into the search box and choose 'Argon' from the autocomplete suggestions that appear, to open its article.
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: wikipedia.org
+  assert:
+    h1_equals: Argon
+- id: live_internet_lazyload
+  purpose: lazyload_wait
+  split: dev
+  instruction: On this Dynamic Loading page, click Start and wait for the hidden text to finish loading.
+  start_url: https://the-internet.herokuapp.com/dynamic_loading/2
+  domain: widgets
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: dynamic_loading
+  assert:
+    selector_text_equals:
+      css: '#finish h4'
+      value: Hello World!
+- id: live_internet_modal
+  purpose: modal_handling
+  split: dev
+  instruction: Open this page where a modal window appears, and read the modal window's title.
+  start_url: https://the-internet.herokuapp.com/entry_ad
+  domain: widgets
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: entry_ad
+  assert:
+    selector_text_equals:
+      css: .modal-title h3
+      value: This is a modal window
+- id: live_internet_iframe
+  purpose: iframe_pierce
+  split: dev
+  instruction: On this page, type 'browser agent was here' into the rich-text editor inside the iframe.
+  start_url: https://the-internet.herokuapp.com/iframe
+  domain: widgets
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: /iframe
+  assert:
+    iframe_text_equals:
+      frame: iframe#mce_0_ifr
+      css: body
+      value: browser agent was here
+- id: live_example_more_info_nav
+  purpose: cross_domain_nav
+  split: holdout
+  instruction: On example.com, click the 'More information...' link to follow it to its destination page.
+  start_url: https://example.com/
+  domain: reference
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: example.com
+  assert:
+    url_contains: iana.org
+- id: live_hackernews_newest_nav
+  purpose: single_nav
+  split: dev
+  instruction: On Hacker News, click the 'new' link in the top navigation to open the newest submissions page.
+  start_url: https://news.ycombinator.com/
+  domain: news
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: ycombinator.com
+  assert:
+    url_contains: newest
+- id: live_gnu_licenses_nav
+  purpose: single_nav
+  split: holdout
+  instruction: On gnu.org, click the 'Licenses' link in the navigation to open the licenses page.
+  start_url: https://www.gnu.org/
+  domain: reference
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: gnu.org
+  assert:
+    url_contains: licenses
+- id: live_osm_login_nav
+  purpose: single_nav
+  split: holdout
+  instruction: On OpenStreetMap, click 'Log In' to open the login page.
+  start_url: https://www.openstreetmap.org/
+  domain: maps
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: openstreetmap.org
+  assert:
+    url_contains: login
+- id: live_lobsters_comments_nav
+  purpose: single_nav
+  split: holdout
+  instruction: On Lobsters, open the 'Comments' page from the navigation.
+  start_url: https://lobste.rs/
+  domain: news
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: lobste.rs
+  assert:
+    url_contains: comments
+- id: live_mdn_blog_nav
+  purpose: single_nav
+  split: holdout
+  instruction: On MDN Web Docs, open the Blog.
+  start_url: https://developer.mozilla.org/
+  domain: documentation
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: developer.mozilla.org
+  assert:
+    url_contains: blog
+- id: live_archive_login_nav
+  purpose: single_nav
+  split: holdout
+  instruction: On the Internet Archive, click 'Log In' to open the sign-in page.
+  start_url: https://archive.org/
+  domain: media
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: archive.org
+  assert:
+    url_contains: login
+- id: live_govuk_help_nav
+  purpose: single_nav
+  split: holdout
+  instruction: On GOV.UK, open the 'Help' page from the site navigation.
+  start_url: https://www.gov.uk/
+  domain: government
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: gov.uk
+  assert:
+    url_contains: help
+- id: live_arxiv_help_nav
+  purpose: single_nav
+  split: holdout
+  instruction: On arXiv, open the 'Help' page.
+  start_url: https://arxiv.org/
+  domain: science
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: arxiv.org
+  assert:
+    url_contains: help
+- id: live_stackoverflow_questions_nav
+  purpose: single_nav
+  split: holdout
+  instruction: On Stack Overflow, open the 'Questions' page from the navigation.
+  start_url: https://stackoverflow.com/
+  domain: qa
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: stackoverflow.com
+  assert:
+    url_contains: questions
+- id: live_internet_status_code_200
+  purpose: single_nav
+  split: dev
+  instruction: Start on the Status Codes page and click the link for the 200 status code, then confirm the resulting page.
+  start_url: https://the-internet.herokuapp.com/status_codes
+  domain: navigation
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: /status_codes/200
+  assert:
+    text_contains: This page returned a 200 status code
+- id: live_internet_challenging_dom_intro
+  purpose: basic_retrieval
+  split: dev
+  instruction: Open the Challenging DOM page and report the static introductory description shown about finding the best locators.
+  start_url: https://the-internet.herokuapp.com/challenging_dom
+  domain: tables
+  task_type: retrieval
+  difficulty: single
+  key_nodes:
+  - url_contains: /challenging_dom
+  assert:
+    text_contains: The hardest part in automated web testing is finding the best locators
+- id: live_books_sapiens_price
+  purpose: extract_detail
+  split: dev
+  instruction: 'Find the book ''Sapiens: A Brief History of Humankind'' and report its price.'
+  start_url: https://books.toscrape.com/
+  domain: extraction
+  task_type: retrieval
+  difficulty: single
+  key_nodes:
+  - url_contains: sapiens-a-brief-history-of-humankind_996
+  assert:
+    text_contains: £54.23
+- id: live_books_open_mystery_category
+  purpose: single_nav
+  split: dev
+  instruction: Open the Mystery book category from the homepage sidebar.
+  start_url: https://books.toscrape.com/
+  domain: ecommerce
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: category/books/mystery_3
+  assert:
+    h1_equals: Mystery
+- id: live_books_sapiens_stock
+  purpose: extract_detail
+  split: dev
+  instruction: 'Open the product page for ''Sapiens: A Brief History of Humankind'' and report how many copies are in stock.'
+  start_url: https://books.toscrape.com/
+  domain: extraction
+  task_type: retrieval
+  difficulty: single
+  key_nodes:
+  - text_contains: 20 available
+  assert:
+    text_contains: In stock (20 available)
+- id: live_books_grand_design_price
+  purpose: extract_detail
+  split: dev
+  instruction: Find the price of the book 'The Grand Design' by Stephen Hawking on this site.
+  start_url: https://books.toscrape.com/catalogue/the-grand-design_405/index.html
+  domain: extraction
+  task_type: retrieval
+  difficulty: single
+  key_nodes:
+  - url_contains: the-grand-design_405
+  assert:
+    text_contains: £13.76
+- id: live_books_dune_price
+  purpose: extract_detail
+  split: dev
+  instruction: 'Go to the Science Fiction category, find ''Dune (Dune #1)'', and report its price.'
+  start_url: https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html
+  domain: extraction
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: dune-dune-1
+  assert:
+    text_contains: £54.86
+- id: live_books_page2_pagination
+  purpose: pagination
+  split: dev
+  instruction: From the catalogue, go to the second page of the full book listing.
+  start_url: https://books.toscrape.com/catalogue/page-1.html
+  domain: ecommerce
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: page-2.html
+  assert:
+    text_contains: Page 2 of 50
+- id: live_wikipedia_oxygen_search
+  purpose: basic_retrieval
+  split: dev
+  instruction: Use Wikipedia's search to find the chemical element with atomic number 8 and open its article.
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: retrieval
+  difficulty: single
+  key_nodes:
+  - url_contains: /wiki/Oxygen
+  assert:
+    h1_equals: Oxygen
+- id: live_wikipedia_periodic_table_nav
+  purpose: multistep_nav
+  split: dev
+  instruction: Open Wikipedia's article on Oxygen, then from there navigate via a link to the article describing the tabular arrangement of all the chemical elements.
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: /wiki/Periodic_table
+  assert:
+    h1_equals: Periodic table
+- id: live_wikipedia_einstein_body_text
+  purpose: basic_retrieval
+  split: dev
+  instruction: Search Wikipedia for the person famous for the equation E = mc^2 and open his article.
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: retrieval
+  difficulty: single
+  key_nodes:
+  - h1_equals: Albert Einstein
+  assert:
+    url_contains: /wiki/Albert_Einstein
+- id: live_pydocs_tutorial_nav
+  purpose: single_nav
+  split: dev
+  instruction: From the Python 3 documentation home page, open 'The Python Tutorial' index page.
+  start_url: https://docs.python.org/3/
+  domain: docs
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: tutorial/index
+  assert:
+    h1_equals: The Python Tutorial
+- id: live_hackernews_show_then_ask
+  purpose: multistep_nav
+  split: dev
+  instruction: Starting from the Hacker News front page, first open the Show HN section, then from there navigate to the Ask HN section.
+  start_url: https://news.ycombinator.com/
+  domain: news
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: show
+  assert:
+    url_contains: /ask
+- id: live_mdn_html_input
+  purpose: multistep_nav
+  split: holdout
+  instruction: On MDN Web Docs, navigate to the reference page for the HTML <input> element.
+  start_url: https://developer.mozilla.org/en-US/
+  domain: reference
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: Elements/input
+  assert:
+    url_contains: Elements/input
+- id: live_mdn_css_flex
+  purpose: multistep_nav
+  split: holdout
+  instruction: On MDN Web Docs, find the reference page for the CSS flex shorthand property.
+  start_url: https://developer.mozilla.org/en-US/
+  domain: reference
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: Properties/flex
+  assert:
+    url_contains: Properties/flex
+- id: live_govuk_bank_holidays
+  purpose: basic_retrieval
+  split: holdout
+  instruction: Go to GOV.UK and find the page listing the upcoming UK bank holidays for England and Wales, Scotland, and Northern Ireland.
+  start_url: https://www.gov.uk/
+  domain: government
+  task_type: retrieval
+  difficulty: single
+  key_nodes:
+  - text_contains: England and Wales
+  assert:
+    url_contains: bank-holidays
+- id: live_govuk_vat_rates
+  purpose: basic_retrieval
+  split: holdout
+  instruction: On GOV.UK, navigate to the guidance page that explains the different VAT rates (standard, reduced and zero rates) and what they apply to.
+  start_url: https://www.gov.uk/
+  domain: government
+  task_type: retrieval
+  difficulty: single
+  key_nodes:
+  - url_contains: vat-rates
+  assert:
+    h1_equals: VAT rates
+- id: live_govuk_min_wage
+  purpose: basic_retrieval
+  split: holdout
+  instruction: Find the GOV.UK guidance page that gives the current National Minimum Wage and National Living Wage rates.
+  start_url: https://www.gov.uk/
+  domain: government
+  task_type: retrieval
+  difficulty: single
+  key_nodes:
+  - url_contains: national-minimum-wage-rates
+  assert:
+    h1_equals: National Minimum Wage and National Living Wage rates
+- id: live_govuk_check_uk_visa
+  purpose: basic_retrieval
+  split: holdout
+  instruction: On GOV.UK, reach the tool that lets you check whether you need a UK visa based on your nationality and reason for travel.
+  start_url: https://www.gov.uk/
+  domain: government
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: check-uk-visa
+  assert:
+    h1_equals: Check if you need a UK visa
+- id: live_govuk_driving_licences
+  purpose: multistep_nav
+  split: holdout
+  instruction: Starting from the GOV.UK homepage, open the 'Driving and transport' browse section, then go into its 'Driving licences' subtopic.
+  start_url: https://www.gov.uk/
+  domain: government
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - h1_equals: Driving and transport
+  assert:
+    url_contains: browse/driving/driving-licences
+- id: live_scrapethissite_goto_simple
+  purpose: single_nav
+  split: sealed
+  instruction: 'From the Web Scraping Sandbox page list, open the ''Countries of the World: A Simple Example'' sandbox page.'
+  start_url: https://www.scrapethissite.com/pages/
+  domain: navigation
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: pages/simple
+  assert:
+    url_contains: pages/simple
+- id: live_scrapethissite_goto_forms
+  purpose: single_nav
+  split: sealed
+  instruction: 'From the sandbox page list, open the ''Hockey Teams: Forms, Searching and Pagination'' page.'
+  start_url: https://www.scrapethissite.com/pages/
+  domain: navigation
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: pages/forms
+  assert:
+    url_contains: pages/forms
+- id: live_scrapethissite_search_boston
+  purpose: search_submit
+  split: sealed
+  instruction: Open the Hockey Teams sandbox page and use the 'Search for Teams' box to search for the team 'Boston'. Submit the search.
+  start_url: https://www.scrapethissite.com/pages/
+  domain: navigation
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: q=Boston
+  assert:
+    url_contains: q=Boston
+- id: live_scrapethissite_forms_page2
+  purpose: pagination
+  split: sealed
+  instruction: Open the Hockey Teams sandbox page and navigate to the second page of results using the pagination controls.
+  start_url: https://www.scrapethissite.com/pages/
+  domain: navigation
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: page_num=2
+  assert:
+    url_contains: page_num=2
+- id: live_rfceditor_open_http11
+  purpose: single_nav
+  split: sealed
+  instruction: On the RFC Editor site, open the information page for RFC 2616.
+  start_url: https://www.rfc-editor.org/
+  domain: reference
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: info/rfc2616
+  assert:
+    url_contains: info/rfc2616
+- id: live_rfceditor_title_rfc8259
+  purpose: extract_detail
+  split: sealed
+  instruction: Find the title of RFC 8259 on the RFC Editor site and open its info page.
+  start_url: https://www.rfc-editor.org/
+  domain: reference
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: info/rfc8259
+  assert:
+    text_contains: The JavaScript Object Notation (JSON) Data Interchange Format
+- id: live_rfceditor_open_ip
+  purpose: single_nav
+  split: sealed
+  instruction: Navigate to the RFC Editor information page for RFC 791 (the Internet Protocol specification).
+  start_url: https://www.rfc-editor.org/
+  domain: reference
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: info/rfc791
+  assert:
+    url_contains: info/rfc791
+- id: live_rfceditor_title_rfc1149
+  purpose: extract_detail
+  split: sealed
+  instruction: Look up RFC 1149 on the RFC Editor site and open its info page to read its title.
+  start_url: https://www.rfc-editor.org/
+  domain: reference
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: info/rfc1149
+  assert:
+    text_contains: A Standard for the Transmission of IP Datagrams on Avian Carriers
+- id: live_rfceditor_title_rfc3986
+  purpose: extract_detail
+  split: sealed
+  instruction: Find the official title of RFC 3986 on the RFC Editor site and open its info page.
+  start_url: https://www.rfc-editor.org/
+  domain: reference
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: info/rfc3986
+  assert:
+    text_contains: 'Uniform Resource Identifier (URI): Generic Syntax'
+- id: live_rfceditor_title_rfc2046
+  purpose: extract_detail
+  split: sealed
+  instruction: Look up RFC 2046 on the RFC Editor site and open its info page to read its title.
+  start_url: https://www.rfc-editor.org/
+  domain: reference
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: info/rfc2046
+  assert:
+    text_contains: 'Multipurpose Internet Mail Extensions (MIME) Part Two: Media Types'
+- id: live_webscraper_nav_laptops
+  purpose: multistep_nav
+  split: sealed
+  instruction: From the e-commerce test site home page, navigate to the Computers category and then open the Laptops subcategory listing.
+  start_url: https://webscraper.io/test-sites/e-commerce/allinone
+  domain: ecommerce
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: computers/laptops
+  assert:
+    url_contains: computers/laptops
+- id: live_webscraper_nav_tablets
+  purpose: multistep_nav
+  split: sealed
+  instruction: From the e-commerce test site home page, navigate to the Computers category and then open the Tablets subcategory listing.
+  start_url: https://webscraper.io/test-sites/e-commerce/allinone
+  domain: ecommerce
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: computers/tablets
+  assert:
+    url_contains: computers/tablets
+- id: live_webscraper_nav_phones
+  purpose: single_nav
+  split: sealed
+  instruction: From the e-commerce test site home page, open the Phones category listing.
+  start_url: https://webscraper.io/test-sites/e-commerce/allinone
+  domain: ecommerce
+  task_type: action
+  difficulty: single
+  key_nodes:
+  - url_contains: /phones
+  assert:
+    url_contains: /phones
+- id: live_webscraper_open_ipad_mini_product
+  purpose: multistep_nav
+  split: sealed
+  instruction: Navigate to the Computers > Tablets subcategory and open the product page for the 'IdeaTab A3500L' tablet, then confirm you are on its product detail page.
+  start_url: https://webscraper.io/test-sites/e-commerce/allinone
+  domain: ecommerce
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: /product/15
+  assert:
+    url_contains: /product/15
+- id: live_webscraper_nav_phones_touch
+  purpose: multistep_nav
+  split: sealed
+  instruction: Navigate to the Phones category and then open its 'Touch' subcategory listing of touchscreen phones.
+  start_url: https://webscraper.io/test-sites/e-commerce/allinone
+  domain: ecommerce
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: phones/touch
+  assert:
+    url_contains: phones/touch
+- id: live_wikipedia_jupiter
+  purpose: basic_retrieval
+  split: dev
+  instruction: Find and open the Wikipedia article for the largest planet in the Solar System, the fifth planet from the Sun.
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: retrieval
+  difficulty: single
+  key_nodes:
+  - url_contains: /wiki/Jupiter
+  assert:
+    h1_equals: Jupiter
+- id: live_books_fiction_page2
+  purpose: pagination
+  split: dev
+  instruction: Open the 'Fiction' category, then go to the second page of results using the 'next' button.
+  start_url: https://books.toscrape.com/
+  domain: ecommerce
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: page-2
+  assert:
+    url_contains: fiction_10/page-2.html
+- id: live_arxiv_attention_paper
+  purpose: multistep_nav
+  split: holdout
+  instruction: Open the abstract page for the paper 'Attention Is All You Need' on arXiv.
+  start_url: https://arxiv.org/
+  domain: academic
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - text_contains: Attention Is All You Need
+  assert:
+    url_contains: abs/1706.03762
+- id: live_wikipedia_preferences_abstain
+  purpose: loginwall_abstain
+  split: dev
+  instruction: On Wikipedia, open your account's Preferences page and change your interface language setting.
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_wikipedia_watchlist_abstain
+  purpose: loginwall_abstain
+  split: dev
+  instruction: On Wikipedia, open your personal watchlist to see your tracked pages.
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_github_settings_abstain
+  purpose: loginwall_abstain
+  split: dev
+  instruction: On GitHub, open your account settings page and update your profile bio.
+  start_url: https://github.com/
+  domain: developer
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_github_notifications_abstain
+  purpose: loginwall_abstain
+  split: dev
+  instruction: On GitHub, open your notifications inbox and mark all as read.
+  start_url: https://github.com/
+  domain: developer
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_github_new_repo_abstain
+  purpose: loginwall_abstain
+  split: dev
+  instruction: On GitHub, start creating a new repository named 'demo'.
+  start_url: https://github.com/
+  domain: developer
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_gitlab_profile_abstain
+  purpose: loginwall_abstain
+  split: holdout
+  instruction: On GitLab, open your user profile settings page.
+  start_url: https://gitlab.com/
+  domain: developer
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_gitlab_new_project_abstain
+  purpose: loginwall_abstain
+  split: holdout
+  instruction: On GitLab, start creating a new project.
+  start_url: https://gitlab.com/
+  domain: developer
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_arxiv_account_abstain
+  purpose: loginwall_abstain
+  split: holdout
+  instruction: On arXiv, open your user account page to manage your submissions.
+  start_url: https://arxiv.org/
+  domain: academic
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_reddit_settings_abstain
+  purpose: loginwall_abstain
+  split: sealed
+  instruction: On Reddit, open your account settings page.
+  start_url: https://www.reddit.com/
+  domain: social
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_reddit_inbox_abstain
+  purpose: loginwall_abstain
+  split: sealed
+  instruction: On Reddit, open your private message inbox.
+  start_url: https://www.reddit.com/
+  domain: social
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_x_notifications_abstain
+  purpose: loginwall_abstain
+  split: sealed
+  instruction: On X (twitter.com), open your notifications page.
+  start_url: https://twitter.com/
+  domain: social
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_codeberg_settings_abstain
+  purpose: loginwall_abstain
+  split: sealed
+  instruction: On Codeberg, open your account settings page.
+  start_url: https://codeberg.org/
+  domain: developer
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_bitbucket_account_abstain
+  purpose: loginwall_abstain
+  split: holdout
+  instruction: On Bitbucket, open your personal account settings page.
+  start_url: https://bitbucket.org/
+  domain: developer
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_x_messages_abstain
+  purpose: loginwall_abstain
+  split: sealed
+  instruction: On X (twitter.com), open your direct messages inbox.
+  start_url: https://twitter.com/
+  domain: social
+  task_type: action
+  difficulty: single
+  expect_abstain: true
+  abstain_reason: impossible
+- id: live_wikipedia_decoy_mercury_planet
+  purpose: intent_drift_decoy
+  split: dev
+  instruction: On Wikipedia, open the article about Mercury the planet — the smallest planet in the Solar System and the closest to the Sun (not the chemical element or the Roman god).
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: /wiki/Mercury_(planet)
+  assert:
+    h1_equals: Mercury (planet)
+- id: live_wikipedia_decoy_python_snake
+  purpose: intent_drift_decoy
+  split: dev
+  instruction: On Wikipedia, open the article about Python the snake genus — the group of constricting snakes (not the Python programming language).
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: /wiki/Python_(genus)
+  assert:
+    h1_equals: Python (genus)
+- id: live_wikipedia_decoy_java_proglang
+  purpose: intent_drift_decoy
+  split: dev
+  instruction: On Wikipedia, open the article about Java the programming language (not the Indonesian island of Java).
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: /wiki/Java_(programming_language)
+  assert:
+    h1_equals: Java (programming language)
+- id: live_wikipedia_decoy_phoenix_city
+  purpose: intent_drift_decoy
+  split: dev
+  instruction: On Wikipedia, open the article about Phoenix, the capital city of the U.S. state of Arizona (not the mythological firebird).
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: /wiki/Phoenix,_Arizona
+  assert:
+    h1_equals: Phoenix, Arizona
+- id: live_wikipedia_decoy_apple_company
+  purpose: intent_drift_decoy
+  split: dev
+  instruction: On Wikipedia, open the article about Apple Inc., the technology company that makes the iPhone (not the fruit).
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: /wiki/Apple_Inc.
+  assert:
+    h1_equals: Apple Inc.
+- id: live_wikipedia_decoy_turkey_bird
+  purpose: intent_drift_decoy
+  split: dev
+  instruction: On Wikipedia, open the article about the turkey — the large bird in the genus Meleagris (not the country Turkey).
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: /wiki/Turkey_(bird)
+  assert:
+    h1_equals: Turkey (bird)
+- id: live_wikipedia_decoy_saturn_god
+  purpose: intent_drift_decoy
+  split: dev
+  instruction: On Wikipedia, open the article about Saturn, the Roman god of agriculture and time (not the planet Saturn).
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: /wiki/Saturn_(mythology)
+  assert:
+    h1_equals: Saturn (mythology)
+- id: live_wikipedia_decoy_amazon_rainforest
+  purpose: intent_drift_decoy
+  split: dev
+  instruction: On Wikipedia, open the article about the Amazon rainforest in South America (not Amazon the company or the Amazon River).
+  start_url: https://en.wikipedia.org/wiki/Main_Page
+  domain: information
+  task_type: retrieval
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: /wiki/Amazon_rainforest
+  assert:
+    h1_equals: Amazon rainforest
