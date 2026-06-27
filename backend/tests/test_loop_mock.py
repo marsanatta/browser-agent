@@ -38,7 +38,10 @@ async def test_executor_runs_navigate_then_click():
 
     finished = payloads[-1]
     assert finished["nominal_completion"] is True
-    assert finished["verified_completion"] is True
+    # No verify_hook supplied -> NO independent goal check ran: the run is
+    # self-report only, never falsely reported as "verified".
+    assert finished["goal_checked"] is False
+    assert finished["verified_completion"] is None
 
 
 @pytest.mark.live

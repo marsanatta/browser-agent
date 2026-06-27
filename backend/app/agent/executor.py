@@ -194,7 +194,8 @@ class Executor:
             # close (architecture/02 §1.6, eval/01 §4): never trust the agent's
             # self-report. verified diverges from nominal exactly when the agent
             # claims success but the state assertion fails — the CuP silent-failure
-            # signal. Hook absent -> verified mirrors nominal (unchanged M1 behavior).
+            # signal. Hook absent -> NO goal check ran: verified stays None and the
+            # run is reported as self-report only, never as "verified".
             if self._verify_hook is not None:
                 try:
                     verified = await self._verify_hook(page)
@@ -207,7 +208,8 @@ class Executor:
         yield events.run_finished(
             run_id,
             nominal=all_ok,
-            verified=all_ok if verified is None else verified,
+            verified=verified,
+            goal_checked=self._verify_hook is not None,
             tokens=getattr(self._gateway, "tokens", {}) or {},
         )
 

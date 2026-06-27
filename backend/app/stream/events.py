@@ -176,14 +176,23 @@ def recovery(
 
 
 def run_finished(
-    run_id: str, nominal: bool, verified: bool, tokens: dict[str, int] | None = None
+    run_id: str,
+    nominal: bool,
+    verified: bool | None,
+    goal_checked: bool = False,
+    tokens: dict[str, int] | None = None,
 ) -> Event:
+    """`goal_checked` is True only when an independent deterministic state check
+    actually ran on the live final page; then `verified_completion` is its real
+    verdict. When False (no success criterion supplied) `verified_completion` is
+    None — the run is self-report only and must NOT be shown as "verified"."""
     return Event(
         EventType.RUN_FINISHED,
         {
             "run_id": run_id,
             "nominal_completion": nominal,
             "verified_completion": verified,
+            "goal_checked": goal_checked,
             "tokens": tokens or {},
         },
     )

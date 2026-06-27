@@ -72,15 +72,18 @@ the honest cost statement is "flat subscription + a per-task request budget of
 
 ## 4. Correctness verification
 
-The differentiator is that **success is never the agent's self-report** — it is an
-**independent programmatic assertion on the live page**.
+The differentiator is that success is graded by an **independent programmatic
+assertion on the live page**, never the agent's self-report — in the **eval harness
+always** (every task ships a hand-written assertion), and in **production whenever
+the caller supplies a success criterion** (see *Production verification* below).
 
-- **Independent ground truth.** `eval/verify/state.py::state_check` re-derives
-  success by inspecting the actual DOM/URL the agent left behind
-  (`url_contains`, `text_contains`, `h1_equals`, `selector_text_equals`). This is
-  *not* self-consistency: the assertion is authored in the eval data, evaluated by
-  separate code, and does not read the agent's claimed output. "An agent cannot
-  pass by lying."
+- **Independent ground truth.** `app/verify/state.py::state_check` (the shipped
+  arbiter, re-exported by `eval/verify/state.py` so harness and production share ONE
+  implementation) re-derives success by inspecting the actual DOM/URL the agent left
+  behind (`url_contains`, `text_contains`, `h1_equals`, `selector_text_equals`). This
+  is *not* self-consistency: the assertion is authored separately (eval data, or the
+  user's criterion), evaluated by separate code, and does not read the agent's claimed
+  output. "An agent cannot pass by lying."
 - **Nominal vs verified (CuP) is the headline silent-failure metric.**
   `eval/scoring.py::silent_failure_gap` counts tasks where the agent claimed
   success (`nominal`) but the independent assertion failed (`verified=False`).
@@ -110,6 +113,19 @@ The differentiator is that **success is never the agent's self-report** — it i
   (sampling approximation of SEP); it is unit-tested but the harness does NOT
   invoke it on these tasks. The hidden-state probe needs logits the Copilot gateway
   does not expose and is an explicit seam in `eval/verify/seams.py`.
+
+**Production verification (`/agent/run`).** The deployed app applies the SAME
+`state_check` arbiter, but only when the user supplies a success criterion (a
+`url_contains` / `h1_equals` / `selector_text_equals` assertion, validated to exclude
+a loose `text_contains`). With a criterion, `verified` is that independent check on
+the live final page, and a silent failure shows as `verified=false` even when the
+agent claims success. **Without a criterion there is no goal to assert against, so no
+independent check runs:** the run is reported as **self-report only** ("actions
+completed — not goal-verified"), never as "verified". The UI badge reflects exactly
+which of three states a run is in — **goal-verified**, **not-goal-verified**, or
+**failed** — so "verified ✓" appears only when the deterministic check actually ran on
+the page. We do **not** claim a blanket production "verified" guarantee; that honest
+distinction is the point.
 
 **Honesty note on statistical power.** n = 12 is far below the ~1,000 items needed
 to detect a 3% delta at 80% power (DESIGN §7; `eval/REPORT.md` caveats). These

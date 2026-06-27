@@ -31,11 +31,31 @@ const en = {
     runError: "Run error: {{error}}",
     connectionLost: "connection lost — your access session may have expired",
     running: "Running…",
+    state: {
+      verified: "Goal-verified ✓",
+      unverified: "Actions completed — not goal-verified",
+      silent: "Failed — claimed success, goal check disagreed",
+      failed: "Failed",
+    },
     nominal: "Nominal",
     verified: "Verified",
+    goalCheck: "Goal check",
+    notProvided: "not provided (self-report only)",
     complete: "complete",
     incomplete: "incomplete",
     silentFlag: "⚠ silent failure (nominal ≠ verified)",
+  },
+  criterion: {
+    heading: "Success criterion (optional) — independent goal check on the final page",
+    check: "check",
+    none: "— none (self-report only) —",
+    urlContains: "URL contains",
+    h1Equals: "Page H1 equals",
+    selectorTextEquals: "Element text equals",
+    css: "CSS selector",
+    cssPlaceholder: "e.g. #cart .count",
+    value: "expected value",
+    valuePlaceholder: "expected text / substring",
   },
   tokens: {
     label: "tokens",
@@ -108,6 +128,10 @@ const en = {
     nominal: "What the agent itself claims it did — its own report, before any independent check.",
     verified:
       "Whether the task actually succeeded when we re-checked the page — not just what the agent claimed.",
+    goalCheck:
+      "No success criterion was given, so the page was not independently checked — this result is the agent's own report only, not a verified pass.",
+    criterion:
+      "Optional. Give a checkable success condition (a URL substring, the page H1, or a specific element's text) and the result is independently re-checked on the final page. Leave it blank and the run is reported as self-report only, never as “verified.”",
     silent: "The agent reported success, but the page check disagreed — a hidden failure.",
     tokens:
       "How much work the language model did for this run. More tokens means more reading and writing, which costs more.",
@@ -152,11 +176,31 @@ const zhHant = {
     runError: "執行錯誤：{{error}}",
     connectionLost: "連線中斷——你的存取工作階段可能已過期",
     running: "執行中…",
+    state: {
+      verified: "目標已驗證 ✓",
+      unverified: "動作已完成——未經目標驗證",
+      silent: "失敗——宣稱成功，但目標檢查不一致",
+      failed: "失敗",
+    },
     nominal: "宣稱結果",
     verified: "驗證結果",
+    goalCheck: "目標檢查",
+    notProvided: "未提供（僅 agent 自我回報）",
     complete: "已完成",
     incomplete: "未完成",
     silentFlag: "⚠ 隱性失敗（宣稱 ≠ 驗證）",
+  },
+  criterion: {
+    heading: "成功條件（選填）——在最終頁面上做獨立的目標檢查",
+    check: "檢查方式",
+    none: "— 無（僅自我回報）—",
+    urlContains: "URL 包含",
+    h1Equals: "頁面 H1 等於",
+    selectorTextEquals: "元素文字等於",
+    css: "CSS selector",
+    cssPlaceholder: "例如 #cart .count",
+    value: "預期值",
+    valuePlaceholder: "預期文字／子字串",
   },
   tokens: {
     label: "tokens",
@@ -227,6 +271,10 @@ const zhHant = {
       "需要登入、兩步驟驗證或 CAPTCHA 的網站，會被回報為「不支援」，而不是想辦法繞過——agent 絕不會試圖破解這些防護。",
     nominal: "agent 自己宣稱完成了什麼——它的自我回報，尚未經過任何獨立檢查。",
     verified: "重新檢查網頁後，任務是否真的完成——而非只是 agent 自己宣稱完成。",
+    goalCheck:
+      "因為沒有提供成功條件，所以沒有對頁面做獨立檢查——這個結果只是 agent 的自我回報，並非已驗證的成功。",
+    criterion:
+      "選填。給一個可檢查的成功條件（URL 子字串、頁面 H1，或某個元素的文字），結果就會在最終頁面上被獨立重新檢查。留空的話，本次執行只會以「自我回報」呈現，絕不會標示為「已驗證」。",
     silent: "agent 回報成功，但網頁檢查結果不一致——這是一個被掩蓋的失敗。",
     tokens:
       "本次執行中語言模型做了多少工作。token 越多代表讀寫越多，成本也越高。",

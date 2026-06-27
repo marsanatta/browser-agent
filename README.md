@@ -11,7 +11,8 @@ ladder. Eval (M3): self-built eval set + scoring harness (key-node TCR/TSR, pass
 nominal-vs-verified silent-failure gap, budget-matched baseline) — see [Eval](#eval-m3).
 Frontend/deploy (M4): React frontend with a live step timeline and an
 **inspectable-failure view** (per step: annotated screenshot, chosen locator tier,
-`failure_category`, recovery/retry chain, nominal-vs-verified verdict), per-step screenshot
+`failure_category`, recovery/retry chain, and an honest run verdict — goal-verified /
+not-goal-verified / failed), per-step screenshot
 capture served out-of-band, and a desktop self-host + Cloudflare quick-tunnel deploy. Docs
 + honest disclosures (M5): this README, `ANALYSIS.md`, `UNSUPPORTED_SITES.md`. `/agent/run`
 streams real step events; `/sse/stream` is the M0 placeholder. The deterministic core needs
@@ -49,6 +50,16 @@ making **nominal-vs-verified completion (CuP) the headline eval metric** (DESIGN
 **not** claim to eliminate false success. The eval harness grades success by independent
 programmatic assertions on the live page, never the agent's self-report, precisely so silent
 failures are measurable rather than hidden.
+
+**In production (`/agent/run`) verification is opt-in and honest about it.** The same
+deterministic `state_check` runs **only when you supply a success criterion** (a
+`url_contains` / `h1_equals` / element-text assertion — never a loose body-text match).
+With one, **"verified ✓" means that independent check actually passed on the final page**,
+and a silent failure surfaces as `verified=false` even when the agent claims success.
+Without one there is nothing to assert against, so no check runs and the run is shown as
+**"actions completed — not goal-verified" (self-report only)** — deliberately distinct from a
+verified pass. The eval harness always verifies (every task ships a hand-written assertion);
+production verifies on demand. We do **not** sell "verified" as a blanket production guarantee.
 
 **Concrete honest example (a real FAIL in `eval/REPORT.md`):** `books_open_light_in_attic`
 gives a *truncated* title (`"A Light in the ..."`) and asserts the exact `h1`

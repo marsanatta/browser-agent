@@ -54,6 +54,7 @@ function reduce(state, ev) {
         status: "finished",
         nominal: payload.nominal_completion,
         verified: payload.verified_completion,
+        goalChecked: payload.goal_checked,
         tokens: payload.tokens,
       },
     };
@@ -99,6 +100,17 @@ function reduce(state, ev) {
     default:
       return state;
   }
+}
+
+function buildCriterion(type, value, css) {
+  // Assemble the optional success criterion into the state_check shape the backend
+  // allows (url_contains / h1_equals / selector_text_equals — never loose text).
+  if (!type || !value.trim()) return null;
+  if (type === "selector_text_equals") {
+    if (!css.trim()) return null;
+    return { selector_text_equals: { css: css.trim(), value } };
+  }
+  return { [type]: value };
 }
 
 function describePlanned(a) {
@@ -181,6 +193,9 @@ export default function App() {
   const [modelSel, setModelSel] = useState(null); // current per-role model selection
   const [effortSel, setEffortSel] = useState(null); // current per-role thinking level
   const [maxReplans, setMaxReplans] = useState(5); // bounded global replans before abstain
+  const [critType, setCritType] = useState(""); // optional success criterion (independent goal check)
+  const [critValue, setCritValue] = useState("");
+  const [critCss, setCritCss] = useState("");
   const [state, dispatch] = useReducer(reduce, initialState);
   const sourceRef = useRef(null);
 
@@ -249,6 +264,8 @@ export default function App() {
       params.set("think_replanner", effortSel.replanner);
     }
     params.set("max_replans", String(maxReplans));
+    const criterion = buildCriterion(critType, critValue, critCss);
+    if (criterion) params.set("criterion", JSON.stringify(criterion));
     const es = new EventSource(`${BACKEND}/agent/run?${params.toString()}`, { withCredentials: true });
     sourceRef.current = es;
 
@@ -348,6 +365,48 @@ export default function App() {
           </span>
         )}
       </form>
+
+      <details className="criterion">
+        <summary>
+          {t("criterion.heading")}
+          <Hint k="criterion" />
+        </summary>
+        <div className="criterion-grid">
+          <label className="field">
+            <span>{t("criterion.check")}</span>
+            <select value={critType} onChange={(e) => setCritType(e.target.value)}>
+              <option value="">{t("criterion.none")}</option>
+              <option value="url_contains">{t("criterion.urlContains")}</option>
+              <option value="h1_equals">{t("criterion.h1Equals")}</option>
+              <option value="selector_text_equals">{t("criterion.selectorTextEquals")}</option>
+            </select>
+          </label>
+          {critType === "selector_text_equals" && (
+            <label className="field">
+              <span>{t("criterion.css")}</span>
+              <input
+                value={critCss}
+                onChange={(e) => setCritCss(e.target.value)}
+                placeholder={t("criterion.cssPlaceholder")}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+          )}
+          {critType && (
+            <label className="field">
+              <span>{t("criterion.value")}</span>
+              <input
+                value={critValue}
+                onChange={(e) => setCritValue(e.target.value)}
+                placeholder={t("criterion.valuePlaceholder")}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+          )}
+        </div>
+      </details>
 
       {models && modelSel && effortSel && (
         <details className="models">
@@ -533,6 +592,17 @@ function PlanView({ plan }) {
   );
 }
 
+const VERDICT_CLASS = { verified: "ok", unverified: "unverified", silent: "silent", failed: "fail" };
+
+function runVerdictState(run) {
+  // Three honest states. The word "verified" is earned ONLY when an independent
+  // goal check actually ran (run.goalChecked). Without one, a nominal pass is
+  // self-report only — never shown as verified.
+  if (!run.goalChecked) return run.nominal ? "unverified" : "failed";
+  if (run.verified) return "verified";
+  return run.nominal ? "silent" : "failed"; // claimed success, goal check disagreed
+}
+
 function RunVerdict({ run }) {
   const { t } = useTranslation();
   if (run.status === "error") {
@@ -541,19 +611,27 @@ function RunVerdict({ run }) {
   if (run.status !== "finished") {
     return <div className="verdict running">{t("verdict.running")}</div>;
   }
-  const silent = run.nominal && !run.verified;
+  const verdict = runVerdictState(run);
   return (
     <>
-      <div className={`verdict ${silent ? "silent" : run.verified ? "ok" : "fail"}`}>
+      <div className={`verdict ${VERDICT_CLASS[verdict]}`}>
+        <span className="verdict-headline">{t(`verdict.state.${verdict}`)}</span>
         <span>
           {t("verdict.nominal")}
           <Hint k="nominal" />: <strong>{run.nominal ? t("verdict.complete") : t("verdict.incomplete")}</strong>
         </span>
-        <span>
-          {t("verdict.verified")}
-          <Hint k="verified" />: <strong>{run.verified ? t("verdict.complete") : t("verdict.incomplete")}</strong>
-        </span>
-        {silent && (
+        {run.goalChecked ? (
+          <span>
+            {t("verdict.verified")}
+            <Hint k="verified" />: <strong>{run.verified ? t("verdict.complete") : t("verdict.incomplete")}</strong>
+          </span>
+        ) : (
+          <span className="muted">
+            {t("verdict.goalCheck")}
+            <Hint k="goalCheck" />: <strong>{t("verdict.notProvided")}</strong>
+          </span>
+        )}
+        {verdict === "silent" && (
           <span className="flag">
             {t("verdict.silentFlag")}
             <Hint k="silent" />

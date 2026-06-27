@@ -8,6 +8,7 @@ All payloads serialize through `redact()` inside `Event.to_sse()`.
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -19,7 +20,7 @@ from pydantic import BaseModel
 from starlette.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
-from app.agent.executor import Executor
+from app.agent.executor import Executor, VerifyHook
 from app.agent.models import (
     EFFORT_DEFAULTS,
     ROLE_DEFAULTS,
@@ -34,6 +35,7 @@ from app.browser.provider import PlaywrightProvider
 from app.obs.tracing import init_observability
 from app.security import TokenAuthMiddleware, is_configured, issue_cookie, valid
 from app.stream import events, screenshots
+from app.verify.state import state_check
 
 
 @asynccontextmanager
@@ -88,7 +90,8 @@ def _placeholder_run(task: str):
         step_id = f"{run_id}-s{i}"
         yield events.step_started(step_id, desc)
         yield events.step_finished(step_id, "ok")
-    yield events.run_finished(run_id, nominal=True, verified=True)
+    # Placeholder demo: no real page, so no independent goal check ran.
+    yield events.run_finished(run_id, nominal=True, verified=None, goal_checked=False)
 
 
 @app.get("/sse/stream")
@@ -156,6 +159,50 @@ async def models() -> dict:
     }
 
 
+_ALLOWED_CRITERION_KEYS = {"url_contains", "h1_equals", "selector_text_equals"}
+
+
+def _parse_criterion(criterion: str | None) -> dict | None:
+    """Parse + validate the optional user success criterion into the dict shape
+    state_check understands. Restricted to deterministic, scoped primitives — a
+    loose body-text `text_contains` (or any unknown key) is REJECTED so a supplied
+    criterion can never weaken into a check that passes by accident. Returns None
+    when no criterion is given; raises 400 on a malformed/disallowed one."""
+    if criterion is None or not criterion.strip():
+        return None
+    try:
+        parsed = json.loads(criterion)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="criterion must be valid JSON")
+    if not isinstance(parsed, dict) or not parsed:
+        raise HTTPException(status_code=400, detail="criterion must be a non-empty object")
+    bad = set(parsed) - _ALLOWED_CRITERION_KEYS
+    if bad:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unsupported criterion key(s) {sorted(bad)}; allowed: {sorted(_ALLOWED_CRITERION_KEYS)}",
+        )
+    if "selector_text_equals" in parsed:
+        spec = parsed["selector_text_equals"]
+        if not (isinstance(spec, dict) and isinstance(spec.get("css"), str) and "value" in spec):
+            raise HTTPException(status_code=400, detail="selector_text_equals requires {css, value}")
+    return parsed
+
+
+def _make_verify_hook(criterion: dict) -> VerifyHook:
+    """Wrap the validated criterion as a verify_hook that runs the SAME independent
+    deterministic state_check the eval harness uses (eval/harness.py), on the live
+    final page. A page-level error verifies as False (honest non-verification)."""
+
+    async def verify_hook(page):
+        try:
+            return await state_check(page, criterion)
+        except Exception:
+            return False
+
+    return verify_hook
+
+
 def _build_executor(
     url: str | None,
     *,
@@ -166,6 +213,7 @@ def _build_executor(
     exec_effort: str,
     replanner_effort: str,
     max_replans: int = 5,
+    verify_hook: VerifyHook | None = None,
 ) -> Executor:
     gateway = LLMGateway(
         workhorse_model=exec_model,
@@ -178,8 +226,12 @@ def _build_executor(
         planner = _StartUrlPlanner(planner, url)
     # peek-plan is the default (autoresearch KEEP: more verified, net cheaper, M3->0).
     # It activates only when a start URL is given (something to peek); else blind.
+    # verify_hook is set only when the caller supplies a success criterion: with it,
+    # `verified` is a real independent state_check; without it the run is self-report
+    # only (verified=None) — never falsely shown as "verified".
     return Executor(PlaywrightProvider(headless=True), planner, gateway=gateway,
-                    peek_plan=True, start_url=url, max_replans=max_replans)
+                    peek_plan=True, start_url=url, max_replans=max_replans,
+                    verify_hook=verify_hook)
 
 
 @app.get("/agent/run")
@@ -193,13 +245,20 @@ async def agent_run(
     think_exec: str | None = None,
     think_replanner: str | None = None,
     max_replans: int = 5,
+    criterion: str | None = None,
 ):
     """Drive the real M1 loop. The planner lazy-connects to Copilot on first use;
     without a live Copilot server it emits a RUN_ERROR event (the stream still
     opens — no auth needed to reach this endpoint). An optional `url` seeds a
     navigate sub-task so the run starts from the user-provided page. Per-role model
     and thinking-level overrides are validated (MODEL_MENU / THINKING_LEVELS) and
-    fall back to the role default when unknown."""
+    fall back to the role default when unknown. An optional `criterion` (JSON in the
+    state_check shape) turns on independent goal-verification on the live final page;
+    without it the run is reported as self-report only, never as "verified"."""
+    verify_hook = None
+    parsed_criterion = _parse_criterion(criterion)  # raises 400 on malformed/disallowed
+    if parsed_criterion is not None:
+        verify_hook = _make_verify_hook(parsed_criterion)
     menu = await _model_menu()
     executor = _build_executor(
         url,
@@ -210,6 +269,7 @@ async def agent_run(
         exec_effort=resolve_effort(think_exec, "exec"),
         replanner_effort=resolve_effort(think_replanner, "replanner"),
         max_replans=max(0, min(int(max_replans), 10)),  # clamp to a sane range
+        verify_hook=verify_hook,
     )
 
     async def gen():
