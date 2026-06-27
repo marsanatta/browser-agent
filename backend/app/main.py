@@ -224,7 +224,7 @@ def _build_executor(
     plan_effort: str,
     exec_effort: str,
     replanner_effort: str,
-    max_replans: int = 5,
+    max_replans: int = 10,
     verify_hook: VerifyHook | None = None,
 ) -> Executor:
     gateway = LLMGateway(
@@ -259,7 +259,7 @@ async def agent_run(
     think_plan: str | None = None,
     think_exec: str | None = None,
     think_replanner: str | None = None,
-    max_replans: int = 5,
+    max_replans: int = 10,
     criterion: str | None = None,
 ):
     """Drive the real M1 loop. The planner lazy-connects to Copilot on first use;

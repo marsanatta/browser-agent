@@ -202,7 +202,7 @@ export default function App() {
   const [models, setModels] = useState(null); // { menu, defaults, thinking_levels, thinking_defaults }
   const [modelSel, setModelSel] = useState(null); // current per-role model selection
   const [effortSel, setEffortSel] = useState(null); // current per-role thinking level
-  const [maxReplans, setMaxReplans] = useState(5); // bounded global replans before abstain
+  const [maxReplans, setMaxReplans] = useState(10); // bounded global replans before abstain
   const [critType, setCritType] = useState(""); // optional success criterion (independent goal check)
   const [critValue, setCritValue] = useState("");
   const [critCss, setCritCss] = useState("");
@@ -380,10 +380,18 @@ export default function App() {
             {t("runbar.task")}
             <Hint k="task" />
           </span>
-          <input
+          <textarea
             value={task}
             onChange={(e) => setTask(e.target.value)}
+            onKeyDown={(e) => {
+              // textarea Enter inserts a newline; keep a keyboard submit path
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                start();
+              }
+            }}
             placeholder={t("runbar.taskPlaceholder")}
+            rows={3}
             autoComplete="off"
             spellCheck={false}
           />

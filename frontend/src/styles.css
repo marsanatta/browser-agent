@@ -28,7 +28,8 @@ body {
 }
 
 button,
-input {
+input,
+textarea {
   font: inherit;
   color: inherit;
 }
@@ -82,7 +83,8 @@ input {
   color: var(--muted);
 }
 
-.field input {
+.field input,
+.field textarea {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -90,11 +92,19 @@ input {
   width: 100%;
 }
 
-.field input:hover {
+.field textarea {
+  resize: vertical;
+  min-height: 44px;
+  line-height: 1.4;
+}
+
+.field input:hover,
+.field textarea:hover {
   border-color: #333a45;
 }
 
-.field input:focus-visible {
+.field input:focus-visible,
+.field textarea:focus-visible {
   border-color: var(--accent);
 }
 
