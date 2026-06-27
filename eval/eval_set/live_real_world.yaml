@@ -1593,3 +1593,94 @@ tasks:
     split: sealed
     expect_abstain: true
     abstain_reason: impossible
+
+  # --- intent-drift / silent-failure traps (decoys walked via actionbook): stopping at the
+  # disambiguation/primary-topic page or wrong sense -> nominal!=verified is CAUGHT ---
+  - id: live_wikipedia_decoy_mercury_planet
+    instruction: On Wikipedia, open the article about Mercury the planet — the smallest planet in the Solar System and the closest to the Sun (not the chemical element or the Roman god).
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Mercury_(planet)
+    assert:
+      h1_equals: Mercury (planet)
+  - id: live_wikipedia_decoy_python_snake
+    instruction: On Wikipedia, open the article about Python the snake genus — the group of constricting snakes (not the Python programming language).
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Python_(genus)
+    assert:
+      h1_equals: Python (genus)
+  - id: live_wikipedia_decoy_java_proglang
+    instruction: On Wikipedia, open the article about Java the programming language (not the Indonesian island of Java).
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Java_(programming_language)
+    assert:
+      h1_equals: Java (programming language)
+  - id: live_wikipedia_decoy_phoenix_city
+    instruction: On Wikipedia, open the article about Phoenix, the capital city of the U.S. state of Arizona (not the mythological firebird).
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Phoenix,_Arizona
+    assert:
+      h1_equals: Phoenix, Arizona
+  - id: live_wikipedia_decoy_apple_company
+    instruction: On Wikipedia, open the article about Apple Inc., the technology company that makes the iPhone (not the fruit).
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Apple_Inc.
+    assert:
+      h1_equals: Apple Inc.
+  - id: live_wikipedia_decoy_turkey_bird
+    instruction: On Wikipedia, open the article about the turkey — the large bird in the genus Meleagris (not the country Turkey).
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Turkey_(bird)
+    assert:
+      h1_equals: Turkey (bird)
+  - id: live_wikipedia_decoy_saturn_god
+    instruction: On Wikipedia, open the article about Saturn, the Roman god of agriculture and time (not the planet Saturn).
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Saturn_(mythology)
+    assert:
+      h1_equals: Saturn (mythology)
+  - id: live_wikipedia_decoy_amazon_rainforest
+    instruction: On Wikipedia, open the article about the Amazon rainforest in South America (not Amazon the company or the Amazon River).
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Amazon_rainforest
+    assert:
+      h1_equals: Amazon rainforest
