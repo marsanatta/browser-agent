@@ -200,7 +200,13 @@ class Executor:
                         perception = await perceive(page)
                         view_scope = min(view_scope * 2, len(perception.elements))
                         observation = _format_observation(perception, limit=view_scope)
-                        result = await self._planner.replan(task, failure_log, observation)
+                        # Pass the ORIGINAL remaining steps (the failed one + every
+                        # downstream goal) so the replanner re-plans the WHOLE remaining
+                        # task and does not silently drop a later goal (e.g. "click the
+                        # 3rd item"), which would let a truncated plan "complete" falsely.
+                        result = await self._planner.replan(
+                            task, failure_log, observation, remaining=subtasks[i:]
+                        )
                         new_subtasks = result.subtasks
                         raw = result.raw
                     except Exception:
