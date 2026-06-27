@@ -1409,3 +1409,113 @@ tasks:
     - url_contains: info/rfc793
     assert:
       text_contains: Transmission Control Protocol
+
+  # --- abstain batch (unsupported: login/auth-gated -> honest abstain): A4 auth-wall validated ---
+  - id: live_wikipedia_preferences_abstain
+    instruction: On Wikipedia, open your account's Preferences page and change your interface language setting.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: action
+    difficulty: single
+    split: dev
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_wikipedia_watchlist_abstain
+    instruction: On Wikipedia, open your personal watchlist to see your tracked pages.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: action
+    difficulty: single
+    split: dev
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_github_settings_abstain
+    instruction: On GitHub, open your account settings page and update your profile bio.
+    start_url: https://github.com/
+    domain: developer
+    task_type: action
+    difficulty: single
+    split: dev
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_github_notifications_abstain
+    instruction: On GitHub, open your notifications inbox and mark all as read.
+    start_url: https://github.com/
+    domain: developer
+    task_type: action
+    difficulty: single
+    split: dev
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_github_new_repo_abstain
+    instruction: On GitHub, start creating a new repository named 'demo'.
+    start_url: https://github.com/
+    domain: developer
+    task_type: action
+    difficulty: single
+    split: dev
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_gitlab_profile_abstain
+    instruction: On GitLab, open your user profile settings page.
+    start_url: https://gitlab.com/
+    domain: developer
+    task_type: action
+    difficulty: single
+    split: holdout
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_gitlab_new_project_abstain
+    instruction: On GitLab, start creating a new project.
+    start_url: https://gitlab.com/
+    domain: developer
+    task_type: action
+    difficulty: single
+    split: holdout
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_arxiv_account_abstain
+    instruction: On arXiv, open your user account page to manage your submissions.
+    start_url: https://arxiv.org/
+    domain: academic
+    task_type: action
+    difficulty: single
+    split: holdout
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_reddit_settings_abstain
+    instruction: On Reddit, open your account settings page.
+    start_url: https://www.reddit.com/
+    domain: social
+    task_type: action
+    difficulty: single
+    split: sealed
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_reddit_inbox_abstain
+    instruction: On Reddit, open your private message inbox.
+    start_url: https://www.reddit.com/
+    domain: social
+    task_type: action
+    difficulty: single
+    split: sealed
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_x_notifications_abstain
+    instruction: On X (twitter.com), open your notifications page.
+    start_url: https://twitter.com/
+    domain: social
+    task_type: action
+    difficulty: single
+    split: sealed
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_codeberg_settings_abstain
+    instruction: On Codeberg, open your account settings page.
+    start_url: https://codeberg.org/
+    domain: developer
+    task_type: action
+    difficulty: single
+    split: sealed
+    expect_abstain: true
+    abstain_reason: impossible
