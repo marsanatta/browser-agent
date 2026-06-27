@@ -246,7 +246,10 @@ def _build_executor(
                     verify_hook=verify_hook)
 
 
-@app.get("/agent/run")
+# POST is the path the frontend uses: Cloudflare quick tunnels buffer SSE-over-GET
+# and flush only at connection close (cloudflared#1449), POST streams in real time.
+# GET is kept for backward-compat (curl/debug). Query params parse the same either way.
+@app.api_route("/agent/run", methods=["GET", "POST"])
 async def agent_run(
     task: str,
     url: str | None = None,
