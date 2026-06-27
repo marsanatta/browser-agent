@@ -192,13 +192,16 @@ class Executor:
                     yield events.phase(run_id, "planning")
                     # Peek the page: feed the planner the accumulated failure log + the
                     # current page's REAL elements, and re-plan the suffix from here.
-                    # The previous plan could not locate its target, so WIDEN the view
+                    # When the target could NOT be located (NOT_FOUND), WIDEN the view
                     # (double it) — elements the planner couldn't see (e.g. result links
                     # deep in a dense page) progressively enter the observation until the
-                    # target is reachable. This is the replanner's view-scope tuning.
+                    # target is reachable. This is the replanner's view-scope tuning. Other
+                    # failure classes already located the element, so a wider view would
+                    # only cost tokens without changing resolution; keep the scope as-is.
                     try:
                         perception = await perceive(page)
-                        view_scope = min(view_scope * 2, len(perception.elements))
+                        if outcome.failure_class == FailureClass.NOT_FOUND.value:
+                            view_scope = min(view_scope * 2, len(perception.elements))
                         observation = _format_observation(perception, limit=view_scope)
                         result = await self._planner.replan(task, failure_log, observation)
                         new_subtasks = result.subtasks
