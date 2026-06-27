@@ -175,7 +175,10 @@ def _build_executor(
     planner: object = LLMPlanner(gateway, model=plan_model, reasoning_effort=plan_effort)
     if url:
         planner = _StartUrlPlanner(planner, url)
-    return Executor(PlaywrightProvider(headless=True), planner, gateway=gateway)
+    # peek-plan is the default (autoresearch KEEP: more verified, net cheaper, M3->0).
+    # It activates only when a start URL is given (something to peek); else blind.
+    return Executor(PlaywrightProvider(headless=True), planner, gateway=gateway,
+                    peek_plan=True, start_url=url)
 
 
 @app.get("/agent/run")

@@ -137,11 +137,12 @@ class RunRecord:
 
 
 async def _run_once(
-    task: EvalTask, gateway: _CountingGateway, *, full: bool, peek_plan: bool = False
+    task: EvalTask, gateway: _CountingGateway, *, full: bool, peek_plan: bool = True
 ) -> RunRecord:
     """One execution of one task. `full` = agent with the recovery ladder + L2 heal;
     not full = budget-matched vanilla baseline (1 attempt, no heal). `peek_plan` = see
-    the start page before the initial plan (the experiment's treatment arm)."""
+    the start page before the initial plan; DEFAULT True (autoresearch KEEP — more
+    verified, net cheaper, M3->0). Pass peek_plan=False to measure the blind baseline."""
     hit_nodes: list[bool] = [False] * len(task.key_nodes)
 
     async def step_hook(page: Any) -> bool:
