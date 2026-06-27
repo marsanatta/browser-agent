@@ -102,6 +102,36 @@ CAPTCHA pages, login / MFA gates, banking / SSO / healthcare. The three probes
 above are concrete instances of the first three categories with real observed
 status codes and element counts.
 
+## Dense-page "click the first result" + the headless anti-bot ceiling (Amazon)
+
+The observation handed to the planner was capped at the first 40 DOM-order elements,
+so on a DENSE results page (e.g. Amazon) the real product links — deep in the DOM after
+~45 header/nav/filter elements — were never shown to the planner, which then guessed a
+non-existent target ("first search result") and collapsed to a wrong label ("Results").
+**Fixed:** the observation scope is now a configurable factor that WIDENS on each
+locate-failure replan (`backend/app/agent/executor.py`), so deep result links
+progressively enter view until reachable. Proven by a deterministic network-free repro
+(`backend/tests/test_view_scope.py`) AND a clean-site live run (45 chrome links + product
+links → the agent widens, sees the products, clicks the first → `/product/`).
+
+Two honest residual limits remain, **neither solvable by the view-scope fix alone**:
+
+1. **Headless anti-bot (the dominant live-Amazon blocker).** On the DEFAULT headless
+   Playwright runtime, `amazon.com` frequently returns a ~150-byte "Continue shopping"
+   interstitial / cross-region redirect instead of the real page (observed across
+   repeated runs). By the "route, don't evade" principle this is an anti-bot wall, so
+   `amazon.com` is **unsupported on the default headless runtime**. Confirmed escalation
+   path: driving a REAL stealth browser over CDP (the Steel.dev / Browserbase tier the
+   `BrowserProvider` seam is designed for; here probed via a real Chrome) reaches the
+   FULL results page — **48 product tiles, 616 links, no interstitial** — i.e. the
+   anti-bot is a browser-layer issue the CDP escalation removes, not an agent-logic one.
+2. **The "first result" ordinal intent + LLM variance.** Even on a clean (no anti-bot)
+   dense site, end-to-end was **~3/5**: the view-scope fix reliably makes the products
+   visible, but the LLM replan occasionally returns no usable plan. "Click the first
+   result" is an ordinal intent the name-based locator cannot express deterministically;
+   the agent depends on the LLM mapping it to a concrete product label. This is the
+   honest reliability ceiling — **mitigated, not solved**.
+
 ## Known gap
 
 The wall handling today is **implicit (fail-closed)**, not an explicit
