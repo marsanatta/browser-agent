@@ -30,6 +30,13 @@ from app.stream.events import Event
 
 _MAX_ATTEMPTS = 4  # bound the ladder; each attempt needs a new observation
 
+# View scope: how many of the page's indexed elements the planner LLM is shown in
+# its observation. It is a STARTING scope, not a hard cap: on a locate-failure
+# replan the executor widens it (doubling) so elements the planner couldn't see —
+# e.g. result links deep in a dense page — progressively enter view until the
+# target is reachable. Configurable per run (never hardcoded in the format helper).
+_VIEW_SCOPE = 40
+
 # verify_hook(page) -> bool: an independent post-run ground-truth check run on the
 # LIVE final page, before the browser closes. Wired by the eval harness (M3) so
 # `verified_completion` reflects a programmatic state assertion rather than the
@@ -50,6 +57,7 @@ class Executor:
         peek_plan: bool = False,
         start_url: str | None = None,
         max_replans: int = 5,
+        view_scope: int = _VIEW_SCOPE,
     ) -> None:
         self._provider = provider
         self._planner = planner
@@ -63,6 +71,8 @@ class Executor:
         # the suffix from the current page, carrying the ACCUMULATED failure log and
         # asking for a DIFFERENT strategy; after max_replans it abstains (ask_user).
         self._max_replans = max_replans
+        # Starting observation scope; widened on each locate-failure replan (see run()).
+        self._view_scope = view_scope
         # confirm-before-submit hook: async () -> bool. Default autopilot approves
         # (no human-in-the-loop yet) but the gate is real.
         self._confirm_submit = confirm_submit
@@ -89,6 +99,7 @@ class Executor:
         replans_used = 0
         failure_log: list[dict] = []
         verified = None
+        view_scope = self._view_scope  # widened on each locate-failure replan
 
         try:
             if peek:
@@ -100,7 +111,7 @@ class Executor:
                 yield events.phase(run_id, "planning")
                 try:
                     await act.navigate(page, self._start_url or "")
-                    observation = _format_observation(await perceive(page))
+                    observation = _format_observation(await perceive(page), limit=view_scope)
                     result = await self._planner.plan(task, observation=observation)
                 except Exception as exc:  # planner/peek seam; surface, don't crash
                     yield Event(events.EventType.RUN_ERROR, {"run_id": run_id, "error": str(exc)})
@@ -181,8 +192,14 @@ class Executor:
                     yield events.phase(run_id, "planning")
                     # Peek the page: feed the planner the accumulated failure log + the
                     # current page's REAL elements, and re-plan the suffix from here.
+                    # The previous plan could not locate its target, so WIDEN the view
+                    # (double it) — elements the planner couldn't see (e.g. result links
+                    # deep in a dense page) progressively enter the observation until the
+                    # target is reachable. This is the replanner's view-scope tuning.
                     try:
-                        observation = _format_observation(await perceive(page))
+                        perception = await perceive(page)
+                        view_scope = min(view_scope * 2, len(perception.elements))
+                        observation = _format_observation(perception, limit=view_scope)
                         result = await self._planner.replan(task, failure_log, observation)
                         new_subtasks = result.subtasks
                         raw = result.raw
