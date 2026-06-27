@@ -359,7 +359,7 @@ target is a real Playwright `Page` (verified: `page.screenshot()` returns valid 
 | Topology | `BROWSER_CDP_URL` | Bypasses anti-bot? | Docker networking |
 |---|---|---|---|
 | **A. Managed service (Steel/Browserbase)** ⭐ | `wss://connect.steel.dev?apiKey=…` / Browserbase `session.connectUrl` | **Yes** (residential IP + stealth) | none — container makes an outbound WSS |
-| **B. Container → host's real Chrome** | `http://<HOST-IP>:9222` (an **IP**, never a hostname) | **Yes** (trusted real profile) | host-reachable + Chrome bound `0.0.0.0` |
+| **B. Container → host's real Chrome** | `ws://host.docker.internal:9223/devtools/browser/<id>` (via a Host-rewrite proxy) | **Yes** (trusted real profile) | proxy on `0.0.0.0:9223` + firewall = Docker subnet only |
 | **C. Chrome inside the same image** | `http://127.0.0.1:9222` | **No** (datacenter IP + fresh profile → still walled) | none (same loopback) |
 
 **A — Managed browser (recommended for cloud).** No Chromium in the image, no
@@ -376,24 +376,48 @@ services:
       BROWSER_CDP_URL: "wss://connect.steel.dev?apiKey=${STEEL_API_KEY}"
 ```
 
-**B — Host's real Chrome (fits the desktop self-host deployment).** When the backend
-container runs on the same desktop as a real, trusted Chrome (e.g. one managed by
-actionbook on CDP port 18800/9222), point the container at the host. Two gotchas:
-- Chrome must bind beyond localhost: launch it with
-  `--remote-debugging-address=0.0.0.0 --remote-debugging-port=9222`.
-- **Use the host IP, not a hostname.** Chrome (66+) rejects the HTTP `/json` probe that
-  Playwright sends first if the `Host` header is not an IP or `localhost` (DNS-rebinding
-  protection), so `host.docker.internal` (a hostname) is rejected. Resolve it to the host
-  IP and pass `http://<HOST-IP>:9222`, or front Chrome with a `socat`/proxy that rewrites
-  `Host: localhost`.
+**B — Host's real Chrome (the desktop self-host deployment; TESTED on Docker Desktop /
+WSL2).** Reaching a real, trusted Chrome (e.g. one managed by actionbook on CDP port
+18800) from the container needs three pieces — a `127.0.0.1`-bound Chrome and a naive
+`host.docker.internal` URL both fail (the container reaches the host on the Docker subnet,
+not the host loopback; and Chrome rejects a hostname `Host` header):
 
-```yaml
-services:
-  agent:
-    extra_hosts: ["host.docker.internal:host-gateway"]   # Linux; resolve to IP at entrypoint
-    environment:
-      BROWSER_CDP_URL: "http://${HOST_IP}:9222"
-```
+1. **Host-rewrite proxy** next to Chrome — no need to re-bind or restart Chrome. It listens
+   on `0.0.0.0:9223`, rewrites the request's `Host:` line to `localhost` (so Chrome's
+   `/json` DNS-rebinding check passes), and forwards to `127.0.0.1:18800`. See
+   `scripts/cdp-host-proxy.py`:
+   ```
+   python scripts/cdp-host-proxy.py        # 0.0.0.0:9223 -> 127.0.0.1:18800
+   ```
+2. **Firewall: Docker subnet only (NOT the LAN).** Allow inbound 9223 from `172.16.0.0/12`
+   and block the rest, so only containers — not the corporate LAN — can reach the proxy:
+   ```powershell
+   New-NetFirewallRule -DisplayName cdp-9223-allow-docker -Direction Inbound -Action Allow `
+     -Protocol TCP -LocalPort 9223 -RemoteAddress 172.16.0.0/12
+   New-NetFirewallRule -DisplayName cdp-9223-block-rest  -Direction Inbound -Action Block `
+     -Protocol TCP -LocalPort 9223
+   ```
+3. **Connect via the WS browser-id, not the http endpoint.** `connect_over_cdp(http://…)`
+   connects the WebSocket to the host Chrome *returns* in `webSocketDebuggerUrl` (here
+   `localhost`, unreachable from the container). Passing a `ws://…/devtools/browser/<id>`
+   URL avoids that — Playwright connects the WS to the endpoint you give it, and WS is
+   exempt from the Host-header check. Fetch the id at container start (re-fetch on Chrome
+   restart — the id is per-session):
+   ```bash
+   ID=$(curl -s http://host.docker.internal:9223/json/version \
+        | sed -n 's#.*"webSocketDebuggerUrl": *"ws://[^/]*\(/devtools/browser/[^"]*\)".*#\1#p')
+   export BROWSER_CDP_URL="ws://host.docker.internal:9223${ID}"
+   ```
+   ```yaml
+   services:
+     agent:
+       environment:
+         BROWSER_CDP_URL: "ws://host.docker.internal:9223/devtools/browser/<id>"
+   ```
+
+**Verified end-to-end:** a container on Docker Desktop/WSL2 ran `connect_over_cdp` through
+this proxy + firewall to a real host Chrome and screenshotted a page — the anti-bot-free
+real browser, reachable only from the Docker subnet.
 
 **C — Chrome in the image (NOT for anti-bot).** Simplest networking (same loopback, no
 Host-header issue), but a containerised Chrome has a datacenter IP and a fresh profile,
