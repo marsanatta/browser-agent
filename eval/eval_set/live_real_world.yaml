@@ -1519,3 +1519,77 @@ tasks:
     split: sealed
     expect_abstain: true
     abstain_reason: impossible
+
+  # --- abstain batch 2 (top-up, login/auth-gated): A4 auth-wall validated ---
+  - id: live_github_issues_abstain
+    instruction: On GitHub, open the page listing issues assigned to you across your repositories.
+    start_url: https://github.com/
+    domain: developer
+    task_type: action
+    difficulty: single
+    split: dev
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_github_pulls_abstain
+    instruction: On GitHub, open the page listing pull requests assigned to you.
+    start_url: https://github.com/
+    domain: developer
+    task_type: action
+    difficulty: single
+    split: dev
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_wikipedia_upload_abstain
+    instruction: On Wikipedia, open the file upload page to upload an image to your account.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: action
+    difficulty: single
+    split: dev
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_gitlab_dashboard_abstain
+    instruction: On GitLab, open your personal dashboard of recent activity.
+    start_url: https://gitlab.com/
+    domain: developer
+    task_type: action
+    difficulty: single
+    split: holdout
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_bitbucket_account_abstain
+    instruction: On Bitbucket, open your personal account settings page.
+    start_url: https://bitbucket.org/
+    domain: developer
+    task_type: action
+    difficulty: single
+    split: holdout
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_x_messages_abstain
+    instruction: On X (twitter.com), open your direct messages inbox.
+    start_url: https://twitter.com/
+    domain: social
+    task_type: action
+    difficulty: single
+    split: sealed
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_reddit_submit_abstain
+    instruction: On Reddit, open the page to submit a new post.
+    start_url: https://www.reddit.com/
+    domain: social
+    task_type: action
+    difficulty: single
+    split: sealed
+    expect_abstain: true
+    abstain_reason: impossible
+  - id: live_codeberg_notifications_abstain
+    instruction: On Codeberg, open your notifications page.
+    start_url: https://codeberg.org/
+    domain: developer
+    task_type: action
+    difficulty: single
+    split: sealed
+    expect_abstain: true
+    abstain_reason: impossible
