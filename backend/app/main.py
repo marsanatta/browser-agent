@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -31,7 +32,7 @@ from app.agent.models import (
     resolve_model,
 )
 from app.agent.planner import LLMPlanner, PlanResult, SubTask
-from app.browser.provider import PlaywrightProvider
+from app.browser.provider import CDPProvider, PlaywrightProvider
 from app.obs.tracing import init_observability
 from app.security import TokenAuthMiddleware, is_configured, issue_cookie, valid
 from app.stream import events, screenshots
@@ -205,6 +206,15 @@ def _make_verify_hook(criterion: dict) -> VerifyHook:
     return verify_hook
 
 
+def _make_provider():
+    """Browser-runtime escalation hook: when `BROWSER_CDP_URL` is set, drive an
+    externally-managed REAL Chrome over CDP (the Steel.dev/Browserbase tier) — this
+    bypasses the headless anti-bot walls that fail sites like Amazon on a fresh
+    headless browser (UNSUPPORTED_SITES.md). Default is self-hosted headless Playwright."""
+    cdp_url = os.getenv("BROWSER_CDP_URL")
+    return CDPProvider(cdp_url) if cdp_url else PlaywrightProvider(headless=True)
+
+
 def _build_executor(
     url: str | None,
     *,
@@ -231,7 +241,7 @@ def _build_executor(
     # verify_hook is set only when the caller supplies a success criterion: with it,
     # `verified` is a real independent state_check; without it the run is self-report
     # only (verified=None) — never falsely shown as "verified".
-    return Executor(PlaywrightProvider(headless=True), planner, gateway=gateway,
+    return Executor(_make_provider(), planner, gateway=gateway,
                     peek_plan=True, start_url=url, max_replans=max_replans,
                     verify_hook=verify_hook)
 
