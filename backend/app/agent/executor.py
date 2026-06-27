@@ -49,6 +49,7 @@ class Executor:
         max_attempts: int = _MAX_ATTEMPTS,
         peek_plan: bool = False,
         start_url: str | None = None,
+        max_replans: int = 5,
     ) -> None:
         self._provider = provider
         self._planner = planner
@@ -58,6 +59,10 @@ class Executor:
         # observed, not guessed a-priori. Needs start_url; otherwise falls back to blind.
         self._peek_plan = peek_plan
         self._start_url = start_url
+        # Bounded global replans: on each local-recovery exhaustion the agent re-plans
+        # the suffix from the current page, carrying the ACCUMULATED failure log and
+        # asking for a DIFFERENT strategy; after max_replans it abstains (ask_user).
+        self._max_replans = max_replans
         # confirm-before-submit hook: async () -> bool. Default autopilot approves
         # (no human-in-the-loop yet) but the gate is real.
         self._confirm_submit = confirm_submit
@@ -81,7 +86,8 @@ class Executor:
         page = None
         launched = False
         all_ok = True
-        replanned = False
+        replans_used = 0
+        failure_log: list[dict] = []
         verified = None
 
         try:
@@ -154,23 +160,20 @@ class Executor:
                     all_ok = False
                     break
 
-                # Exhausted local recovery on this sub-task. Global replan once
-                # (docs/architecture/02 §1.3: replan only on local exhaustion),
-                # then ask_user.
-                if not replanned:
-                    replanned = True
+                # Exhausted local recovery on this sub-task. Re-plan the suffix from the
+                # current page (docs/architecture/02 §1.3: replan only on local
+                # exhaustion), up to max_replans, then ask_user. Each replan records the
+                # failure and is shown the ACCUMULATED log so it tries a DIFFERENT strategy.
+                failure_log.append({"step": _describe(st), "class": outcome.failure_class})
+                if replans_used < self._max_replans:
+                    replans_used += 1
                     yield events.recovery(step_id, outcome.failure_class, Recovery.REPLAN.value, _MAX_ATTEMPTS)
                     yield events.phase(run_id, "planning")
-                    # Peek the page: feed the planner the failed step + failure class
-                    # + the current page's REAL elements, and re-plan the suffix from
-                    # here. Closes the open loop where the original plan's words
-                    # matched no element on the live page (vs blindly re-issuing the
-                    # same from-scratch plan, which fails identically).
+                    # Peek the page: feed the planner the accumulated failure log + the
+                    # current page's REAL elements, and re-plan the suffix from here.
                     try:
                         observation = _format_observation(await perceive(page))
-                        new_subtasks = await self._planner.replan(
-                            task, _describe(st), outcome.failure_class, observation
-                        )
+                        new_subtasks = await self._planner.replan(task, failure_log, observation)
                     except Exception:
                         new_subtasks = None
                     if new_subtasks:

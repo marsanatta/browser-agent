@@ -43,7 +43,7 @@ async def test_static_absent_target_stops_early(perceive_counter):
         SubTask(action="click", target="Missing", role="button"),
     ]
     max_attempts = 4
-    ex = Executor(PlaywrightProvider(headless=True), MockPlanner(plan), max_attempts=max_attempts)
+    ex = Executor(PlaywrightProvider(headless=True), MockPlanner(plan), max_attempts=max_attempts, max_replans=1)
 
     regrounds = 0
     async for ev in ex.run("click missing"):
@@ -83,7 +83,7 @@ async def test_mutating_page_keeps_retrying(perceive_counter):
         SubTask(action="click", target="Missing", role="button"),
     ]
     max_attempts = 4
-    ex = Executor(PlaywrightProvider(headless=True), MockPlanner(plan), max_attempts=max_attempts)
+    ex = Executor(PlaywrightProvider(headless=True), MockPlanner(plan), max_attempts=max_attempts, max_replans=1)
 
     regrounds = 0
     async for ev in ex.run("click missing on mutating page"):

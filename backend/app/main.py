@@ -119,10 +119,10 @@ class _StartUrlPlanner:
             return subtasks
         return [SubTask(action="navigate", url=self._start_url, description="open start URL"), *subtasks]
 
-    async def replan(self, task: str, failed: str, failure_class: str, observation: str) -> list[SubTask]:
+    async def replan(self, task: str, failure_log: list[dict], observation: str) -> list[SubTask]:
         # Re-plan from the CURRENT page — do not re-prepend the start URL (the page
         # is already loaded; the peek-replan plans the suffix from here).
-        return await self._inner.replan(task, failed, failure_class, observation)
+        return await self._inner.replan(task, failure_log, observation)
 
 
 _MODEL_MENU_CACHE: list[str] | None = None
@@ -165,6 +165,7 @@ def _build_executor(
     plan_effort: str,
     exec_effort: str,
     replanner_effort: str,
+    max_replans: int = 5,
 ) -> Executor:
     gateway = LLMGateway(
         workhorse_model=exec_model,
@@ -178,7 +179,7 @@ def _build_executor(
     # peek-plan is the default (autoresearch KEEP: more verified, net cheaper, M3->0).
     # It activates only when a start URL is given (something to peek); else blind.
     return Executor(PlaywrightProvider(headless=True), planner, gateway=gateway,
-                    peek_plan=True, start_url=url)
+                    peek_plan=True, start_url=url, max_replans=max_replans)
 
 
 @app.get("/agent/run")
@@ -191,6 +192,7 @@ async def agent_run(
     think_plan: str | None = None,
     think_exec: str | None = None,
     think_replanner: str | None = None,
+    max_replans: int = 5,
 ):
     """Drive the real M1 loop. The planner lazy-connects to Copilot on first use;
     without a live Copilot server it emits a RUN_ERROR event (the stream still
@@ -207,6 +209,7 @@ async def agent_run(
         plan_effort=resolve_effort(think_plan, "plan"),
         exec_effort=resolve_effort(think_exec, "exec"),
         replanner_effort=resolve_effort(think_replanner, "replanner"),
+        max_replans=max(0, min(int(max_replans), 10)),  # clamp to a sane range
     )
 
     async def gen():

@@ -25,6 +25,7 @@ const en = {
     replanner: "Replanner",
     model: "model",
     thinking: "thinking",
+    maxReplans: "Replan attempts",
   },
   verdict: {
     runError: "Run error: {{error}}",
@@ -145,6 +146,7 @@ const zhHant = {
     replanner: "Replanner（重新規劃）",
     model: "model（模型）",
     thinking: "thinking（思考強度）",
+    maxReplans: "Replan 次數",
   },
   verdict: {
     runError: "執行錯誤：{{error}}",

@@ -42,7 +42,7 @@ class Planner(Protocol):
     ) -> list[SubTask]: ...
 
     async def replan(
-        self, task: str, failed: str, failure_class: str, observation: str
+        self, task: str, failure_log: list[dict], observation: str
     ) -> list[SubTask]: ...
 
 
@@ -62,7 +62,7 @@ class MockPlanner:
         # peek_subtasks: returned when plan() is called WITH an observation (peek-plan),
         # so a test can prove "seeing the page -> a different/correct plan".
         self._peek_subtasks = peek_subtasks
-        self.replan_calls: list[tuple[str, str, str, str]] = []
+        self.replan_calls: list[tuple] = []  # (task, failure_log, observation)
         self.plan_calls: list[tuple[str, str | None, str | None]] = []  # (task, start_url, observation)
 
     async def plan(
@@ -74,9 +74,9 @@ class MockPlanner:
         return list(self._subtasks)
 
     async def replan(
-        self, task: str, failed: str, failure_class: str, observation: str
+        self, task: str, failure_log: list[dict], observation: str
     ) -> list[SubTask]:
-        self.replan_calls.append((task, failed, failure_class, observation))
+        self.replan_calls.append((task, list(failure_log), observation))
         src = self._replan_subtasks if self._replan_subtasks is not None else self._subtasks
         return list(src)
 
@@ -128,26 +128,27 @@ _PEEK_PLAN_PROMPT = (
 
 
 # Peek-the-page replan (docs/architecture/02 §1.3, the close-the-loop fix): on local
-# recovery exhaustion the agent spends tokens to SHOW the planner the current page's
-# real elements and asks for a revised plan from here — closing the open loop where
-# the original plan's words matched no element on the live page.
-_REPLAN_PROMPT = """You are the planner for a browser-automation agent, RE-PLANNING
-after a step failed. The agent has already run the earlier steps and is CURRENTLY on a
-page. It tried the failed step below but could not complete it. Produce a NEW plan to
-finish the task FROM THE CURRENT PAGE, using ONLY the elements actually present (listed
-below). Prefer the visible element whose label best matches the intent even if the
-wording differs (e.g. click "Log in" when the goal said "Sign In"). If a listed link's
-target path already satisfies the goal, navigate to it directly.
+# recovery exhaustion the agent spends tokens to SHOW the planner the current page's real
+# elements and asks for a revised plan from here. It carries the ACCUMULATED failure log
+# across replans and asks for a DIFFERENT strategy, so repeated replans escalate the
+# approach instead of re-issuing the same losing plan.
+_REPLAN_PROMPT = """You are the planner for a browser-automation agent, RE-PLANNING. The
+agent is CURRENTLY on a page (its real elements are listed at the end). The attempts under
+"FAILED ALREADY" have NOT worked — do NOT repeat those strategies; try a DIFFERENT approach
+(a different element, a different action, or navigate directly if a listed link's target
+already satisfies the goal). Prefer the visible element whose label best matches the intent
+even if the wording differs (e.g. "Log in" for "Sign In").
 
-Each sub-task is one of: navigate (needs "url"), click (needs "target": the visible
-label), fill (needs "target" and "value"), press (needs "target" and "value": a key
-such as "Enter"). A click/press may carry "expect" — {"text_visible":"..."} /
-{"selector_visible":"css"} / {"url_contains":"..."} — the observable result that proves
-it worked, so a wrong-but-page-changing action is not mistaken for success. Respond with
+Each sub-task is one of: navigate (needs "url"), click (needs "target": the visible label),
+fill (needs "target" and "value"), press (needs "target" and "value": a key such as
+"Enter"). A click/press may carry "expect" — {"text_visible":"..."} / {"selector_visible":
+"css"} / {"url_contains":"..."} — the observable result that proves it worked. Respond with
 ONLY a JSON array of the REMAINING steps from here, no prose.
 
 User task: __TASK__
-Failed step: __FAILED__ (failure class: __CLASS__)
+
+FAILED ALREADY (do not repeat these strategies):
+__FAILURES__
 
 Elements currently on the page:
 __OBSERVATION__
@@ -179,12 +180,11 @@ class LLMPlanner:
         return _parse_plan(resp.content)
 
     async def replan(
-        self, task: str, failed: str, failure_class: str, observation: str
+        self, task: str, failure_log: list[dict], observation: str
     ) -> list[SubTask]:
         prompt = (
             _REPLAN_PROMPT.replace("__TASK__", task)
-            .replace("__FAILED__", failed)
-            .replace("__CLASS__", failure_class)
+            .replace("__FAILURES__", _format_failures(failure_log))
             .replace("__OBSERVATION__", observation)
         )
         # The deep replan is the gated escalation tier: use the gateway's replanner
@@ -194,6 +194,14 @@ class LLMPlanner:
         effort = getattr(self._gateway, "replanner_effort", None) or self._effort
         resp = await self._gateway.complete(prompt, model=model, reasoning_effort=effort)
         return _parse_plan(resp.content)
+
+
+def _format_failures(failure_log: list[dict]) -> str:
+    """Render the accumulated failure log for the replan prompt: every attempt that has
+    already failed (step + failure class), so the planner won't re-issue a losing one."""
+    if not failure_log:
+        return "(none yet)"
+    return "\n".join(f"- {f.get('step', '?')} -> {f.get('class', '?')}" for f in failure_log)
 
 
 def _parse_plan(content: str) -> list[SubTask]:

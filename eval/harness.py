@@ -112,8 +112,8 @@ class _StartUrlPlanner:
             return subtasks
         return [SubTask(action="navigate", url=self._start_url, description="open start URL"), *subtasks]
 
-    async def replan(self, task: str, failed: str, failure_class: str, observation: str) -> list[SubTask]:
-        return await self._inner.replan(task, failed, failure_class, observation)
+    async def replan(self, task: str, failure_log: list[dict], observation: str) -> list[SubTask]:
+        return await self._inner.replan(task, failure_log, observation)
 
 
 @dataclass

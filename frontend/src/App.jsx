@@ -180,6 +180,7 @@ export default function App() {
   const [models, setModels] = useState(null); // { menu, defaults, thinking_levels, thinking_defaults }
   const [modelSel, setModelSel] = useState(null); // current per-role model selection
   const [effortSel, setEffortSel] = useState(null); // current per-role thinking level
+  const [maxReplans, setMaxReplans] = useState(5); // bounded global replans before abstain
   const [state, dispatch] = useReducer(reduce, initialState);
   const sourceRef = useRef(null);
 
@@ -247,6 +248,7 @@ export default function App() {
       params.set("think_exec", effortSel.exec);
       params.set("think_replanner", effortSel.replanner);
     }
+    params.set("max_replans", String(maxReplans));
     const es = new EventSource(`${BACKEND}/agent/run?${params.toString()}`, { withCredentials: true });
     sourceRef.current = es;
 
@@ -382,6 +384,18 @@ export default function App() {
                 </label>
               </div>
             ))}
+            <label className="field model-replans">
+              <span>{t("models.maxReplans")}</span>
+              <input
+                type="number"
+                min={0}
+                max={10}
+                value={maxReplans}
+                onChange={(e) =>
+                  setMaxReplans(Math.max(0, Math.min(10, Number(e.target.value) || 0)))
+                }
+              />
+            </label>
           </div>
         </details>
       )}

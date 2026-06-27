@@ -119,8 +119,9 @@ async def test_not_interactable_bounded_escalation_to_ask_user():
     assert any(r["recovery"] == Recovery.REPLAN.value for r in recoveries)  # escalated
     assert asks, "bounded ladder must terminate at ask_user"
     assert finished["nominal_completion"] is False
-    # bound: even with one replan the ladder is finite (no infinite loop)
-    assert len(recoveries) < 12
+    # bound: even with the default 5 replans (each re-running the local ladder) the
+    # whole thing is FINITE and terminates at ask_user — no infinite loop.
+    assert len(recoveries) < 40
 
 
 # ---- replan path emits its own PHASE(planning): the re-plan is a silent LLM gap too ----
@@ -131,7 +132,7 @@ async def test_replan_emits_second_planning_phase():
     call, i.e. another silent gap. It must emit PHASE(planning) before that re-plan,
     just like the initial plan, so the live view never goes dark during a replan."""
     plan = [SubTask(action="click", target="Place Order", role="button")]
-    ex = Executor(_LocalProvider(_DISABLED), MockPlanner(plan))
+    ex = Executor(_LocalProvider(_DISABLED), MockPlanner(plan), max_replans=1)
 
     seq = []
     async for ev in ex.run("click disabled"):
@@ -159,7 +160,7 @@ async def test_replan_emits_second_plan_ready():
     second PLAN_READY so the live view can show what the replan produced — the
     initial PLAN_READY (planning) + one more after the REPLAN recovery."""
     plan = [SubTask(action="click", target="Place Order", role="button")]
-    ex = Executor(_LocalProvider(_DISABLED), MockPlanner(plan))
+    ex = Executor(_LocalProvider(_DISABLED), MockPlanner(plan), max_replans=1)
     out = await _collect(ex, "click disabled", EventType.PLAN_READY)
     plans = out[EventType.PLAN_READY]
 
@@ -202,7 +203,7 @@ class _TwoPlanner:
         self.calls += 1
         return list(p)
 
-    async def replan(self, task, failed, failure_class, observation):
+    async def replan(self, task, failure_log, observation):
         # The peek-replan path returns the second plan (the page-grounded retry).
         return list(self._plans[1])
 
@@ -226,7 +227,7 @@ async def test_replan_plan_ready_includes_completed_prefix():
         SubTask(action="click", target="Place Order", role="button"),
     ]
     second = [SubTask(action="click", target="Retry Order", role="button")]
-    ex = Executor(_LocalProvider(_STEP1_OK_STEP2_DISABLED), _TwoPlanner(first, second))
+    ex = Executor(_LocalProvider(_STEP1_OK_STEP2_DISABLED), _TwoPlanner(first, second), max_replans=1)
     out = await _collect(ex, "two step", EventType.PLAN_READY)
     plans = out[EventType.PLAN_READY]
 
