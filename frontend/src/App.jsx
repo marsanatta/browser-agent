@@ -7,24 +7,6 @@ import { maskArgs, MASK } from "./mask.js";
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL ?? "";
 
-const STREAM_EVENTS = [
-  "RUN_STARTED",
-  "RUN_FINISHED",
-  "RUN_ERROR",
-  "STEP_STARTED",
-  "STEP_FINISHED",
-  "TOOL_CALL_START",
-  "TOOL_CALL_ARGS",
-  "TOOL_CALL_END",
-  "TEXT_MESSAGE",
-  "SCREENSHOT_ANNOTATED",
-  "LOCATOR_RESOLVED",
-  "ASK_USER",
-  "RECOVERY",
-  "PLAN_READY",
-  "PHASE",
-];
-
 const TERMINAL = new Set(["RUN_FINISHED", "RUN_ERROR"]);
 
 const initialState = { run: null, steps: [], order: [], notices: [], plan: null, planVersions: [] };
@@ -227,6 +209,8 @@ export default function App() {
   const [state, dispatch] = useReducer(reduce, initialState);
   const sourceRef = useRef(null);
 
+  useEffect(() => () => sourceRef.current?.close(), []); // abort an in-flight run stream on unmount
+
   useEffect(() => {
     let alive = true;
     fetch(`${BACKEND}/models`)
@@ -294,35 +278,76 @@ export default function App() {
     params.set("max_replans", String(maxReplans));
     const criterion = buildCriterion(critType, critValue, critCss);
     if (criterion) params.set("criterion", JSON.stringify(criterion));
-    const es = new EventSource(`${BACKEND}/agent/run?${params.toString()}`, { withCredentials: true });
-    sourceRef.current = es;
-
-    let opened = false;
+    // Stream over POST instead of EventSource(GET): Cloudflare quick tunnels
+    // buffer SSE-over-GET and flush only at connection close (cloudflared#1449);
+    // POST streams live. We parse the text/event-stream frames by hand.
+    const controller = new AbortController();
     let terminated = false;
-    es.onopen = () => { opened = true; };
-    const onAny = (e) => {
-      const parsed = JSON.parse(e.data);
-      dispatch(parsed);
-      if (TERMINAL.has(parsed.type)) {
-        terminated = true;
-        es.close();
-        setRunning(false);
-      }
-    };
-    STREAM_EVENTS.forEach((name) => es.addEventListener(name, onAny));
-    es.onerror = () => {
-      if (terminated) return; // clean end: server closed the stream after a terminal event
-      es.close();
+    sourceRef.current = { close: () => { terminated = true; controller.abort(); } };
+
+    const fail = (gate) => {
+      if (terminated) return; // clean end or user-initiated stop
+      terminated = true;
+      controller.abort();
       setRunning(false);
-      // surface the failure instead of freezing the UI on "executing"
       dispatch({ type: "RUN_ERROR", payload: { error: t("verdict.connectionLost") } });
-      if (!opened) {
-        // never connected -> almost always an expired/invalid access cookie; re-show the gate
+      if (gate) {
+        // never connected -> almost always an expired/invalid access cookie
         localStorage.removeItem("ba_authed");
         setSessionExpired(true);
         setAuthed(false);
       }
     };
+
+    (async () => {
+      let res;
+      try {
+        res = await fetch(`${BACKEND}/agent/run?${params.toString()}`, {
+          method: "POST",
+          credentials: "include",
+          signal: controller.signal,
+        });
+      } catch {
+        fail(true);
+        return;
+      }
+      if (!res.ok || !res.body) {
+        fail(res.status === 401 || res.status === 503);
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true }).replace(/\r/g, "");
+          let i;
+          while ((i = buf.indexOf("\n\n")) >= 0) {
+            const frame = buf.slice(0, i);
+            buf = buf.slice(i + 2);
+            const data = frame
+              .split("\n")
+              .filter((l) => l.startsWith("data:"))
+              .map((l) => l.slice(5).replace(/^ /, ""))
+              .join("\n");
+            if (!data) continue; // heartbeat / comment frame
+            const parsed = JSON.parse(data);
+            dispatch(parsed);
+            if (TERMINAL.has(parsed.type)) {
+              terminated = true;
+              controller.abort();
+              setRunning(false);
+              return;
+            }
+          }
+        }
+        fail(false); // stream ended without a terminal event
+      } catch {
+        fail(false); // mid-stream network drop (no-op if user stopped)
+      }
+    })();
   }
 
   function stop() {
