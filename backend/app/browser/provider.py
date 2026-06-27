@@ -86,15 +86,23 @@ class CDPProvider(BrowserProvider):
         from playwright.async_api import async_playwright
 
         self._playwright = await async_playwright().start()
-        self._browser = await self._playwright.chromium.connect_over_cdp(self._cdp_url)
+        try:
+            self._browser = await self._playwright.chromium.connect_over_cdp(self._cdp_url)
+        except Exception:
+            # Connecting to an external endpoint fails far more often than a local
+            # launch (browser down / wrong port) — don't leak the local driver process.
+            await self._playwright.stop()
+            self._playwright = None
+            raise
 
     async def new_page(self) -> Any:
         if self._browser is None:
             raise RuntimeError("launch() must be called before new_page()")
-        # Use the external browser's existing context (its real profile/cookies) — do
-        # not spawn an isolated context; the real-profile fingerprint is the whole point.
-        context = self._browser.contexts[0] if self._browser.contexts else await self._browser.new_context()
-        self._page = await context.new_page()
+        # Use the external browser's existing context (its real profile/cookies) — the
+        # real-profile fingerprint is the whole point, so never spawn an isolated one.
+        if not self._browser.contexts:
+            raise RuntimeError("connected browser exposes no context over CDP")
+        self._page = await self._browser.contexts[0].new_page()
         return self._page
 
     async def close(self) -> None:
