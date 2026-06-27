@@ -47,16 +47,31 @@ async def _check_one(page: Any, c: dict) -> tuple[str, str, str]:
     entry_block = await detect_block(page)
 
     if c.get("expect_abstain"):
-        # Valid ONLY if a real bot-wall is actually present (entry or solution); a site
-        # that loads fine is NOT a legitimate expect_abstain=blocked case.
+        # An abstain case is valid ONLY if the task is genuinely uncompletable by an
+        # unauthenticated agent: a real bot-wall (reason "blocked") OR an auth wall that
+        # gates the resource (reason "impossible"). A site that just loads and lets you
+        # act is NOT a legitimate abstain.
         if entry_block:
             return cid, "PASS", f"abstain confirmed: bot-wall at entry ({entry_block})"
-        sol = c.get("solution_url")
-        if sol and not await _goto(page, sol):
-            b = await detect_block(page)
-            if b:
-                return cid, "PASS", f"abstain confirmed: bot-wall at solution ({b})"
-        return cid, "FAIL", "expect_abstain but NO bot-wall detected (not a real abstain)"
+        # Navigate the gated resource (the thing the task needs), if distinct.
+        gated = c.get("solution_url")
+        if gated and gated != c["start_url"]:
+            await _goto(page, gated)
+        if (b := await detect_block(page)):
+            return cid, "PASS", f"abstain confirmed: bot-wall ({b})"
+        final = (getattr(page, "url", "") or "").lower()
+        if any(k in final for k in ("login", "signin", "sign-in", "sign_in", "oauth", "/account/")):
+            return cid, "PASS", f"abstain confirmed: auth wall (redirected to {final[:70]})"
+        try:
+            body = (await page.inner_text("body"))[:6000].lower()
+        except Exception:
+            body = ""
+        if any(p in body for p in (
+            "sign in to", "log in to", "please log in", "you must be logged in",
+            "sign in required", "log in or sign up", "you need to be logged in",
+        )):
+            return cid, "PASS", "abstain confirmed: login required (page prompts sign-in)"
+        return cid, "FAIL", f"no bot-wall/auth-wall at {final[:70] or c['start_url']} -> not a real abstain"
 
     sol = c.get("solution_url") or c["start_url"]
     err = await _goto(page, sol)
