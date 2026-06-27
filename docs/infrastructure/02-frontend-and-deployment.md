@@ -345,6 +345,93 @@ This separates concerns: agent API (thin, stateless) + managed browser (stateful
 └──────────────────────────────────────────────┘
 ```
 
+### 4.8 Real-Browser Escalation over CDP (`BROWSER_CDP_URL`) — Three Docker Topologies
+
+The default `PlaywrightProvider` launches a headless Chromium inside the container —
+fine for bot-wall-free sites, but a headless / fresh-profile browser trips anti-bot
+interstitials on sites like Amazon (`UNSUPPORTED_SITES.md`). The swappable
+`CDPProvider` (`backend/app/browser/provider.py`) instead connects Playwright over CDP
+(`connect_over_cdp`) to an **externally-managed real browser**. Set `BROWSER_CDP_URL`
+to switch; leave it unset for the default headless path (byte-identical to before). The
+agent logic, SSE event stream, and per-step screenshots all work unchanged — the CDP
+target is a real Playwright `Page` (verified: `page.screenshot()` returns valid PNG).
+
+| Topology | `BROWSER_CDP_URL` | Bypasses anti-bot? | Docker networking |
+|---|---|---|---|
+| **A. Managed service (Steel/Browserbase)** ⭐ | `wss://connect.steel.dev?apiKey=…` / Browserbase `session.connectUrl` | **Yes** (residential IP + stealth) | none — container makes an outbound WSS |
+| **B. Container → host's real Chrome** | `ws://host.docker.internal:9223/devtools/browser/<id>` (via a Host-rewrite proxy) | **Yes** (trusted real profile) | proxy on `0.0.0.0:9223` + firewall = Docker subnet only |
+| **C. Chrome inside the same image** | `http://127.0.0.1:9222` | **No** (datacenter IP + fresh profile → still walled) | none (same loopback) |
+
+**A — Managed browser (recommended for cloud).** No Chromium in the image, no
+host-networking: the container opens an outbound secure WebSocket to the provider, which
+runs a stealth browser on a residential / anti-detect IP — that is the actual anti-bot
+bypass (their product). Extends §4.6.
+
+```yaml
+# docker-compose.yml (excerpt) — nothing else needed; the browser is remote
+services:
+  agent:
+    image: <your-image>
+    environment:
+      BROWSER_CDP_URL: "wss://connect.steel.dev?apiKey=${STEEL_API_KEY}"
+```
+
+**B — Host's real Chrome (the desktop self-host deployment; TESTED on Docker Desktop /
+WSL2).** Reaching a real, trusted Chrome (e.g. one managed by actionbook on CDP port
+18800) from the container needs three pieces — a `127.0.0.1`-bound Chrome and a naive
+`host.docker.internal` URL both fail (the container reaches the host on the Docker subnet,
+not the host loopback; and Chrome rejects a hostname `Host` header):
+
+1. **Host-rewrite proxy** next to Chrome — no need to re-bind or restart Chrome. It listens
+   on `0.0.0.0:9223`, rewrites the request's `Host:` line to `localhost` (so Chrome's
+   `/json` DNS-rebinding check passes), and forwards to `127.0.0.1:18800`. See
+   `scripts/cdp-host-proxy.py`:
+   ```
+   python scripts/cdp-host-proxy.py        # 0.0.0.0:9223 -> 127.0.0.1:18800
+   ```
+2. **Firewall: Docker subnet only (NOT the LAN).** Allow inbound 9223 from `172.16.0.0/12`
+   and block the rest, so only containers — not the corporate LAN — can reach the proxy:
+   ```powershell
+   New-NetFirewallRule -DisplayName cdp-9223-allow-docker -Direction Inbound -Action Allow `
+     -Protocol TCP -LocalPort 9223 -RemoteAddress 172.16.0.0/12
+   New-NetFirewallRule -DisplayName cdp-9223-block-rest  -Direction Inbound -Action Block `
+     -Protocol TCP -LocalPort 9223
+   ```
+3. **Connect via the WS browser-id, not the http endpoint.** `connect_over_cdp(http://…)`
+   connects the WebSocket to the host Chrome *returns* in `webSocketDebuggerUrl` (here
+   `localhost`, unreachable from the container). Passing a `ws://…/devtools/browser/<id>`
+   URL avoids that — Playwright connects the WS to the endpoint you give it, and WS is
+   exempt from the Host-header check. Fetch the id at container start (re-fetch on Chrome
+   restart — the id is per-session):
+   ```bash
+   ID=$(curl -s http://host.docker.internal:9223/json/version \
+        | sed -n 's#.*"webSocketDebuggerUrl": *"ws://[^/]*\(/devtools/browser/[^"]*\)".*#\1#p')
+   export BROWSER_CDP_URL="ws://host.docker.internal:9223${ID}"
+   ```
+   ```yaml
+   services:
+     agent:
+       environment:
+         BROWSER_CDP_URL: "ws://host.docker.internal:9223/devtools/browser/<id>"
+   ```
+
+**Verified end-to-end:** a container on Docker Desktop/WSL2 ran `connect_over_cdp` through
+this proxy + firewall to a real host Chrome and screenshotted a page — the anti-bot-free
+real browser, reachable only from the Docker subnet.
+
+**C — Chrome in the image (NOT for anti-bot).** Simplest networking (same loopback, no
+Host-header issue), but a containerised Chrome has a datacenter IP and a fresh profile,
+so anti-bot sites still block it — no gain over default headless. Only worth it if you
+need a real (headed) Chrome window for non-anti-bot reasons; run it under Xvfb with the
+§4.1 hardening (`--disable-dev-shm-usage`, non-root, `shm_size: 2gb`).
+
+**Security:** topologies A/B drive a real, possibly logged-in profile, so screenshots may
+capture that profile's PII — keep the screenshots dir a git-ignored secret and rely on
+the §5 serialization-time redaction. `CDPProvider.close()` only closes the agent's own
+tab, never the external browser or its other tabs.
+
+**Sources**: [Chrome remote-debugging Host-header change (Chrome 66+)](https://developer.chrome.com/blog/remote-debugging-port), [Steel.dev — connect with Playwright (`connectOverCDP('wss://connect.steel.dev?apiKey=…')`)](https://docs.steel.dev/overview/guides/connect-with-playwright-node), [Browserbase — Playwright `connectOverCDP(session.connectUrl)`](https://docs.browserbase.com/introduction/playwright), [host.docker.internal + Chrome remote debugging in Docker](https://sahajamit.medium.com/can-selenium-chrome-dev-tools-recipe-works-inside-a-docker-container-afff92e9cce5)
+
 ---
 
 ## 5. Security in the Frontend

@@ -125,10 +125,10 @@ class _StartUrlPlanner:
         prepended = [SubTask(action="navigate", url=self._start_url, description="open start URL"), *subtasks]
         return PlanResult(prepended, result.raw)
 
-    async def replan(self, task: str, failure_log: list[dict], observation: str) -> PlanResult:
+    async def replan(self, task, failure_log, observation, remaining=None) -> PlanResult:
         # Re-plan from the CURRENT page — do not re-prepend the start URL (the page
         # is already loaded; the peek-replan plans the suffix from here).
-        return await self._inner.replan(task, failure_log, observation)
+        return await self._inner.replan(task, failure_log, observation, remaining=remaining)
 
 
 _MODEL_MENU_CACHE: list[str] | None = None

@@ -53,7 +53,11 @@ class Planner(Protocol):
     ) -> PlanResult: ...
 
     async def replan(
-        self, task: str, failure_log: list[dict], observation: str
+        self,
+        task: str,
+        failure_log: list[dict],
+        observation: str,
+        remaining: list[SubTask] | None = None,
     ) -> PlanResult: ...
 
 
@@ -73,7 +77,7 @@ class MockPlanner:
         # peek_subtasks: returned when plan() is called WITH an observation (peek-plan),
         # so a test can prove "seeing the page -> a different/correct plan".
         self._peek_subtasks = peek_subtasks
-        self.replan_calls: list[tuple] = []  # (task, failure_log, observation)
+        self.replan_calls: list[tuple] = []  # (task, failure_log, observation, remaining)
         self.plan_calls: list[tuple[str, str | None, str | None]] = []  # (task, start_url, observation)
 
     async def plan(
@@ -85,9 +89,13 @@ class MockPlanner:
         return PlanResult(list(self._subtasks), _mock_raw(self._subtasks))
 
     async def replan(
-        self, task: str, failure_log: list[dict], observation: str
+        self,
+        task: str,
+        failure_log: list[dict],
+        observation: str,
+        remaining: list[SubTask] | None = None,
     ) -> PlanResult:
-        self.replan_calls.append((task, list(failure_log), observation))
+        self.replan_calls.append((task, list(failure_log), observation, list(remaining or [])))
         src = self._replan_subtasks if self._replan_subtasks is not None else self._subtasks
         return PlanResult(list(src), _mock_raw(src))
 
@@ -157,8 +165,15 @@ If what you need is not listed yet, pick the closest element that IS shown.
 Each sub-task is one of: navigate (needs "url"), click (needs "target": the visible label),
 fill (needs "target" and "value"), press (needs "target" and "value": a key such as
 "Enter"). A click/press may carry "expect" — {"text_visible":"..."} / {"selector_visible":
-"css"} / {"url_contains":"..."} — the observable result that proves it worked. Respond with
-ONLY a JSON array of the REMAINING steps from here, no prose.
+"css"} / {"url_contains":"..."} — the observable result that proves it worked.
+
+Your plan must COMPLETE THE WHOLE TASK from here, not just fix the failed step. The original
+plan still had these remaining goal steps, which you are replacing:
+__REMAINING__
+Keep EVERY one of those goals — do NOT drop the later ones. In particular, if the task's
+FINAL goal (e.g. clicking a specific result/item, or reaching a target page) has not happened
+yet, your plan MUST still include it and END with it. Respond with ONLY a JSON array of the
+remaining steps from here, no prose.
 
 User task: __TASK__
 
@@ -195,11 +210,16 @@ class LLMPlanner:
         return PlanResult(_parse_plan(resp.content), resp.content)
 
     async def replan(
-        self, task: str, failure_log: list[dict], observation: str
+        self,
+        task: str,
+        failure_log: list[dict],
+        observation: str,
+        remaining: list[SubTask] | None = None,
     ) -> PlanResult:
         prompt = (
             _REPLAN_PROMPT.replace("__TASK__", task)
             .replace("__FAILURES__", _format_failures(failure_log))
+            .replace("__REMAINING__", _format_remaining(remaining))
             .replace("__OBSERVATION__", observation)
         )
         # The deep replan is the gated escalation tier: use the gateway's replanner
@@ -222,6 +242,21 @@ def _mock_raw(subtasks: list[SubTask]) -> str:
         for st in subtasks
     ]
     return json.dumps(items)
+
+
+def _format_remaining(remaining: list[SubTask] | None) -> str:
+    """Render the original remaining-goal steps the replan is REPLACING, so the planner
+    re-includes every downstream goal (esp. the final one) instead of dropping it."""
+    if not remaining:
+        return "(none recorded)"
+    lines = []
+    for st in remaining:
+        if st.action == "navigate":
+            lines.append(f"- navigate {st.url or ''}".rstrip())
+        else:
+            tail = f" = {st.value}" if st.value is not None else ""
+            lines.append(f"- {st.action} '{st.target or ''}'{tail}")
+    return "\n".join(lines)
 
 
 def _format_failures(failure_log: list[dict]) -> str:

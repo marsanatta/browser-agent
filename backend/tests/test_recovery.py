@@ -203,7 +203,7 @@ class _TwoPlanner:
         self.calls += 1
         return PlanResult(list(p))
 
-    async def replan(self, task, failure_log, observation):
+    async def replan(self, task, failure_log, observation, remaining=None):
         # The peek-replan path returns the second plan (the page-grounded retry).
         return PlanResult(list(self._plans[1]))
 

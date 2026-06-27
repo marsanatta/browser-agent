@@ -45,7 +45,7 @@ async def test_peek_replan_resolves_via_page_grounded_suffix():
     assert fin.payload["nominal_completion"] is True   # only possible via replan's suffix
     assert not asked
     assert len(planner.replan_calls) == 1
-    task, failure_log, observation = planner.replan_calls[0]
+    task, failure_log, observation, remaining = planner.replan_calls[0]
     assert any("Place Order" in f["step"] for f in failure_log)  # the failed step was passed
     assert "Submit Order" in observation               # the page was peeked + passed
 
@@ -83,4 +83,4 @@ async def test_replan_is_bounded_and_accumulates_failures():
     assert len(planner.replan_calls) == 3                 # bounded by max_replans, not one-shot
     assert asked and fin.payload["nominal_completion"] is False
     # the failure log GROWS across replans (accumulation), 1 -> 2 -> 3
-    assert [len(fl) for (_t, fl, _o) in planner.replan_calls] == [1, 2, 3]
+    assert [len(fl) for (_t, fl, _o, _r) in planner.replan_calls] == [1, 2, 3]

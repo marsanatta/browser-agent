@@ -63,7 +63,7 @@ class _ObsReadingPlanner:
             '[{"action":"navigate"},{"action":"click","target":"first search result"}]',
         )
 
-    async def replan(self, task, failure_log, observation) -> PlanResult:
+    async def replan(self, task, failure_log, observation, remaining=None) -> PlanResult:
         product = _first_product_in(observation)
         target = product or "first search result"
         return PlanResult([SubTask(action="click", target=target)],

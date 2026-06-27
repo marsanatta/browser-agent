@@ -114,8 +114,8 @@ class _StartUrlPlanner:
         prepended = [SubTask(action="navigate", url=self._start_url, description="open start URL"), *subtasks]
         return PlanResult(prepended, result.raw)
 
-    async def replan(self, task: str, failure_log: list[dict], observation: str) -> PlanResult:
-        return await self._inner.replan(task, failure_log, observation)
+    async def replan(self, task, failure_log, observation, remaining=None) -> PlanResult:
+        return await self._inner.replan(task, failure_log, observation, remaining=remaining)
 
 
 @dataclass
