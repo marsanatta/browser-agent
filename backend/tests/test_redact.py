@@ -178,3 +178,39 @@ def test_prose_with_email_not_mangled_beyond_email():
     out = redact(text)
     assert "alice@example.com" not in out
     assert "about the page-2 results, then click Submit." in out
+
+
+def test_usage_ledger_survives_redaction():
+    # The per-run token meter: a dict under the key `tokens` whose members also
+    # contain "tokens". None of it is a secret, so all integer counts must pass
+    # through intact (regression: the "token" key heuristic masked the whole dict).
+    out = redact(
+        {
+            "tokens": {
+                "output_tokens": 123,
+                "input_tokens": 456,
+                "reasoning_tokens": 7,
+                "total_nano_aiu": 89000,
+            }
+        }
+    )
+    assert out["tokens"] == {
+        "output_tokens": 123,
+        "input_tokens": 456,
+        "reasoning_tokens": 7,
+        "total_nano_aiu": 89000,
+    }
+
+
+def test_real_token_secrets_still_masked_after_ledger_exemption():
+    # Independent ground truth for the other direction: exempting the ledger keys
+    # must NOT loosen masking of genuine secret-bearing keys.
+    out = redact(
+        {
+            "access_token": "ya29.SECRETvalue",
+            "agent_token": "OUNatSECRET",
+            "authorization": "Bearer eyJsecret",
+            "refresh_token": "1//SECRETrefresh",
+        }
+    )
+    assert all(out[k] == "[REDACTED]" for k in out), out

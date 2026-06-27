@@ -76,6 +76,14 @@ _REDACT_KEYS = re.compile(
     r"refresh[_-]?token|token|secret|password|passwd|credential|session)"
 )
 
+# These ledger keys collide with the "token" secret heuristic but hold integer
+# usage counts, never secrets. Exempt them so the per-run token meter survives
+# serialization — without this the whole `tokens` dict (and its *_tokens members)
+# masks to "[REDACTED]" and the UI shows no usage.
+_USAGE_LEDGER_KEYS = frozenset(
+    {"tokens", "output_tokens", "input_tokens", "reasoning_tokens"}
+)
+
 
 def redact(value: Any) -> Any:
     """Recursively mask secrets/PII in strings, dicts, and lists.
@@ -94,7 +102,11 @@ def redact(value: Any) -> Any:
     if isinstance(value, dict):
         out: dict[Any, Any] = {}
         for k, v in value.items():
-            if isinstance(k, str) and _REDACT_KEYS.search(k):
+            if (
+                isinstance(k, str)
+                and _REDACT_KEYS.search(k)
+                and k.lower() not in _USAGE_LEDGER_KEYS
+            ):
                 out[k] = _MASK
             else:
                 out[k] = redact(v)
