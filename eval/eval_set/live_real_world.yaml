@@ -341,7 +341,7 @@ tasks:
 - id: live_wikipedia_oxygen_search
   purpose: basic_retrieval
   split: dev
-  instruction: Use Wikipedia's search to find the chemical element with atomic number 8 and open its article.
+  instruction: On Wikipedia, find and open the article about the chemical element Oxygen.
   start_url: https://en.wikipedia.org/wiki/Main_Page
   domain: information
   task_type: retrieval
@@ -938,7 +938,7 @@ tasks:
 - id: live_wikipedia_signup_captcha_abstain
   purpose: botwall_abstain
   split: dev
-  instruction: On Wikipedia, click the 'Sign Up' link and create a new account.
+  instruction: On Wikipedia, open the account creation (sign-up) page.
   start_url: https://en.wikipedia.org/wiki/Main_Page
   domain: information
   task_type: action
