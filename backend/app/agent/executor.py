@@ -469,7 +469,7 @@ class _Outcome:
         self.failure_class = failure_class
 
 
-def _format_observation(perception: Any, limit: int = 40) -> str:
+def _format_observation(perception: Any, limit: int = _VIEW_SCOPE) -> str:
     """Compact role|name(+href) list of the live page for the peek-replan — never
     raw DOM (token blowup); the same indexed-element vocabulary perceive/locate use."""
     lines = []
