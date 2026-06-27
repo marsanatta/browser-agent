@@ -47,10 +47,17 @@ class Executor:
         verify_hook: VerifyHook | None = None,
         step_hook: VerifyHook | None = None,
         max_attempts: int = _MAX_ATTEMPTS,
+        peek_plan: bool = False,
+        start_url: str | None = None,
     ) -> None:
         self._provider = provider
         self._planner = planner
         self._gateway = gateway  # enables the L2 LLM locator fallback when set
+        # peek_plan: see the start page BEFORE the initial plan (navigate -> perceive ->
+        # plan WITH the observed elements), so the plan is grounded and `expect` is
+        # observed, not guessed a-priori. Needs start_url; otherwise falls back to blind.
+        self._peek_plan = peek_plan
+        self._start_url = start_url
         # confirm-before-submit hook: async () -> bool. Default autopilot approves
         # (no human-in-the-loop yet) but the gate is real.
         self._confirm_submit = confirm_submit
@@ -70,23 +77,43 @@ class Executor:
         run_id = uuid.uuid4().hex[:8]
         yield events.run_started(task, run_id)
 
-        yield events.phase(run_id, "planning")
-        try:
-            subtasks = await self._planner.plan(task)
-        except Exception as exc:  # planner is the LLM seam; surface, don't crash
-            yield Event(events.EventType.RUN_ERROR, {"run_id": run_id, "error": str(exc)})
-            return
-
-        yield events.plan_ready(run_id, [_args(st) for st in subtasks])
-
-        yield events.phase(run_id, "launching")
-        await self._provider.launch()
-        page = await self._provider.new_page()
+        peek = bool(self._peek_plan and self._start_url)
+        page = None
+        launched = False
         all_ok = True
         replanned = False
         verified = None
 
         try:
+            if peek:
+                # peek-plan: launch + SEE the start page before planning.
+                yield events.phase(run_id, "launching")
+                await self._provider.launch()
+                launched = True
+                page = await self._provider.new_page()
+                yield events.phase(run_id, "planning")
+                try:
+                    await act.navigate(page, self._start_url or "")
+                    observation = _format_observation(await perceive(page))
+                    subtasks = await self._planner.plan(task, observation=observation)
+                except Exception as exc:  # planner/peek seam; surface, don't crash
+                    yield Event(events.EventType.RUN_ERROR, {"run_id": run_id, "error": str(exc)})
+                    return
+                yield events.plan_ready(run_id, [_args(st) for st in subtasks])
+            else:
+                # blind: plan BEFORE launch (unchanged baseline behavior).
+                yield events.phase(run_id, "planning")
+                try:
+                    subtasks = await self._planner.plan(task)
+                except Exception as exc:  # planner is the LLM seam; surface, don't crash
+                    yield Event(events.EventType.RUN_ERROR, {"run_id": run_id, "error": str(exc)})
+                    return
+                yield events.plan_ready(run_id, [_args(st) for st in subtasks])
+                yield events.phase(run_id, "launching")
+                await self._provider.launch()
+                launched = True
+                page = await self._provider.new_page()
+
             i = 0
             while i < len(subtasks):
                 st = subtasks[i]
@@ -171,7 +198,8 @@ class Executor:
                 except Exception:
                     verified = False
         finally:
-            await self._provider.close()
+            if launched:
+                await self._provider.close()
 
         yield events.run_finished(
             run_id,

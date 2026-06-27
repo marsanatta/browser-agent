@@ -1,0 +1,42 @@
+{"task": "live_wikipedia_helium_retrieval", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 7.2242, "error": null}
+{"task": "live_pydocs_json_nav", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 17.381725, "error": null}
+{"task": "live_google_search_steam", "arm": "blind", "nominal": false, "verified": true, "silent": false, "aiu": 7.158575, "error": null}
+{"task": "live_wikipedia_signin_synonym", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 7.11295, "error": null}
+{"task": "live_wikipedia_search_submit", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 7.224825, "error": null}
+{"task": "live_wikipedia_autocomplete", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 7.54914, "error": null}
+{"task": "live_internet_lazyload", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 7.129825, "error": null}
+{"task": "live_internet_modal", "arm": "blind", "nominal": true, "verified": false, "silent": true, "aiu": 7.53795, "error": null}
+{"task": "live_internet_iframe", "arm": "blind", "nominal": false, "verified": false, "silent": false, "aiu": 22.707975, "error": null}
+{"task": "live_example_more_info_nav", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 16.782475, "error": null}
+{"task": "live_hackernews_newest_nav", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 7.103575, "error": null}
+{"task": "live_gnu_licenses_nav", "arm": "blind", "nominal": false, "verified": false, "silent": false, "aiu": 7.112325, "error": "TimeoutError: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://www.gnu.org/\", waiting until \"domcontentloaded\"\n"}
+{"task": "live_osm_login_nav", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 7.106075, "error": null}
+{"task": "live_lobsters_comments_nav", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 7.1067, "error": null}
+{"task": "live_mdn_blog_nav", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 7.439765, "error": null}
+{"task": "live_archive_login_nav", "arm": "blind", "nominal": false, "verified": false, "silent": false, "aiu": 14.504025, "error": null}
+{"task": "live_govuk_help_nav", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 7.10545, "error": null}
+{"task": "live_arxiv_help_nav", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 7.096075, "error": null}
+{"task": "live_yahoofinance_aapl_quote", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 7.159825, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "nominal": true, "verified": true, "silent": false, "aiu": 7.109825, "error": null}
+{"task": "live_stackoverflow_questions_nav", "arm": "blind", "nominal": false, "verified": false, "silent": false, "aiu": 14.4759, "error": null}
+{"task": "live_wikipedia_helium_retrieval", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 7.94795, "error": null}
+{"task": "live_pydocs_json_nav", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 7.893575, "error": null}
+{"task": "live_google_search_steam", "arm": "peek", "nominal": false, "verified": true, "silent": false, "aiu": 8.196075, "error": null}
+{"task": "live_wikipedia_signin_synonym", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 7.8542, "error": null}
+{"task": "live_wikipedia_search_submit", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 7.956075, "error": null}
+{"task": "live_wikipedia_autocomplete", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 9.7747, "error": null}
+{"task": "live_internet_lazyload", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 7.144825, "error": null}
+{"task": "live_internet_modal", "arm": "peek", "nominal": false, "verified": true, "silent": false, "aiu": 21.202075, "error": null}
+{"task": "live_internet_iframe", "arm": "peek", "nominal": false, "verified": false, "silent": false, "aiu": 9.019175, "error": null}
+{"task": "live_example_more_info_nav", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 7.424825, "error": null}
+{"task": "live_hackernews_newest_nav", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 7.75545, "error": null}
+{"task": "live_gnu_licenses_nav", "arm": "peek", "nominal": false, "verified": false, "silent": false, "aiu": 0.0, "error": "Page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://www.gnu.org/\", waiting until \"domcontentloaded\"\n"}
+{"task": "live_osm_login_nav", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 7.591075, "error": null}
+{"task": "live_lobsters_comments_nav", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 7.668575, "error": null}
+{"task": "live_mdn_blog_nav", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 7.921075, "error": null}
+{"task": "live_archive_login_nav", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 14.629025, "error": null}
+{"task": "live_govuk_help_nav", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 7.717325, "error": null}
+{"task": "live_arxiv_help_nav", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 7.681075, "error": null}
+{"task": "live_yahoofinance_aapl_quote", "arm": "peek", "nominal": true, "verified": true, "silent": false, "aiu": 19.812535, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "nominal": false, "verified": false, "silent": false, "aiu": 0.0, "error": "Page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://openlibrary.org/\", waiting until \"domcontentloaded\"\n"}
+{"task": "live_stackoverflow_questions_nav", "arm": "peek", "nominal": false, "verified": true, "silent": false, "aiu": 15.1334, "error": null}

@@ -37,7 +37,9 @@ class SubTask:
 
 
 class Planner(Protocol):
-    async def plan(self, task: str, start_url: str | None = None) -> list[SubTask]: ...
+    async def plan(
+        self, task: str, start_url: str | None = None, observation: str | None = None
+    ) -> list[SubTask]: ...
 
     async def replan(
         self, task: str, failed: str, failure_class: str, observation: str
@@ -50,13 +52,25 @@ class MockPlanner:
     records each replan call so a test can assert the page observation was passed."""
 
     def __init__(
-        self, subtasks: list[SubTask], replan_subtasks: list[SubTask] | None = None
+        self,
+        subtasks: list[SubTask],
+        replan_subtasks: list[SubTask] | None = None,
+        peek_subtasks: list[SubTask] | None = None,
     ) -> None:
         self._subtasks = subtasks
         self._replan_subtasks = replan_subtasks
+        # peek_subtasks: returned when plan() is called WITH an observation (peek-plan),
+        # so a test can prove "seeing the page -> a different/correct plan".
+        self._peek_subtasks = peek_subtasks
         self.replan_calls: list[tuple[str, str, str, str]] = []
+        self.plan_calls: list[tuple[str, str | None, str | None]] = []  # (task, start_url, observation)
 
-    async def plan(self, task: str, start_url: str | None = None) -> list[SubTask]:
+    async def plan(
+        self, task: str, start_url: str | None = None, observation: str | None = None
+    ) -> list[SubTask]:
+        self.plan_calls.append((task, start_url, observation))
+        if observation is not None and self._peek_subtasks is not None:
+            return list(self._peek_subtasks)
         return list(self._subtasks)
 
     async def replan(
@@ -101,6 +115,18 @@ _START_CONTEXT = (
 )
 
 
+# Peek-plan (the root fix for a-priori blindness): the agent navigates to the start page
+# and PERCEIVES it BEFORE the initial plan, so the planner sees the real elements and can
+# ground both the plan and any `expect` in what is actually there (vs guessing blind).
+_PEEK_PLAN_PROMPT = (
+    "The browser is ALREADY loaded on the start page and you can SEE its real interactive\n"
+    "elements (listed at the end). Plan FROM this page using the ACTUAL visible labels, not\n"
+    'guesses, and ground any "expect" in what you can see.\n\n'
+    + _PLAN_PROMPT
+    + "\nElements currently on the page:\n__OBSERVATION__\n"
+)
+
+
 # Peek-the-page replan (docs/architecture/02 §1.3, the close-the-loop fix): on local
 # recovery exhaustion the agent spends tokens to SHOW the planner the current page's
 # real elements and asks for a revised plan from here — closing the open loop where
@@ -139,10 +165,16 @@ class LLMPlanner:
         self._model = model
         self._effort = reasoning_effort
 
-    async def plan(self, task: str, start_url: str | None = None) -> list[SubTask]:
-        prompt = _PLAN_PROMPT.replace("__TASK__", task)
-        if start_url:
-            prompt = _START_CONTEXT.format(url=start_url) + prompt
+    async def plan(
+        self, task: str, start_url: str | None = None, observation: str | None = None
+    ) -> list[SubTask]:
+        if observation is not None:
+            # peek-plan: the agent already saw the start page; plan grounded in it.
+            prompt = _PEEK_PLAN_PROMPT.replace("__TASK__", task).replace("__OBSERVATION__", observation)
+        elif start_url:
+            prompt = _START_CONTEXT.format(url=start_url) + _PLAN_PROMPT.replace("__TASK__", task)
+        else:
+            prompt = _PLAN_PROMPT.replace("__TASK__", task)
         resp = await self._gateway.complete(prompt, model=self._model, reasoning_effort=self._effort)
         return _parse_plan(resp.content)
 

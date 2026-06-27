@@ -109,7 +109,11 @@ class _StartUrlPlanner:
         self._inner = inner
         self._start_url = start_url
 
-    async def plan(self, task: str, start_url: str | None = None) -> list[SubTask]:
+    async def plan(
+        self, task: str, start_url: str | None = None, observation: str | None = None
+    ) -> list[SubTask]:
+        if observation is not None:
+            return await self._inner.plan(task, observation=observation)  # peek: no prepend
         subtasks = await self._inner.plan(task, start_url=self._start_url)
         if subtasks and subtasks[0].action == "navigate":
             return subtasks

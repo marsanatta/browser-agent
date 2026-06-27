@@ -100,7 +100,13 @@ class _StartUrlPlanner:
         self._inner = inner
         self._start_url = start_url
 
-    async def plan(self, task: str, start_url: str | None = None) -> list[SubTask]:
+    async def plan(
+        self, task: str, start_url: str | None = None, observation: str | None = None
+    ) -> list[SubTask]:
+        if observation is not None:
+            # peek-plan: the executor already navigated to the start page, so do NOT
+            # prepend a navigate; plan grounded in the observation.
+            return await self._inner.plan(task, observation=observation)
         subtasks = await self._inner.plan(task, start_url=self._start_url)
         if subtasks and subtasks[0].action == "navigate":
             return subtasks
@@ -127,11 +133,15 @@ class RunRecord:
     blocked: bool = False
     plan: list = field(default_factory=list)
     audit_steps: list = field(default_factory=list)
+    replanned: bool = False  # did a global replan fire (peek-plan experiment cost cut)
 
 
-async def _run_once(task: EvalTask, gateway: _CountingGateway, *, full: bool) -> RunRecord:
+async def _run_once(
+    task: EvalTask, gateway: _CountingGateway, *, full: bool, peek_plan: bool = False
+) -> RunRecord:
     """One execution of one task. `full` = agent with the recovery ladder + L2 heal;
-    not full = budget-matched vanilla baseline (1 attempt, no heal)."""
+    not full = budget-matched vanilla baseline (1 attempt, no heal). `peek_plan` = see
+    the start page before the initial plan (the experiment's treatment arm)."""
     hit_nodes: list[bool] = [False] * len(task.key_nodes)
 
     async def step_hook(page: Any) -> bool:
@@ -159,6 +169,8 @@ async def _run_once(task: EvalTask, gateway: _CountingGateway, *, full: bool) ->
         verify_hook=verify_hook,
         step_hook=step_hook,
         max_attempts=4 if full else 1,        # budget-matched: baseline gets 1 attempt
+        peek_plan=peek_plan,
+        start_url=task.start_url,
     )
 
     nominal = False
@@ -211,6 +223,7 @@ async def _run_once(task: EvalTask, gateway: _CountingGateway, *, full: bool) ->
         blocked=reduced["blocked"],
         plan=reduced["plan"],
         audit_steps=reduced["steps"],
+        replanned=any("REPLAN" in (s.get("recovery") or []) for s in reduced["steps"]),
     )
 
 
