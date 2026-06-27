@@ -1165,3 +1165,247 @@ tasks:
     - url_contains: phones/touch
     assert:
       url_contains: phones/touch
+
+  # --- batch 3 (supported fill: dev/holdout/sealed): two-pass validated ---
+  - id: live_wikipedia_iron_element
+    instruction: Search Wikipedia for the chemical element with atomic number 26 and symbol Fe, then open its article.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Iron
+    assert:
+      h1_equals: Iron
+  - id: live_wikipedia_jupiter
+    instruction: Find and open the Wikipedia article for the largest planet in the Solar System, the fifth planet from the Sun.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Jupiter
+    assert:
+      h1_equals: Jupiter
+  - id: live_wikipedia_brazil
+    instruction: Search Wikipedia for the largest country in South America and open its article.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Brazil
+    assert:
+      h1_equals: Brazil
+  - id: live_wikipedia_isaac_newton
+    instruction: Find the Wikipedia article for the English physicist and mathematician who formulated the laws of motion and universal gravitation, and open it.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Isaac_Newton
+    assert:
+      h1_equals: Isaac Newton
+  - id: live_wikipedia_bengal_tiger_via_brazil
+    instruction: Open the Wikipedia article for the largest country in South America, then from there navigate to the article about the tiger population native to the Indian subcontinent (Bengal tiger).
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Bengal_tiger
+    assert:
+      h1_equals: Bengal tiger
+  - id: live_wikipedia_mitochondrion_via_iron
+    instruction: Open the Wikipedia article for the chemical element iron, then navigate to the article about the cell organelle that uses aerobic respiration to generate ATP (the mitochondrion).
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Mitochondrion
+    assert:
+      h1_equals: Mitochondrion
+  - id: live_wikipedia_pacific_ocean_via_jupiter
+    instruction: Open the Wikipedia article for the planet Jupiter, then navigate to the article about the largest and deepest of Earth's five oceanic divisions (the Pacific Ocean).
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Pacific_Ocean
+    assert:
+      h1_equals: Pacific Ocean
+  - id: live_books_romance_category
+    instruction: Open the 'Romance' book category from the homepage sidebar.
+    start_url: https://books.toscrape.com/
+    domain: ecommerce
+    task_type: action
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: romance_8
+    assert:
+      h1_equals: Romance
+  - id: live_books_music_category
+    instruction: Navigate to the 'Music' book category.
+    start_url: https://books.toscrape.com/
+    domain: ecommerce
+    task_type: action
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: music_14
+    assert:
+      h1_equals: Music
+  - id: live_books_how_music_works_price
+    instruction: In the Music category, open the book 'How Music Works' and report its price.
+    start_url: https://books.toscrape.com/
+    domain: extraction
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: how-music-works_979
+    assert:
+      text_contains: £37.32
+  - id: live_books_sophies_world_price
+    instruction: In the Philosophy category, open the book 'Sophie's World' and report its price.
+    start_url: https://books.toscrape.com/
+    domain: extraction
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: sophies-world_966
+    assert:
+      text_contains: £15.94
+  - id: live_books_rip_it_up_price
+    instruction: Find the book 'Rip it Up and Start Again' in the Music category and report the price on its product page.
+    start_url: https://books.toscrape.com/
+    domain: extraction
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: rip-it-up-and-start-again_986
+    assert:
+      text_contains: £35.02
+  - id: live_books_fiction_page2
+    instruction: Open the 'Fiction' category, then go to the second page of results using the 'next' button.
+    start_url: https://books.toscrape.com/
+    domain: ecommerce
+    task_type: action
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: page-2
+    assert:
+      url_contains: fiction_10/page-2.html
+  - id: live_arxiv_attention_paper
+    instruction: Open the abstract page for the paper 'Attention Is All You Need' on arXiv.
+    start_url: https://arxiv.org/
+    domain: academic
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: holdout
+    key_nodes:
+    - text_contains: Attention Is All You Need
+    assert:
+      url_contains: abs/1706.03762
+  - id: live_arxiv_bert_paper
+    instruction: 'Find and open the arXiv abstract page for the BERT paper titled ''BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding''.'
+    start_url: https://arxiv.org/
+    domain: academic
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: holdout
+    key_nodes:
+    - url_contains: abs/1810.04805
+    assert:
+      text_contains: 'BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding'
+  - id: live_arxiv_cs_ai_listing
+    instruction: Navigate from the arXiv home page to the recent submissions listing for Computer Science > Artificial Intelligence (cs.AI).
+    start_url: https://arxiv.org/
+    domain: academic
+    task_type: action
+    difficulty: single
+    split: holdout
+    key_nodes:
+    - url_contains: list/cs.AI
+    assert:
+      url_contains: list/cs.AI
+  - id: live_arxiv_cs_lg_listing
+    instruction: Navigate from the arXiv home page to the recent submissions listing for the Computer Science > Machine Learning (cs.LG) category.
+    start_url: https://arxiv.org/
+    domain: academic
+    task_type: action
+    difficulty: single
+    split: holdout
+    key_nodes:
+    - url_contains: list/cs.LG
+    assert:
+      url_contains: list/cs.LG
+  - id: live_rfceditor_websocket_open
+    instruction: Open the RFC Editor info page for RFC 6455.
+    start_url: https://www.rfc-editor.org/
+    domain: reference
+    task_type: action
+    difficulty: single
+    split: sealed
+    key_nodes:
+    - url_contains: info/rfc6455
+    assert:
+      url_contains: info/rfc6455
+  - id: live_rfceditor_smtp_open
+    instruction: Navigate to the RFC Editor info page for RFC 5321.
+    start_url: https://www.rfc-editor.org/
+    domain: reference
+    task_type: action
+    difficulty: single
+    split: sealed
+    key_nodes:
+    - url_contains: info/rfc5321
+    assert:
+      url_contains: info/rfc5321
+  - id: live_rfceditor_udp_open
+    instruction: Open the info page for RFC 768 on the RFC Editor site.
+    start_url: https://www.rfc-editor.org/
+    domain: reference
+    task_type: action
+    difficulty: single
+    split: sealed
+    key_nodes:
+    - url_contains: info/rfc768
+    assert:
+      url_contains: info/rfc768
+  - id: live_rfceditor_rfc1918_title
+    instruction: Find the title of RFC 1918 and report it.
+    start_url: https://www.rfc-editor.org/
+    domain: reference
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: sealed
+    key_nodes:
+    - url_contains: info/rfc1918
+    assert:
+      text_contains: Address Allocation for Private Internets
+  - id: live_rfceditor_rfc793_title
+    instruction: Find the title of RFC 793 and report it.
+    start_url: https://www.rfc-editor.org/
+    domain: reference
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: sealed
+    key_nodes:
+    - url_contains: info/rfc793
+    assert:
+      text_contains: Transmission Control Protocol
