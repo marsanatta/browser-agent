@@ -345,6 +345,69 @@ This separates concerns: agent API (thin, stateless) + managed browser (stateful
 └──────────────────────────────────────────────┘
 ```
 
+### 4.8 Real-Browser Escalation over CDP (`BROWSER_CDP_URL`) — Three Docker Topologies
+
+The default `PlaywrightProvider` launches a headless Chromium inside the container —
+fine for bot-wall-free sites, but a headless / fresh-profile browser trips anti-bot
+interstitials on sites like Amazon (`UNSUPPORTED_SITES.md`). The swappable
+`CDPProvider` (`backend/app/browser/provider.py`) instead connects Playwright over CDP
+(`connect_over_cdp`) to an **externally-managed real browser**. Set `BROWSER_CDP_URL`
+to switch; leave it unset for the default headless path (byte-identical to before). The
+agent logic, SSE event stream, and per-step screenshots all work unchanged — the CDP
+target is a real Playwright `Page` (verified: `page.screenshot()` returns valid PNG).
+
+| Topology | `BROWSER_CDP_URL` | Bypasses anti-bot? | Docker networking |
+|---|---|---|---|
+| **A. Managed service (Steel/Browserbase)** ⭐ | `wss://connect.steel.dev?apiKey=…` / Browserbase `session.connectUrl` | **Yes** (residential IP + stealth) | none — container makes an outbound WSS |
+| **B. Container → host's real Chrome** | `http://<HOST-IP>:9222` (an **IP**, never a hostname) | **Yes** (trusted real profile) | host-reachable + Chrome bound `0.0.0.0` |
+| **C. Chrome inside the same image** | `http://127.0.0.1:9222` | **No** (datacenter IP + fresh profile → still walled) | none (same loopback) |
+
+**A — Managed browser (recommended for cloud).** No Chromium in the image, no
+host-networking: the container opens an outbound secure WebSocket to the provider, which
+runs a stealth browser on a residential / anti-detect IP — that is the actual anti-bot
+bypass (their product). Extends §4.6.
+
+```yaml
+# docker-compose.yml (excerpt) — nothing else needed; the browser is remote
+services:
+  agent:
+    image: <your-image>
+    environment:
+      BROWSER_CDP_URL: "wss://connect.steel.dev?apiKey=${STEEL_API_KEY}"
+```
+
+**B — Host's real Chrome (fits the desktop self-host deployment).** When the backend
+container runs on the same desktop as a real, trusted Chrome (e.g. one managed by
+actionbook on CDP port 18800/9222), point the container at the host. Two gotchas:
+- Chrome must bind beyond localhost: launch it with
+  `--remote-debugging-address=0.0.0.0 --remote-debugging-port=9222`.
+- **Use the host IP, not a hostname.** Chrome (66+) rejects the HTTP `/json` probe that
+  Playwright sends first if the `Host` header is not an IP or `localhost` (DNS-rebinding
+  protection), so `host.docker.internal` (a hostname) is rejected. Resolve it to the host
+  IP and pass `http://<HOST-IP>:9222`, or front Chrome with a `socat`/proxy that rewrites
+  `Host: localhost`.
+
+```yaml
+services:
+  agent:
+    extra_hosts: ["host.docker.internal:host-gateway"]   # Linux; resolve to IP at entrypoint
+    environment:
+      BROWSER_CDP_URL: "http://${HOST_IP}:9222"
+```
+
+**C — Chrome in the image (NOT for anti-bot).** Simplest networking (same loopback, no
+Host-header issue), but a containerised Chrome has a datacenter IP and a fresh profile,
+so anti-bot sites still block it — no gain over default headless. Only worth it if you
+need a real (headed) Chrome window for non-anti-bot reasons; run it under Xvfb with the
+§4.1 hardening (`--disable-dev-shm-usage`, non-root, `shm_size: 2gb`).
+
+**Security:** topologies A/B drive a real, possibly logged-in profile, so screenshots may
+capture that profile's PII — keep the screenshots dir a git-ignored secret and rely on
+the §5 serialization-time redaction. `CDPProvider.close()` only closes the agent's own
+tab, never the external browser or its other tabs.
+
+**Sources**: [Chrome remote-debugging Host-header change (Chrome 66+)](https://developer.chrome.com/blog/remote-debugging-port), [Steel.dev — connect with Playwright (`connectOverCDP('wss://connect.steel.dev?apiKey=…')`)](https://docs.steel.dev/overview/guides/connect-with-playwright-node), [Browserbase — Playwright `connectOverCDP(session.connectUrl)`](https://docs.browserbase.com/introduction/playwright), [host.docker.internal + Chrome remote debugging in Docker](https://sahajamit.medium.com/can-selenium-chrome-dev-tools-recipe-works-inside-a-docker-container-afff92e9cce5)
+
 ---
 
 ## 5. Security in the Frontend
