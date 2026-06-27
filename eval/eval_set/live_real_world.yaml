@@ -325,3 +325,456 @@ tasks:
       - url_contains: "stackoverflow.com"
     assert:
       url_contains: "questions"
+
+  # --- batch 1 (dev): two-pass validated (A4 probe + independent reviewer) ---
+  - id: live_internet_status_code_200
+    instruction: Start on the Status Codes page and click the link for the 200 status code, then confirm the resulting page.
+    start_url: https://the-internet.herokuapp.com/status_codes
+    domain: navigation
+    task_type: action
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /status_codes/200
+    assert:
+      text_contains: This page returned a 200 status code
+  - id: live_internet_redirector_to_status
+    instruction: On the Redirection page, click the 'here' link to follow the redirect to the status codes page.
+    start_url: https://the-internet.herokuapp.com/redirector
+    domain: navigation
+    task_type: action
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - text_contains: status code
+    assert:
+      url_contains: /status_codes
+  - id: live_internet_challenging_dom_intro
+    instruction: Open the Challenging DOM page and report the static introductory description shown about finding the best locators.
+    start_url: https://the-internet.herokuapp.com/challenging_dom
+    domain: tables
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: /challenging_dom
+    assert:
+      text_contains: The hardest part in automated web testing is finding the best locators
+  - id: live_books_sapiens_price
+    instruction: 'Find the book ''Sapiens: A Brief History of Humankind'' and report its price.'
+    start_url: https://books.toscrape.com/
+    domain: extraction
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: sapiens-a-brief-history-of-humankind_996
+    assert:
+      text_contains: £54.23
+  - id: live_books_open_mystery_category
+    instruction: Open the Mystery book category from the homepage sidebar.
+    start_url: https://books.toscrape.com/
+    domain: ecommerce
+    task_type: action
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: category/books/mystery_3
+    assert:
+      h1_equals: Mystery
+  - id: live_books_sapiens_stock
+    instruction: 'Open the product page for ''Sapiens: A Brief History of Humankind'' and report how many copies are in stock.'
+    start_url: https://books.toscrape.com/
+    domain: extraction
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - text_contains: 20 available
+    assert:
+      text_contains: In stock (20 available)
+  - id: live_books_grand_design_price
+    instruction: Find the price of the book 'The Grand Design' by Stephen Hawking on this site.
+    start_url: https://books.toscrape.com/catalogue/the-grand-design_405/index.html
+    domain: extraction
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: the-grand-design_405
+    assert:
+      text_contains: £13.76
+  - id: live_books_open_science_fiction
+    instruction: Navigate to the Science Fiction category and confirm the category page has loaded.
+    start_url: https://books.toscrape.com/
+    domain: ecommerce
+    task_type: action
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: science-fiction_16
+    assert:
+      h1_equals: Science Fiction
+  - id: live_books_dune_price
+    instruction: 'Go to the Science Fiction category, find ''Dune (Dune #1)'', and report its price.'
+    start_url: https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html
+    domain: extraction
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: dune-dune-1
+    assert:
+      text_contains: £54.86
+  - id: live_books_page2_pagination
+    instruction: From the catalogue, go to the second page of the full book listing.
+    start_url: https://books.toscrape.com/catalogue/page-1.html
+    domain: ecommerce
+    task_type: action
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: page-2.html
+    assert:
+      text_contains: Page 2 of 50
+  - id: live_books_classics_secret_garden
+    instruction: Open the Classics category and find the price of 'The Secret Garden'.
+    start_url: https://books.toscrape.com/catalogue/category/books/classics_6/index.html
+    domain: extraction
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: the-secret-garden
+    assert:
+      text_contains: £15.08
+  - id: live_books_travel_count
+    instruction: Open the Travel category and report how many books (results) it contains.
+    start_url: https://books.toscrape.com/
+    domain: extraction
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: travel_2
+    assert:
+      text_contains: 11 results
+  - id: live_books_poetry_olio_price
+    instruction: Open the Poetry category and report the price of the book 'Olio'.
+    start_url: https://books.toscrape.com/catalogue/category/books/poetry_23/index.html
+    domain: extraction
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: olio_984
+    assert:
+      text_contains: £23.88
+  - id: live_books_grand_design_stock
+    instruction: Open the product page for 'The Grand Design' and report how many copies are in stock.
+    start_url: https://books.toscrape.com/catalogue/the-grand-design_405/index.html
+    domain: extraction
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - text_contains: 5 available
+    assert:
+      text_contains: In stock (5 available)
+  - id: live_wikipedia_oxygen_search
+    instruction: Use Wikipedia's search to find the chemical element with atomic number 8 and open its article.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Oxygen
+    assert:
+      h1_equals: Oxygen
+  - id: live_wikipedia_photosynthesis_search
+    instruction: Search Wikipedia for the biological process by which plants convert light energy into chemical energy and open the resulting article.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Photosynthesis
+    assert:
+      h1_equals: Photosynthesis
+  - id: live_wikipedia_everest_retrieval
+    instruction: Find and open the Wikipedia article for the highest mountain on Earth above sea level.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Mount_Everest
+    assert:
+      h1_equals: Mount Everest
+  - id: live_wikipedia_japan_country
+    instruction: Search Wikipedia for the island country in East Asia whose capital is Tokyo and open its article.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Japan
+    assert:
+      h1_equals: Japan
+  - id: live_wikipedia_periodic_table_nav
+    instruction: Open Wikipedia's article on Oxygen, then from there navigate via a link to the article describing the tabular arrangement of all the chemical elements.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Periodic_table
+    assert:
+      h1_equals: Periodic table
+  - id: live_wikipedia_dna_search
+    instruction: Search Wikipedia for the molecule that carries genetic instructions in living organisms, abbreviated as deoxyribonucleic acid, and open its article.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/DNA
+    assert:
+      h1_equals: DNA
+  - id: live_wikipedia_einstein_via_gravity
+    instruction: Open Wikipedia's article on Gravity, then follow a link to the article about the physicist who developed the general theory of relativity.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Albert_Einstein
+    assert:
+      h1_equals: Albert Einstein
+  - id: live_wikipedia_great_barrier_reef
+    instruction: Search Wikipedia for the world's largest coral reef system, located off the coast of Queensland, Australia, and open its article.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Great_Barrier_Reef
+    assert:
+      h1_equals: Great Barrier Reef
+  - id: live_wikipedia_volcano_via_everest
+    instruction: Open Wikipedia's article on Mount Everest, then use search to find and open the article about a rupture in a planetary crust that allows lava to escape, titled Volcano.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: /wiki/Volcano
+    assert:
+      h1_equals: Volcano
+  - id: live_wikipedia_einstein_body_text
+    instruction: Search Wikipedia for the person famous for the equation E = mc^2 and open his article.
+    start_url: https://en.wikipedia.org/wiki/Main_Page
+    domain: information
+    task_type: retrieval
+    difficulty: single
+    split: dev
+    key_nodes:
+    - h1_equals: Albert Einstein
+    assert:
+      url_contains: /wiki/Albert_Einstein
+  - id: live_pydocs_os_nav
+    instruction: From the Python 3 documentation home page, navigate to The Python Standard Library index and open the documentation page for the 'os' module (miscellaneous operating system interfaces).
+    start_url: https://docs.python.org/3/
+    domain: reference
+    task_type: action
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: library/os
+    assert:
+      h1_equals: os — Miscellaneous operating system interfaces
+  - id: live_pydocs_pathlib_nav
+    instruction: Starting at the Python 3 documentation home, go through the standard library index and open the 'pathlib' module page about object-oriented filesystem paths.
+    start_url: https://docs.python.org/3/
+    domain: reference
+    task_type: action
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: library/pathlib
+    assert:
+      h1_equals: pathlib — Object-oriented filesystem paths
+  - id: live_pydocs_datetime_nav
+    instruction: From the Python 3 docs home page, navigate via the standard library to the 'datetime' module documentation page covering basic date and time types.
+    start_url: https://docs.python.org/3/
+    domain: reference
+    task_type: action
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: library/datetime
+    assert:
+      h1_equals: datetime — Basic date and time types
+  - id: live_pydocs_collections_nav
+    instruction: Beginning at the Python 3 documentation home, use the standard library index to reach the 'collections' module page on container datatypes.
+    start_url: https://docs.python.org/3/
+    domain: reference
+    task_type: action
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: library/collections
+    assert:
+      h1_equals: collections — Container datatypes
+  - id: live_pydocs_re_nav
+    instruction: From the Python 3 documentation home page, navigate through the standard library to open the 're' module documentation about regular expression operations.
+    start_url: https://docs.python.org/3/
+    domain: reference
+    task_type: action
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: library/re
+    assert:
+      h1_equals: re — Regular expression operations
+  - id: live_pydocs_itertools_nav
+    instruction: Starting from the Python 3 docs home, navigate via the standard library index to the 'itertools' module page about functions creating iterators for efficient looping.
+    start_url: https://docs.python.org/3/
+    domain: reference
+    task_type: action
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: library/itertools
+    assert:
+      h1_equals: itertools — Functions creating iterators for efficient looping
+  - id: live_pydocs_sys_nav
+    instruction: From the Python 3 documentation home page, go to the standard library index and open the 'sys' module page on system-specific parameters and functions.
+    start_url: https://docs.python.org/3/
+    domain: reference
+    task_type: action
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: library/sys
+    assert:
+      h1_equals: sys — System-specific parameters and functions
+  - id: live_pydocs_builtins_nav
+    instruction: From the Python 3 documentation home, navigate through the standard library to the 'Built-in Functions' reference page that lists functions such as abs(), len(), and zip().
+    start_url: https://docs.python.org/3/
+    domain: reference
+    task_type: action
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: library/functions
+    assert:
+      h1_equals: Built-in Functions
+  - id: live_pydocs_tutorial_nav
+    instruction: From the Python 3 documentation home page, open 'The Python Tutorial' index page.
+    start_url: https://docs.python.org/3/
+    domain: docs
+    task_type: action
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: tutorial/index
+    assert:
+      h1_equals: The Python Tutorial
+  - id: live_pydocs_stdlib_index_nav
+    instruction: From the Python 3 documentation home page, open 'The Python Standard Library' index page.
+    start_url: https://docs.python.org/3/
+    domain: docs
+    task_type: action
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: library/index
+    assert:
+      h1_equals: The Python Standard Library
+  - id: live_hackernews_ask_nav
+    instruction: From the Hacker News front page, click the navigation link that opens the Ask HN section.
+    start_url: https://news.ycombinator.com/
+    domain: news
+    task_type: action
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: ask
+    assert:
+      url_contains: /ask
+  - id: live_hackernews_comments_nav
+    instruction: From the Hacker News front page, open the newest comments feed by clicking the 'comments' link in the top navigation bar.
+    start_url: https://news.ycombinator.com/
+    domain: news
+    task_type: action
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: newcomments
+    assert:
+      url_contains: /newcomments
+  - id: live_hackernews_past_front_nav
+    instruction: From the Hacker News front page, click the 'past' link in the top navigation bar to view the front page of previous days.
+    start_url: https://news.ycombinator.com/
+    domain: news
+    task_type: action
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: front
+    assert:
+      url_contains: /front
+  - id: live_hackernews_show_then_ask
+    instruction: Starting from the Hacker News front page, first open the Show HN section, then from there navigate to the Ask HN section.
+    start_url: https://news.ycombinator.com/
+    domain: news
+    task_type: action
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: show
+    assert:
+      url_contains: /ask
+  - id: live_hackernews_show_nav
+    instruction: From the Hacker News front page, navigate to the Show HN section using the top navigation bar.
+    start_url: https://news.ycombinator.com/
+    domain: news
+    task_type: action
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: show
+    assert:
+      url_contains: /show
+  - id: live_hackernews_jobs_nav
+    instruction: From the Hacker News front page, click the navigation link to view the Jobs page.
+    start_url: https://news.ycombinator.com/
+    domain: news
+    task_type: action
+    difficulty: single
+    split: dev
+    key_nodes:
+    - url_contains: jobs
+    assert:
+      url_contains: /jobs
+  - id: live_hackernews_newest_to_jobs
+    instruction: Starting from the Hacker News front page, click 'new' to view the newest submissions, then click 'jobs' to reach the Jobs page.
+    start_url: https://news.ycombinator.com/
+    domain: news
+    task_type: action
+    difficulty: multi_same_domain
+    split: dev
+    key_nodes:
+    - url_contains: newest
+    assert:
+      url_contains: /jobs
