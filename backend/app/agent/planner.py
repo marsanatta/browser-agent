@@ -149,6 +149,10 @@ agent is CURRENTLY on a page (its real elements are listed at the end). The atte
 (a different element, a different action, or navigate directly if a listed link's target
 already satisfies the goal). Prefer the visible element whose label best matches the intent
 even if the wording differs (e.g. "Log in" for "Sign In").
+The element list below is the most relevant slice of the page and is WIDENED on each retry.
+Always target a label that ACTUALLY appears in the list — never invent a placeholder name
+(e.g. "first result", "first button"); a guessed label that matches nothing just fails again.
+If what you need is not listed yet, pick the closest element that IS shown.
 
 Each sub-task is one of: navigate (needs "url"), click (needs "target": the visible label),
 fill (needs "target" and "value"), press (needs "target" and "value": a key such as
