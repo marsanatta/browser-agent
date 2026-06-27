@@ -45,3 +45,8 @@ paired 0.208->0.078) AND the named modal probe CLEARED (4/5 silent -> 0/5, 0->5/
 HONEST FLAGS: (1) openlibrary single-run regression — confirm with a paired run before trusting.
 (2) peek sees only the FIRST page (multi-page partial), yet multi-step gained the most (replan-rate 0.38->0).
 (3) 1/154 transient planner-JSON error.
+
+## openlibrary flag — RESOLVED (paired k=8)
+blind verified 6/8 == peek verified 6/8; peek-only-win 2 == blind-only-win 2 (symmetric, no effect).
+The failures were openlibrary.org NETWORK errors (ERR_CONNECTION_CLOSED / Timeout) hitting BOTH arms
+-> the single full-tier flip was SITE flakiness, not a peek regression. Flag CLEARED. KEEP is clean.

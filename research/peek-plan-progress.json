@@ -1,26 +1,99 @@
 {
   "decision": "KEEP",
   "paired": {
-    "n_runs": 154, "k_single": 5, "k_multi": 8, "design": "interleaved blind/peek per task (paired)",
+    "n_runs": 154,
+    "k_single": 5,
+    "k_multi": 8,
+    "design": "interleaved blind/peek per task (paired)",
     "verified_paired_diff": {
-      "ALL":    {"peek_only_win": 18, "blind_only_win": 3, "delta": 0.19, "ci": [0.08, 0.31], "separates": true},
-      "single": {"peek_only_win": 9,  "blind_only_win": 2, "delta": 0.16, "ci": [0.01, 0.30], "separates": true},
-      "multi":  {"peek_only_win": 9,  "blind_only_win": 1, "delta": 0.25, "ci": [0.06, 0.44], "separates": true}
+      "ALL": {
+        "peek_only_win": 18,
+        "blind_only_win": 3,
+        "delta": 0.19,
+        "ci": [
+          0.08,
+          0.31
+        ],
+        "separates": true
+      },
+      "single": {
+        "peek_only_win": 9,
+        "blind_only_win": 2,
+        "delta": 0.16,
+        "ci": [
+          0.01,
+          0.3
+        ],
+        "separates": true
+      },
+      "multi": {
+        "peek_only_win": 9,
+        "blind_only_win": 1,
+        "delta": 0.25,
+        "ci": [
+          0.06,
+          0.44
+        ],
+        "separates": true
+      }
     },
-    "cost_aiu_per_task": {"ALL": {"blind": 10.7, "peek": 8.9, "delta": -1.8}},
+    "cost_aiu_per_task": {
+      "ALL": {
+        "blind": 10.7,
+        "peek": 8.9,
+        "delta": -1.8
+      }
+    },
     "cost_2x2_aiu": {
-      "single_first_try": {"blind": 7.3, "peek": 9.8, "delta": 2.5},
-      "single_replan":    {"blind": 16.7, "peek": 9.0, "delta": -7.6},
-      "multi_first_try":  {"blind": 7.4, "peek": 8.0, "delta": 0.5},
-      "multi_replan":     {"blind": 17.7, "peek": 7.9, "delta": -9.7}
+      "single_first_try": {
+        "blind": 7.3,
+        "peek": 9.8,
+        "delta": 2.5
+      },
+      "single_replan": {
+        "blind": 16.7,
+        "peek": 9.0,
+        "delta": -7.6
+      },
+      "multi_first_try": {
+        "blind": 7.4,
+        "peek": 8.0,
+        "delta": 0.5
+      },
+      "multi_replan": {
+        "blind": 17.7,
+        "peek": 7.9,
+        "delta": -9.7
+      }
     },
-    "replan_rate": {"blind": 0.34, "peek": 0.17},
-    "modal_probe": {"blind_silent": "4/5", "blind_verified": "0/5", "peek_silent": "0/5", "peek_verified": "5/5", "cleared": true},
-    "m3_paired": {"blind": 0.208, "peek": 0.078}
+    "replan_rate": {
+      "blind": 0.34,
+      "peek": 0.17
+    },
+    "modal_probe": {
+      "blind_silent": "4/5",
+      "blind_verified": "0/5",
+      "peek_silent": "0/5",
+      "peek_verified": "5/5",
+      "cleared": true
+    },
+    "m3_paired": {
+      "blind": 0.208,
+      "peek": 0.078
+    }
   },
-  "full_tier_m3": {"blind": {"m3": 0.048, "verified": "16/21"}, "peek": {"m3": 0.0, "verified": "18/21"}},
+  "full_tier_m3": {
+    "blind": {
+      "m3": 0.048,
+      "verified": "16/21"
+    },
+    "peek": {
+      "m3": 0.0,
+      "verified": "18/21"
+    }
+  },
   "honest_flags": [
-    "openlibrary_login single-run regression (blind T -> peek F) — confirm with paired run",
+    "openlibrary_login: RESOLVED via paired k=8 (6/8==6/8, symmetric); failures were openlibrary.org network errors on BOTH arms -> single flip was site noise, peek NOT worse",
     "peek sees only the FIRST page (multi-page partial), yet multi-step gained the most",
     "easy first-try-success is the only cell where peek costs more (+1..2.5 AIU)",
     "1/154 transient planner-JSON parse error"

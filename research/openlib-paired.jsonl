@@ -1,0 +1,32 @@
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 0, "verified": true, "nominal": true, "aiu": 7.106075, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 0, "verified": true, "nominal": true, "aiu": 7.566075, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 1, "verified": true, "nominal": true, "aiu": 7.108575, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 0, "verified": true, "nominal": true, "aiu": 7.113575, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 1, "verified": true, "nominal": true, "aiu": 7.563575, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 0, "verified": true, "nominal": true, "aiu": 7.564825, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 2, "verified": true, "nominal": true, "aiu": 7.104825, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 1, "verified": true, "nominal": true, "aiu": 7.109825, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 2, "verified": true, "nominal": true, "aiu": 7.569825, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 1, "verified": true, "nominal": true, "aiu": 7.569825, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 3, "verified": true, "nominal": true, "aiu": 7.109825, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 2, "verified": true, "nominal": true, "aiu": 7.108575, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 2, "verified": false, "nominal": false, "aiu": 0.0, "error": "Page.goto: net::ERR_CONNECTION_CLOSED at https://openlibrary.org/\nCall log:\n  - navigating to \"https://openlibrary.org/\", waiting until \"domcontentloaded\"\n"}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 3, "verified": true, "nominal": true, "aiu": 7.571075, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 3, "verified": false, "nominal": false, "aiu": 7.109825, "error": "Error: Page.goto: net::ERR_CONNECTION_CLOSED at https://openlibrary.org/\nCall log:\n  - navigating to \"https://openlibrary.org/\", waiting until \"domcontentloaded\"\n"}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 4, "verified": true, "nominal": true, "aiu": 7.113575, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 3, "verified": true, "nominal": true, "aiu": 7.571075, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 4, "verified": false, "nominal": false, "aiu": 0.0, "error": "Page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://openlibrary.org/\", waiting until \"domcontentloaded\"\n"}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 4, "verified": true, "nominal": true, "aiu": 7.113575, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 5, "verified": false, "nominal": false, "aiu": 7.112325, "error": "TimeoutError: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://openlibrary.org/\", waiting until \"domcontentloaded\"\n"}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 4, "verified": false, "nominal": false, "aiu": 0.0, "error": "Page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://openlibrary.org/\", waiting until \"domcontentloaded\"\n"}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 5, "verified": false, "nominal": false, "aiu": 0.0, "error": "Page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://openlibrary.org/\", waiting until \"domcontentloaded\"\n"}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 5, "verified": true, "nominal": true, "aiu": 7.106075, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 6, "verified": true, "nominal": true, "aiu": 7.108575, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 5, "verified": true, "nominal": true, "aiu": 7.566075, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 6, "verified": true, "nominal": true, "aiu": 7.572325, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 6, "verified": false, "nominal": false, "aiu": 7.111075, "error": "Error: Page.goto: net::ERR_CONNECTION_CLOSED at https://openlibrary.org/\nCall log:\n  - navigating to \"https://openlibrary.org/\", waiting until \"domcontentloaded\"\n"}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 7, "verified": true, "nominal": true, "aiu": 7.114825, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 6, "verified": true, "nominal": true, "aiu": 7.568575, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 7, "verified": true, "nominal": true, "aiu": 7.569825, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "blind", "pair": 7, "verified": true, "nominal": true, "aiu": 7.111075, "error": null}
+{"task": "live_openlibrary_login_nav", "arm": "peek", "pair": 7, "verified": true, "nominal": true, "aiu": 7.571075, "error": null}
