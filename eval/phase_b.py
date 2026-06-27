@@ -48,11 +48,11 @@ async def run_split(split: str):
 
 async def main() -> None:
     ap = argparse.ArgumentParser()
+    # choices excludes "sealed" — it is scored once at the end via run_live_tier --sealed,
+    # never per-round here (so it can't leak into the dev/holdout keep loop).
     ap.add_argument("--split", default="dev", choices=["dev", "holdout"])
     ap.add_argument("--tag", default="round0")
     args = ap.parse_args()
-    if args.split == "sealed":
-        raise SystemExit("sealed is scored once at the end via run_live_tier --sealed")
 
     rows, calls = await run_split(args.split)
     n = len(rows)

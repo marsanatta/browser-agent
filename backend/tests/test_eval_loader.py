@@ -60,6 +60,15 @@ def test_select_splits_seals_off_sealed_by_default(tmp_path):
     assert {t.id for t in final} == {"s1"}
 
 
+def test_sandbox_set_has_no_sealed_tasks():
+    # ENFORCE the offline-gate seal in code (review S-caveat): harness.run_eval scores the
+    # sandbox set (tasks.yaml) with NO split filter, so the sealed seal there rests on the
+    # invariant "sealed cases live ONLY in the live tier (live_real_world.yaml)". If a sealed
+    # task ever lands in tasks.yaml it would silently enter the offline gate's headline — this
+    # guard fails the build instead.
+    assert all(t.split != "sealed" for t in load_tasks())
+
+
 def test_eval_set_loads_and_is_modest():
     tasks = load_tasks()
     assert 12 <= len(tasks) <= 60  # modest now; upper bound headroom for autoresearch growth
