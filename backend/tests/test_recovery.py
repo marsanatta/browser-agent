@@ -19,7 +19,7 @@ from app.agent.classify import (
     recovery_for,
 )
 from app.agent.executor import Executor
-from app.agent.planner import MockPlanner, SubTask
+from app.agent.planner import MockPlanner, PlanResult, SubTask
 from app.browser.provider import BrowserProvider, PlaywrightProvider
 from app.stream.events import EventType
 
@@ -198,14 +198,14 @@ class _TwoPlanner:
         self._plans = [first, second]
         self.calls = 0
 
-    async def plan(self, task, start_url=None):
+    async def plan(self, task, start_url=None, observation=None):
         p = self._plans[min(self.calls, len(self._plans) - 1)]
         self.calls += 1
-        return list(p)
+        return PlanResult(list(p))
 
     async def replan(self, task, failure_log, observation):
         # The peek-replan path returns the second plan (the page-grounded retry).
-        return list(self._plans[1])
+        return PlanResult(list(self._plans[1]))
 
 
 _STEP1_OK_STEP2_DISABLED = """

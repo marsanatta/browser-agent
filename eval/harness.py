@@ -25,7 +25,7 @@ from typing import Any
 
 from app.agent.executor import Executor
 from app.agent.models import LLMGateway
-from app.agent.planner import LLMPlanner, SubTask
+from app.agent.planner import LLMPlanner, PlanResult, SubTask
 from app.browser.provider import PlaywrightProvider
 from app.stream.events import EventType
 
@@ -102,17 +102,19 @@ class _StartUrlPlanner:
 
     async def plan(
         self, task: str, start_url: str | None = None, observation: str | None = None
-    ) -> list[SubTask]:
+    ) -> PlanResult:
         if observation is not None:
             # peek-plan: the executor already navigated to the start page, so do NOT
             # prepend a navigate; plan grounded in the observation.
             return await self._inner.plan(task, observation=observation)
-        subtasks = await self._inner.plan(task, start_url=self._start_url)
+        result = await self._inner.plan(task, start_url=self._start_url)
+        subtasks = result.subtasks
         if subtasks and subtasks[0].action == "navigate":
-            return subtasks
-        return [SubTask(action="navigate", url=self._start_url, description="open start URL"), *subtasks]
+            return result
+        prepended = [SubTask(action="navigate", url=self._start_url, description="open start URL"), *subtasks]
+        return PlanResult(prepended, result.raw)
 
-    async def replan(self, task: str, failure_log: list[dict], observation: str) -> list[SubTask]:
+    async def replan(self, task: str, failure_log: list[dict], observation: str) -> PlanResult:
         return await self._inner.replan(task, failure_log, observation)
 
 

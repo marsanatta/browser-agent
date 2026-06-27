@@ -284,10 +284,6 @@ input {
   font-size: 13px;
 }
 
-.plan-steps li.is-new {
-  color: var(--accent);
-}
-
 .plan-steps .num {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
@@ -302,6 +298,75 @@ input {
 
 .plan-steps .plan-target {
   color: var(--text);
+}
+
+.plan-history {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plan-version {
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.plan-version.replan {
+  border-left: 3px solid var(--accent);
+}
+
+.plan-version-head {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.plan-why {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.plan-why-label {
+  color: var(--muted);
+}
+
+.plan-failures {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.plan-failures code {
+  color: var(--text);
+}
+
+.plan-raw {
+  margin-top: 8px;
+}
+
+.plan-raw summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.plan-raw-pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
 }
 
 .replan-divider {

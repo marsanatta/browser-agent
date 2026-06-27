@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { StepDetail } from "./StepDetail.jsx";
 import { LiveActivity } from "./LiveActivity.jsx";
 import { Hint, LanguageSwitcher } from "./Hint.jsx";
-import { maskArgs } from "./mask.js";
+import { maskArgs, MASK } from "./mask.js";
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL ?? "";
 
@@ -27,7 +27,7 @@ const STREAM_EVENTS = [
 
 const TERMINAL = new Set(["RUN_FINISHED", "RUN_ERROR"]);
 
-const initialState = { run: null, steps: [], order: [], notices: [], plan: null };
+const initialState = { run: null, steps: [], order: [], notices: [], plan: null, planVersions: [] };
 
 function reduce(state, ev) {
   const { type, payload } = ev;
@@ -38,10 +38,21 @@ function reduce(state, ev) {
       order: [],
       notices: [],
       plan: null,
+      planVersions: [],
     };
   }
   if (type === "PLAN_READY") {
-    return seedPlan(state, payload.run_id, payload.plan ?? []);
+    // Seed the execution timeline off the FULL reconciled plan (unchanged), and
+    // ACCUMULATE this version into the history (never overwrite a prior plan/replan).
+    const seeded = seedPlan(state, payload.run_id, payload.plan ?? []);
+    const version = {
+      version: payload.version ?? state.planVersions.length + 1,
+      kind: payload.kind ?? "plan",
+      reasoning: payload.reasoning ?? "",
+      failures: payload.failures ?? null,
+      steps: payload.steps ?? payload.plan ?? [],
+    };
+    return { ...seeded, planVersions: [...state.planVersions, version] };
   }
   if (type === "PHASE") {
     return { ...state, run: { ...state.run, phase: payload.phase } };
@@ -100,6 +111,23 @@ function reduce(state, ev) {
     default:
       return state;
   }
+}
+
+function maskRawPlan(raw) {
+  // Show the planner LLM's verbatim output, but never render a `fill` value — it can be
+  // a secret the user asked the agent to type (same precaution maskArgs applies to the
+  // step view). Real tokens/keys/emails are already masked server-side by redact().
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return JSON.stringify(parsed.map((a) => maskArgs(a)), null, 2);
+  } catch {
+    // not clean JSON (model added prose / malformed) — fall back to a regex mask
+  }
+  // Defensive fallback (can't parse structure to tell actions apart): mask EVERY
+  // "value" field, order-independent, so a `fill` value can never leak. Over-masking
+  // a non-secret value (e.g. a press key) is acceptable for raw observability.
+  return raw.replace(/("value"\s*:\s*)"(?:[^"\\]|\\.)*"/g, `$1"${MASK}"`);
 }
 
 function buildCriterion(type, value, css) {
@@ -464,7 +492,7 @@ export default function App() {
       )}
       {run && run.status !== "running" ? <RunVerdict run={run} /> : null}
 
-      {state.plan && <PlanView plan={state.plan} />}
+      {state.planVersions.length > 0 && <PlanHistory versions={state.planVersions} />}
 
       <section className="board">
         <ol className="timeline" aria-live="polite" aria-label={t("timeline.label")}>
@@ -566,28 +594,59 @@ function AuthGate({ onUnlock, expired }) {
   );
 }
 
-function PlanView({ plan }) {
-  const { t } = useTranslation();
-  const steps = plan.steps ?? [];
-  const replanned = plan.replanFrom >= 0;
+function PlanSteps({ steps }) {
   return (
-    <section className="plan" aria-label={t("plan.heading", { n: steps.length })}>
-      <h2 className="plan-heading">
-        {t("plan.heading", { n: steps.length })}
-        {replanned && <span className="plan-tag">{t("plan.replanned")}</span>}
-      </h2>
-      <ol className="plan-steps">
-        {steps.map((a, i) => (
-          <li key={i} className={replanned && i >= plan.replanFrom ? "is-new" : ""}>
-            <span className="num">{i + 1}</span>
-            <code className="plan-action">{a.action}</code>
-            <span className="plan-target break-words">
-              {a.action === "navigate" ? a.url ?? "" : a.target ?? ""}
-              {a.value != null && a.action !== "navigate" ? ` = ${maskArgs(a).value}` : ""}
-            </span>
-          </li>
-        ))}
-      </ol>
+    <ol className="plan-steps">
+      {steps.map((a, i) => (
+        <li key={i}>
+          <span className="num">{i + 1}</span>
+          <code className="plan-action">{a.action}</code>
+          <span className="plan-target break-words">
+            {a.action === "navigate" ? a.url ?? "" : a.target ?? ""}
+            {a.value != null && a.action !== "navigate" ? ` = ${maskArgs(a).value}` : ""}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function PlanHistory({ versions }) {
+  // Preserve the full plan -> replan history: every version is kept and shown in full
+  // (vertical, all expanded), each with the planner LLM's verbatim output and, for a
+  // replan, the failure log that was fed to the LLM (the "why").
+  const { t } = useTranslation();
+  return (
+    <section className="plan-history" aria-label={t("planHistory.heading")}>
+      <h2 className="plan-heading">{t("planHistory.heading")}</h2>
+      {versions.map((v, idx) => (
+        <article key={idx} className={`plan-version ${v.kind}`}>
+          <h3 className="plan-version-head">
+            {v.kind === "replan"
+              ? t("planHistory.replan", { v: v.version, n: v.failures?.length ?? 0 })
+              : t("planHistory.initial", { v: v.version })}
+          </h3>
+          {v.kind === "replan" && (v.failures?.length ?? 0) > 0 && (
+            <div className="plan-why">
+              <span className="plan-why-label">{t("planHistory.why")}</span>
+              <ul className="plan-failures">
+                {v.failures.map((f, i) => (
+                  <li key={i}>
+                    <code>{f.step}</code> → <span className="fcat">{f.class}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <PlanSteps steps={v.steps ?? []} />
+          {v.reasoning && (
+            <details className="plan-raw" open>
+              <summary>{t("planHistory.rawOutput")}</summary>
+              <pre className="plan-raw-pre">{maskRawPlan(v.reasoning)}</pre>
+            </details>
+          )}
+        </article>
+      ))}
     </section>
   );
 }

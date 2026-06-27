@@ -77,6 +77,13 @@ const en = {
     heading: "Plan · {{n}} steps",
     replanned: "replanned",
   },
+  planHistory: {
+    heading: "Plan history",
+    initial: "Plan v{{v}} · initial",
+    replan: "Replan v{{v}} · after {{n}} failure(s)",
+    why: "Why replanned (failures sent to the planner):",
+    rawOutput: "Raw planner output (verbatim LLM response)",
+  },
   phase: {
     planning: "Planning the task…",
     launching: "Opening browser…",
@@ -220,6 +227,13 @@ const zhHant = {
   plan: {
     heading: "Plan · {{n}} 個步驟",
     replanned: "已重新規劃",
+  },
+  planHistory: {
+    heading: "Plan 歷史",
+    initial: "Plan v{{v}} · 初次規劃",
+    replan: "Replan v{{v}} · 在 {{n}} 次失敗後",
+    why: "為何重新規劃（送給 planner 的失敗紀錄）：",
+    rawOutput: "Planner 原始輸出（LLM 逐字回應）",
   },
   phase: {
     planning: "規劃任務中…",

@@ -36,14 +36,25 @@ class SubTask:
     expect: dict | None = field(default=None, hash=False)
 
 
+@dataclass
+class PlanResult:
+    """A plan plus the planner LLM's verbatim response text. `raw` is surfaced in
+    the UI so the operator sees the model's ACTUAL output (its thinking/strategy),
+    not just the parsed step blocks. It passes through `redact()` at the SSE
+    boundary like every payload."""
+
+    subtasks: list[SubTask]
+    raw: str = ""
+
+
 class Planner(Protocol):
     async def plan(
         self, task: str, start_url: str | None = None, observation: str | None = None
-    ) -> list[SubTask]: ...
+    ) -> PlanResult: ...
 
     async def replan(
         self, task: str, failure_log: list[dict], observation: str
-    ) -> list[SubTask]: ...
+    ) -> PlanResult: ...
 
 
 class MockPlanner:
@@ -67,18 +78,18 @@ class MockPlanner:
 
     async def plan(
         self, task: str, start_url: str | None = None, observation: str | None = None
-    ) -> list[SubTask]:
+    ) -> PlanResult:
         self.plan_calls.append((task, start_url, observation))
         if observation is not None and self._peek_subtasks is not None:
-            return list(self._peek_subtasks)
-        return list(self._subtasks)
+            return PlanResult(list(self._peek_subtasks), _mock_raw(self._peek_subtasks))
+        return PlanResult(list(self._subtasks), _mock_raw(self._subtasks))
 
     async def replan(
         self, task: str, failure_log: list[dict], observation: str
-    ) -> list[SubTask]:
+    ) -> PlanResult:
         self.replan_calls.append((task, list(failure_log), observation))
         src = self._replan_subtasks if self._replan_subtasks is not None else self._subtasks
-        return list(src)
+        return PlanResult(list(src), _mock_raw(src))
 
 
 _PLAN_PROMPT = """You are the planner for a browser-automation agent.
@@ -177,11 +188,11 @@ class LLMPlanner:
         else:
             prompt = _PLAN_PROMPT.replace("__TASK__", task)
         resp = await self._gateway.complete(prompt, model=self._model, reasoning_effort=self._effort)
-        return _parse_plan(resp.content)
+        return PlanResult(_parse_plan(resp.content), resp.content)
 
     async def replan(
         self, task: str, failure_log: list[dict], observation: str
-    ) -> list[SubTask]:
+    ) -> PlanResult:
         prompt = (
             _REPLAN_PROMPT.replace("__TASK__", task)
             .replace("__FAILURES__", _format_failures(failure_log))
@@ -193,7 +204,20 @@ class LLMPlanner:
         model = getattr(self._gateway, "replanner_model", None) or self._model
         effort = getattr(self._gateway, "replanner_effort", None) or self._effort
         resp = await self._gateway.complete(prompt, model=model, reasoning_effort=effort)
-        return _parse_plan(resp.content)
+        return PlanResult(_parse_plan(resp.content), resp.content)
+
+
+def _mock_raw(subtasks: list[SubTask]) -> str:
+    """A stand-in for the LLM's verbatim output when there is no LLM (MockPlanner):
+    the same JSON-array shape a real planner emits, so UI/tests see a realistic raw."""
+    items = [
+        {k: v for k, v in {
+            "action": st.action, "target": st.target, "url": st.url,
+            "value": st.value, "expect": st.expect,
+        }.items() if v is not None}
+        for st in subtasks
+    ]
+    return json.dumps(items)
 
 
 def _format_failures(failure_log: list[dict]) -> str:

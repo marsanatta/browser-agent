@@ -13,7 +13,7 @@ import json
 import pytest
 
 from app.agent.executor import Executor
-from app.agent.planner import SubTask
+from app.agent.planner import PlanResult, SubTask
 from app.browser.provider import BrowserProvider
 from app.stream.events import EventType
 
@@ -25,7 +25,7 @@ class _FakePlanner:
 
     async def plan(self, task):
         self.calls += 1
-        return list(self._subtasks)
+        return PlanResult(list(self._subtasks))
 
 
 class _FakePage:

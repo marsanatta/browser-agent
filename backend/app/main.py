@@ -30,7 +30,7 @@ from app.agent.models import (
     resolve_effort,
     resolve_model,
 )
-from app.agent.planner import LLMPlanner, SubTask
+from app.agent.planner import LLMPlanner, PlanResult, SubTask
 from app.browser.provider import PlaywrightProvider
 from app.obs.tracing import init_observability
 from app.security import TokenAuthMiddleware, is_configured, issue_cookie, valid
@@ -114,15 +114,17 @@ class _StartUrlPlanner:
 
     async def plan(
         self, task: str, start_url: str | None = None, observation: str | None = None
-    ) -> list[SubTask]:
+    ) -> PlanResult:
         if observation is not None:
             return await self._inner.plan(task, observation=observation)  # peek: no prepend
-        subtasks = await self._inner.plan(task, start_url=self._start_url)
+        result = await self._inner.plan(task, start_url=self._start_url)
+        subtasks = result.subtasks
         if subtasks and subtasks[0].action == "navigate":
-            return subtasks
-        return [SubTask(action="navigate", url=self._start_url, description="open start URL"), *subtasks]
+            return result
+        prepended = [SubTask(action="navigate", url=self._start_url, description="open start URL"), *subtasks]
+        return PlanResult(prepended, result.raw)
 
-    async def replan(self, task: str, failure_log: list[dict], observation: str) -> list[SubTask]:
+    async def replan(self, task: str, failure_log: list[dict], observation: str) -> PlanResult:
         # Re-plan from the CURRENT page — do not re-prepend the start URL (the page
         # is already loaded; the peek-replan plans the suffix from here).
         return await self._inner.replan(task, failure_log, observation)

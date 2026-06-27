@@ -101,20 +101,30 @@ class Executor:
                 try:
                     await act.navigate(page, self._start_url or "")
                     observation = _format_observation(await perceive(page))
-                    subtasks = await self._planner.plan(task, observation=observation)
+                    result = await self._planner.plan(task, observation=observation)
                 except Exception as exc:  # planner/peek seam; surface, don't crash
                     yield Event(events.EventType.RUN_ERROR, {"run_id": run_id, "error": str(exc)})
                     return
-                yield events.plan_ready(run_id, [_args(st) for st in subtasks])
+                subtasks = result.subtasks
+                yield events.plan_ready(
+                    run_id, [_args(st) for st in subtasks],
+                    version=1, kind="plan", reasoning=result.raw,
+                    steps=[_args(st) for st in subtasks],
+                )
             else:
                 # blind: plan BEFORE launch (unchanged baseline behavior).
                 yield events.phase(run_id, "planning")
                 try:
-                    subtasks = await self._planner.plan(task)
+                    result = await self._planner.plan(task)
                 except Exception as exc:  # planner is the LLM seam; surface, don't crash
                     yield Event(events.EventType.RUN_ERROR, {"run_id": run_id, "error": str(exc)})
                     return
-                yield events.plan_ready(run_id, [_args(st) for st in subtasks])
+                subtasks = result.subtasks
+                yield events.plan_ready(
+                    run_id, [_args(st) for st in subtasks],
+                    version=1, kind="plan", reasoning=result.raw,
+                    steps=[_args(st) for st in subtasks],
+                )
                 yield events.phase(run_id, "launching")
                 await self._provider.launch()
                 launched = True
@@ -173,16 +183,24 @@ class Executor:
                     # current page's REAL elements, and re-plan the suffix from here.
                     try:
                         observation = _format_observation(await perceive(page))
-                        new_subtasks = await self._planner.replan(task, failure_log, observation)
+                        result = await self._planner.replan(task, failure_log, observation)
+                        new_subtasks = result.subtasks
+                        raw = result.raw
                     except Exception:
                         new_subtasks = None
+                        raw = ""
                     if new_subtasks:
+                        # `steps`/`reasoning`/`failures` describe THIS replan version (the
+                        # suffix the LLM produced and the failure log it was given), for the
+                        # plan-history panel. `plan` stays the FULL reconciled list because
+                        # the frontend seeds step ids (`${run_id}-s${i+1}`) off it.
+                        suffix_steps = [_args(s) for s in new_subtasks]
                         subtasks = subtasks[:i] + new_subtasks
-                        # Surface the replan's output so the live view shows what
-                        # changed. The ids the frontend seeds (`${run_id}-s${i+1}`)
-                        # are still computed off the FULL `subtasks` list, so emit
-                        # the full reconciled plan, not just the tail.
-                        yield events.plan_ready(run_id, [_args(s) for s in subtasks])
+                        yield events.plan_ready(
+                            run_id, [_args(s) for s in subtasks],
+                            version=replans_used + 1, kind="replan", reasoning=raw,
+                            failures=list(failure_log), steps=suffix_steps,
+                        )
                         continue
                 yield events.ask_user(
                     step_id, f"Could not complete '{_describe(st)}' after recovery; need guidance."

@@ -111,11 +111,36 @@ def phase(run_id: str, name: str) -> Event:
     return Event(EventType.PHASE, {"run_id": run_id, "phase": name})
 
 
-def plan_ready(run_id: str, plan: list[dict[str, Any]]) -> Event:
-    """The planner's initial decomposition, emitted by the executor (NOT the
-    planner) right after planning, so the audit/attribution can read it from the
-    event stream without touching planner.py."""
-    return Event(EventType.PLAN_READY, {"run_id": run_id, "plan": plan})
+def plan_ready(
+    run_id: str,
+    plan: list[dict[str, Any]],
+    *,
+    version: int = 1,
+    kind: str = "plan",
+    reasoning: str = "",
+    failures: list[dict[str, Any]] | None = None,
+    steps: list[dict[str, Any]] | None = None,
+) -> Event:
+    """The planner's decomposition, emitted by the executor (NOT the planner) right
+    after planning/replanning, so audit/attribution can read it from the stream.
+
+    `plan` is the FULL reconciled step list (timeline id-seeding reads this). The
+    rest describe this plan VERSION for the history panel: `version`/`kind` mark it
+    as the initial plan or the Nth replan; `reasoning` is the planner LLM's verbatim
+    output (its thinking, redacted at serialization); `failures` is the accumulated
+    failure log fed to the LLM on a replan (the "why"); `steps` is this version's own
+    output (the replan's suffix), distinct from the full reconciled `plan`."""
+    payload: dict[str, Any] = {
+        "run_id": run_id,
+        "plan": plan,
+        "version": version,
+        "kind": kind,
+        "reasoning": reasoning,
+        "steps": steps if steps is not None else plan,
+    }
+    if failures is not None:
+        payload["failures"] = failures
+    return Event(EventType.PLAN_READY, payload)
 
 
 def tool_call_start(step_id: str, tool: str, call_id: str) -> Event:
