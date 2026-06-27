@@ -319,3 +319,81 @@ tasks:
       - text_contains: "Send"
     assert:
       text_contains: "SENT name=Ada msg=hello"
+
+  # --- Silent-failure family (predict-then-verify) -----------------------------
+  # Each page offers a tempting WRONG action that changes the page but does NOT
+  # reach the goal. Without predict-then-verify the agent can claim success on the
+  # change (nominal=True) while the independent assert fails (verified=False) -> a
+  # silent failure. The assert is the independent goal check; M3 (silent_failure_gap)
+  # is the headline these measure. Deterministic pages (inline_html), real planner.
+  - id: silent_modal_dismiss
+    instruction: "A modal window is already open on this page. Confirm the modal window's title is shown."
+    inline_html: |
+      <div id="m"><h3 class="t">MODAL TITLE</h3></div>
+      <button onclick="document.getElementById('m').remove()">Close</button>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - text_contains: "MODAL TITLE"
+    assert:
+      selector_text_equals: { css: "h3.t", value: "MODAL TITLE" }
+
+  - id: silent_wrong_button
+    instruction: "Submit the form."
+    inline_html: |
+      <button onclick="document.getElementById('o').innerText='Submitted!'">Submit</button>
+      <button onclick="document.getElementById('o').innerText='Cancelled'">Cancel</button>
+      <p id="o">idle</p>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - text_contains: "Submit"
+    assert:
+      selector_text_equals: { css: "#o", value: "Submitted!" }
+
+  - id: silent_premature_success
+    instruction: "Run the search and confirm the results have appeared."
+    inline_html: |
+      <button onclick="document.getElementById('s').style.display='block'">Search</button>
+      <div id="s" style="display:none">Loading...</div>
+      <div id="r"></div>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - text_contains: "Search"
+    assert:
+      text_contains: "Results"
+
+  - id: silent_navigated_away
+    instruction: "Stay on this page and confirm the TARGET section is shown."
+    inline_html: |
+      <a href="#other" onclick="document.getElementById('app').innerText='OTHER'">Go elsewhere</a>
+      <div id="app">TARGET</div>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - text_contains: "TARGET"
+    assert:
+      selector_text_equals: { css: "#app", value: "TARGET" }
+
+  - id: silent_overlay_dismiss
+    instruction: "Complete the survey on this page."
+    inline_html: |
+      <div id="ov">cookie notice <button onclick="document.getElementById('ov').remove()">Accept</button></div>
+      <p>Please complete the survey</p>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    held_out: false
+    key_nodes:
+      - text_contains: "survey"
+    assert:
+      text_contains: "Survey done"

@@ -340,10 +340,10 @@ class Executor:
                 )
             elif st.action == "press":
                 await act.press(located.locator, st.value or "Enter")
-                expect = verify.Expectation(url_changes=True, dom_changes=True)
+                expect = verify.Expectation(url_changes=True, dom_changes=True, goal=st.expect)
             else:
                 await act.click(located.locator)
-                expect = verify.Expectation(url_changes=True, dom_changes=True)
+                expect = verify.Expectation(url_changes=True, dom_changes=True, goal=st.expect)
         except Exception as exc:
             return verify.VerifyResult.NO_CHANGE, classify_exception(exc), located, shot
 

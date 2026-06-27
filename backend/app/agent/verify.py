@@ -8,7 +8,7 @@ change, then diff. NO_CHANGE is the re-ground trigger.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
@@ -36,6 +36,12 @@ class Expectation:
     target_locator: Any = None
     target_effect: str | None = None  # "value" | "detached" | "visible_enabled"
     target_value: str | None = None
+    # predict-then-verify: a goal-grounded post-state the planner declared for this
+    # step (e.g. {"text_visible": "..."}). When set it GATES success — a DOM change
+    # that does not meet the goal (e.g. dismissing a modal) is NO_CHANGE, not success.
+    # This closes the silent-failure hole where "the page moved" was read as "done".
+    # hash=False keeps this frozen dataclass hashable despite the dict field.
+    goal: dict | None = field(default=None, hash=False)
 
 
 @dataclass(frozen=True)
@@ -140,10 +146,53 @@ async def _target_satisfied(expect: Expectation) -> bool:
     return False
 
 
+async def _one_primitive(page: Any, kind: str, value: Any) -> bool:
+    try:
+        if kind == "url_contains":
+            return str(value) in (page.url or "")
+        if kind == "selector_visible":
+            loc = page.locator(str(value)).first
+            return await loc.count() > 0 and await loc.is_visible()
+        if kind == "text_visible":
+            # Only VISIBLE body text — a removed/hidden modal's title is not in it.
+            # Case-insensitive substring so CSS text-transform (uppercase) still matches.
+            body = (await page.inner_text("body")).lower()
+            return str(value).lower() in body
+    except Exception:
+        return False
+    return False  # unknown primitive -> fail-closed
+
+
+async def _goal_satisfied(page: Any, goal: dict) -> bool:
+    """Independent, goal-grounded post-state check for predict-then-verify. Small
+    deterministic primitives (text_visible / selector_visible / url_contains) read
+    from OBSERVABLE browser state. ALL keys must hold (AND), so a multi-key goal is
+    not silently reduced to its first entry. DELIBERATELY separate code from the eval
+    `state_check` so the agent's in-loop signal stays independent of the eval
+    arbiter (engineering-rigor: never validate with the verifier's own formula)."""
+    if not isinstance(goal, dict) or not goal:
+        return False
+    for kind, value in goal.items():
+        if not await _one_primitive(page, kind, value):
+            return False
+    return True
+
+
 async def verify_after_act(
     page: Any, before: StateSnapshot, expect: Expectation
 ) -> VerifyResult:
     after = await snapshot(page)
+
+    # predict-then-verify GATE: a declared goal takes precedence over the generic
+    # url/dom-change channels. The step is CHANGED only if the goal actually holds;
+    # a page that moved but did not reach the goal is NO_CHANGE (the re-ground signal).
+    # An empty/malformed goal ({} or non-dict) is treated as no goal (falls through).
+    if expect.goal:
+        return (
+            VerifyResult.CHANGED
+            if await _goal_satisfied(page, expect.goal)
+            else VerifyResult.NO_CHANGE
+        )
 
     if expect.url_contains is not None:
         return VerifyResult.CHANGED if expect.url_contains in after.url else VerifyResult.NO_CHANGE

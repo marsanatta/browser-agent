@@ -13,7 +13,7 @@ deterministic and out of the LLM's hands).
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from app.agent.models import PLANNER_EFFORT, PLANNER_MODEL, LLMGateway
@@ -27,6 +27,13 @@ class SubTask:
     url: str | None = None  # for navigate
     value: str | None = None  # fill value, or the key to press (e.g. "Enter")
     description: str = ""
+    # predict-then-verify: an optional goal-grounded post-state the planner declares
+    # for a click/press (e.g. {"text_visible": "Results"}). The executor verifies it
+    # after acting, so a "page moved but goal not reached" action (dismissing a modal,
+    # clicking the wrong button) fails instead of silently counting as success.
+    # hash=False: a dict field would make this frozen dataclass's auto __hash__ throw
+    # if ever hashed (set/dict-key/dedup); excluded so SubTask stays hashable.
+    expect: dict | None = field(default=None, hash=False)
 
 
 class Planner(Protocol):
@@ -67,10 +74,16 @@ relative path), click (needs "target": the visible label/accessible name), fill
 (needs "target" and "value"), press (needs "target" and "value": a key such as
 "Enter" — use it AFTER fill to submit a search box or form when there is no obvious
 submit button).
+Optionally add "expect" to a click or press: an object declaring the OBSERVABLE result
+that proves the step worked — one of {"text_visible":"..."} (text that should appear),
+{"selector_visible":"css"}, or {"url_contains":"..."}. Add it ONLY when success means
+something specific must appear (e.g. a result or a title) AND you can name that exact
+observable; a wrong or guessed goal causes false failures, so omit "expect" when you are
+unsure or when any change is fine.
 Respond with ONLY a JSON array, no prose. Example:
 [{"action":"navigate","url":"https://www.google.com"},
  {"action":"fill","target":"Search","value":"steam"},
- {"action":"press","target":"Search","value":"Enter"}]
+ {"action":"press","target":"Search","value":"Enter","expect":{"text_visible":"results"}}]
 
 User task: __TASK__
 """
@@ -102,8 +115,10 @@ target path already satisfies the goal, navigate to it directly.
 
 Each sub-task is one of: navigate (needs "url"), click (needs "target": the visible
 label), fill (needs "target" and "value"), press (needs "target" and "value": a key
-such as "Enter"). Respond with ONLY a JSON array of the REMAINING steps from here, no
-prose.
+such as "Enter"). A click/press may carry "expect" — {"text_visible":"..."} /
+{"selector_visible":"css"} / {"url_contains":"..."} — the observable result that proves
+it worked, so a wrong-but-page-changing action is not mistaken for success. Respond with
+ONLY a JSON array of the REMAINING steps from here, no prose.
 
 User task: __TASK__
 Failed step: __FAILED__ (failure class: __CLASS__)
@@ -154,6 +169,7 @@ def _parse_plan(content: str) -> list[SubTask]:
     items = json.loads(raw)
     out: list[SubTask] = []
     for it in items:
+        expect = it.get("expect")
         out.append(
             SubTask(
                 action=str(it["action"]),
@@ -162,6 +178,8 @@ def _parse_plan(content: str) -> list[SubTask]:
                 url=it.get("url"),
                 value=it.get("value"),
                 description=it.get("description", ""),
+                # drop an empty/malformed expect so it never forces a guaranteed fail
+                expect=expect if isinstance(expect, dict) and expect else None,
             )
         )
     return out
