@@ -174,7 +174,7 @@ tasks:
     domain: news
     task_type: action
     difficulty: single
-    held_out: true
+    split: dev  # news.ycombinator.com is a dev site (batch-1 added 7 dev cases here); keep the site disjoint
     key_nodes:
       - url_contains: "ycombinator.com"
     assert:
@@ -778,3 +778,390 @@ tasks:
     - url_contains: newest
     assert:
       url_contains: /jobs
+
+  # --- batch 2 (holdout + sealed): two-pass validated (A4 probe + independent reviewer) ---
+  - id: live_mdn_html_input
+    instruction: On MDN Web Docs, navigate to the reference page for the HTML <input> element.
+    start_url: https://developer.mozilla.org/en-US/
+    domain: reference
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: holdout
+    key_nodes:
+    - url_contains: Elements/input
+    assert:
+      url_contains: Elements/input
+  - id: live_mdn_css_flex
+    instruction: On MDN Web Docs, find the reference page for the CSS flex shorthand property.
+    start_url: https://developer.mozilla.org/en-US/
+    domain: reference
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: holdout
+    key_nodes:
+    - url_contains: Properties/flex
+    assert:
+      url_contains: Properties/flex
+  - id: live_mdn_array_map
+    instruction: On MDN Web Docs, navigate to the JavaScript reference page for the Array.prototype.map() method.
+    start_url: https://developer.mozilla.org/en-US/
+    domain: reference
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: holdout
+    key_nodes:
+    - url_contains: Global_Objects/Array/map
+    assert:
+      h1_equals: Array.prototype.map()
+  - id: live_mdn_http_get
+    instruction: On MDN Web Docs, go to the HTTP reference page documenting the GET request method.
+    start_url: https://developer.mozilla.org/en-US/
+    domain: reference
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: holdout
+    key_nodes:
+    - url_contains: Methods/GET
+    assert:
+      url_contains: Methods/GET
+  - id: live_mdn_fetch_api
+    instruction: On MDN Web Docs, open the Web API overview page for the Fetch API.
+    start_url: https://developer.mozilla.org/en-US/
+    domain: reference
+    task_type: retrieval
+    difficulty: single
+    split: holdout
+    key_nodes:
+    - url_contains: Web/API/Fetch_API
+    assert:
+      h1_equals: Fetch API
+  - id: live_mdn_grid_template_columns
+    instruction: On MDN Web Docs, find the CSS reference page for the grid-template-columns property.
+    start_url: https://developer.mozilla.org/en-US/
+    domain: reference
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: holdout
+    key_nodes:
+    - url_contains: Properties/grid-template-columns
+    assert:
+      url_contains: Properties/grid-template-columns
+  - id: live_mdn_promise_all
+    instruction: On MDN Web Docs, navigate to the JavaScript reference page for the Promise.all() static method.
+    start_url: https://developer.mozilla.org/en-US/
+    domain: reference
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: holdout
+    key_nodes:
+    - url_contains: Global_Objects/Promise/all
+    assert:
+      h1_equals: Promise.all()
+  - id: live_mdn_http_404
+    instruction: On MDN Web Docs, go to the HTTP reference page for the 404 Not Found status code.
+    start_url: https://developer.mozilla.org/en-US/
+    domain: reference
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: holdout
+    key_nodes:
+    - url_contains: Status/404
+    assert:
+      h1_equals: 404 Not Found
+  - id: live_govuk_bank_holidays
+    instruction: Go to GOV.UK and find the page listing the upcoming UK bank holidays for England and Wales, Scotland, and Northern Ireland.
+    start_url: https://www.gov.uk/
+    domain: government
+    task_type: retrieval
+    difficulty: single
+    split: holdout
+    key_nodes:
+    - text_contains: England and Wales
+    assert:
+      url_contains: bank-holidays
+  - id: live_govuk_vat_rates
+    instruction: On GOV.UK, navigate to the guidance page that explains the different VAT rates (standard, reduced and zero rates) and what they apply to.
+    start_url: https://www.gov.uk/
+    domain: government
+    task_type: retrieval
+    difficulty: single
+    split: holdout
+    key_nodes:
+    - url_contains: vat-rates
+    assert:
+      h1_equals: VAT rates
+  - id: live_govuk_min_wage
+    instruction: Find the GOV.UK guidance page that gives the current National Minimum Wage and National Living Wage rates.
+    start_url: https://www.gov.uk/
+    domain: government
+    task_type: retrieval
+    difficulty: single
+    split: holdout
+    key_nodes:
+    - url_contains: national-minimum-wage-rates
+    assert:
+      h1_equals: National Minimum Wage and National Living Wage rates
+  - id: live_govuk_check_uk_visa
+    instruction: On GOV.UK, reach the tool that lets you check whether you need a UK visa based on your nationality and reason for travel.
+    start_url: https://www.gov.uk/
+    domain: government
+    task_type: action
+    difficulty: single
+    split: holdout
+    key_nodes:
+    - url_contains: check-uk-visa
+    assert:
+      h1_equals: Check if you need a UK visa
+  - id: live_govuk_contact_dvla
+    instruction: Navigate GOV.UK to the page that provides contact details for the DVLA (Driver and Vehicle Licensing Agency).
+    start_url: https://www.gov.uk/
+    domain: government
+    task_type: action
+    difficulty: single
+    split: holdout
+    key_nodes:
+    - url_contains: contact-the-dvla
+    assert:
+      h1_equals: Contact DVLA
+  - id: live_govuk_driving_licences
+    instruction: Starting from the GOV.UK homepage, open the 'Driving and transport' browse section, then go into its 'Driving licences' subtopic.
+    start_url: https://www.gov.uk/
+    domain: government
+    task_type: action
+    difficulty: multi_same_domain
+    split: holdout
+    key_nodes:
+    - h1_equals: Driving and transport
+    assert:
+      url_contains: browse/driving/driving-licences
+  - id: live_govuk_provisional_licence
+    instruction: From the GOV.UK homepage, work through the driving section to reach the page for applying for your first provisional driving licence.
+    start_url: https://www.gov.uk/
+    domain: government
+    task_type: action
+    difficulty: multi_same_domain
+    split: holdout
+    key_nodes:
+    - url_contains: browse/driving
+    assert:
+      h1_equals: Apply for your first provisional driving licence
+  - id: live_scrapethissite_goto_simple
+    instruction: 'From the Web Scraping Sandbox page list, open the ''Countries of the World: A Simple Example'' sandbox page.'
+    start_url: https://www.scrapethissite.com/pages/
+    domain: navigation
+    task_type: action
+    difficulty: single
+    split: sealed
+    key_nodes:
+    - url_contains: pages/simple
+    assert:
+      url_contains: pages/simple
+  - id: live_scrapethissite_goto_forms
+    instruction: 'From the sandbox page list, open the ''Hockey Teams: Forms, Searching and Pagination'' page.'
+    start_url: https://www.scrapethissite.com/pages/
+    domain: navigation
+    task_type: action
+    difficulty: single
+    split: sealed
+    key_nodes:
+    - url_contains: pages/forms
+    assert:
+      url_contains: pages/forms
+  - id: live_scrapethissite_search_boston
+    instruction: Open the Hockey Teams sandbox page and use the 'Search for Teams' box to search for the team 'Boston'. Submit the search.
+    start_url: https://www.scrapethissite.com/pages/
+    domain: navigation
+    task_type: action
+    difficulty: multi_same_domain
+    split: sealed
+    key_nodes:
+    - url_contains: q=Boston
+    assert:
+      url_contains: q=Boston
+  - id: live_scrapethissite_forms_page2
+    instruction: Open the Hockey Teams sandbox page and navigate to the second page of results using the pagination controls.
+    start_url: https://www.scrapethissite.com/pages/
+    domain: navigation
+    task_type: action
+    difficulty: multi_same_domain
+    split: sealed
+    key_nodes:
+    - url_contains: page_num=2
+    assert:
+      url_contains: page_num=2
+  - id: live_scrapethissite_goto_ajax
+    instruction: 'From the sandbox page list, open the ''Oscar Winning Films: AJAX and Javascript'' page.'
+    start_url: https://www.scrapethissite.com/pages/
+    domain: navigation
+    task_type: action
+    difficulty: single
+    split: sealed
+    key_nodes:
+    - url_contains: pages/ajax-javascript
+    assert:
+      text_contains: Oscar Winning Films
+  - id: live_scrapethissite_frames_topic
+    instruction: 'From the sandbox page list, open the ''Turtles All the Way Down: Frames & iFrames'' page and confirm it is about turtles.'
+    start_url: https://www.scrapethissite.com/pages/
+    domain: navigation
+    task_type: retrieval
+    difficulty: single
+    split: sealed
+    key_nodes:
+    - url_contains: pages/frames
+    assert:
+      text_contains: Turtles All the Way Down
+  - id: live_rfceditor_open_http11
+    instruction: On the RFC Editor site, open the information page for RFC 2616.
+    start_url: https://www.rfc-editor.org/
+    domain: reference
+    task_type: action
+    difficulty: single
+    split: sealed
+    key_nodes:
+    - url_contains: info/rfc2616
+    assert:
+      url_contains: info/rfc2616
+  - id: live_rfceditor_title_rfc8259
+    instruction: Find the title of RFC 8259 on the RFC Editor site and open its info page.
+    start_url: https://www.rfc-editor.org/
+    domain: reference
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: sealed
+    key_nodes:
+    - url_contains: info/rfc8259
+    assert:
+      text_contains: The JavaScript Object Notation (JSON) Data Interchange Format
+  - id: live_rfceditor_open_ip
+    instruction: Navigate to the RFC Editor information page for RFC 791 (the Internet Protocol specification).
+    start_url: https://www.rfc-editor.org/
+    domain: reference
+    task_type: action
+    difficulty: single
+    split: sealed
+    key_nodes:
+    - url_contains: info/rfc791
+    assert:
+      url_contains: info/rfc791
+  - id: live_rfceditor_title_rfc1149
+    instruction: Look up RFC 1149 on the RFC Editor site and open its info page to read its title.
+    start_url: https://www.rfc-editor.org/
+    domain: reference
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: sealed
+    key_nodes:
+    - url_contains: info/rfc1149
+    assert:
+      text_contains: A Standard for the Transmission of IP Datagrams on Avian Carriers
+  - id: live_rfceditor_open_uri
+    instruction: On the RFC Editor site, open the information page for RFC 3986, the URI generic syntax standard.
+    start_url: https://www.rfc-editor.org/
+    domain: reference
+    task_type: action
+    difficulty: single
+    split: sealed
+    key_nodes:
+    - url_contains: info/rfc3986
+    assert:
+      url_contains: info/rfc3986
+  - id: live_rfceditor_title_rfc3986
+    instruction: Find the official title of RFC 3986 on the RFC Editor site and open its info page.
+    start_url: https://www.rfc-editor.org/
+    domain: reference
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: sealed
+    key_nodes:
+    - url_contains: info/rfc3986
+    assert:
+      text_contains: 'Uniform Resource Identifier (URI): Generic Syntax'
+  - id: live_rfceditor_open_ftp
+    instruction: Navigate to the RFC Editor information page for RFC 959.
+    start_url: https://www.rfc-editor.org/
+    domain: reference
+    task_type: action
+    difficulty: single
+    split: sealed
+    key_nodes:
+    - url_contains: info/rfc959
+    assert:
+      url_contains: info/rfc959
+  - id: live_rfceditor_title_rfc2046
+    instruction: Look up RFC 2046 on the RFC Editor site and open its info page to read its title.
+    start_url: https://www.rfc-editor.org/
+    domain: reference
+    task_type: retrieval
+    difficulty: multi_same_domain
+    split: sealed
+    key_nodes:
+    - url_contains: info/rfc2046
+    assert:
+      text_contains: 'Multipurpose Internet Mail Extensions (MIME) Part Two: Media Types'
+  - id: live_webscraper_nav_laptops
+    instruction: From the e-commerce test site home page, navigate to the Computers category and then open the Laptops subcategory listing.
+    start_url: https://webscraper.io/test-sites/e-commerce/allinone
+    domain: ecommerce
+    task_type: action
+    difficulty: multi_same_domain
+    split: sealed
+    key_nodes:
+    - url_contains: computers/laptops
+    assert:
+      url_contains: computers/laptops
+  - id: live_webscraper_nav_tablets
+    instruction: From the e-commerce test site home page, navigate to the Computers category and then open the Tablets subcategory listing.
+    start_url: https://webscraper.io/test-sites/e-commerce/allinone
+    domain: ecommerce
+    task_type: action
+    difficulty: multi_same_domain
+    split: sealed
+    key_nodes:
+    - url_contains: computers/tablets
+    assert:
+      url_contains: computers/tablets
+  - id: live_webscraper_nav_phones
+    instruction: From the e-commerce test site home page, open the Phones category listing.
+    start_url: https://webscraper.io/test-sites/e-commerce/allinone
+    domain: ecommerce
+    task_type: action
+    difficulty: single
+    split: sealed
+    key_nodes:
+    - url_contains: /phones
+    assert:
+      url_contains: /phones
+  - id: live_webscraper_open_ipad_mini_product
+    instruction: Navigate to the Computers > Tablets subcategory and open the product page for the 'IdeaTab A3500L' tablet, then confirm you are on its product detail page.
+    start_url: https://webscraper.io/test-sites/e-commerce/allinone
+    domain: ecommerce
+    task_type: action
+    difficulty: multi_same_domain
+    split: sealed
+    key_nodes:
+    - url_contains: /product/15
+    assert:
+      url_contains: /product/15
+  - id: live_webscraper_open_iphone_product
+    instruction: Go to the Phones category and open the product detail page for the 'Iphone' product.
+    start_url: https://webscraper.io/test-sites/e-commerce/allinone
+    domain: ecommerce
+    task_type: action
+    difficulty: multi_same_domain
+    split: sealed
+    key_nodes:
+    - url_contains: /product/7
+    assert:
+      url_contains: /product/7
+  - id: live_webscraper_nav_phones_touch
+    instruction: Navigate to the Phones category and then open its 'Touch' subcategory listing of touchscreen phones.
+    start_url: https://webscraper.io/test-sites/e-commerce/allinone
+    domain: ecommerce
+    task_type: action
+    difficulty: multi_same_domain
+    split: sealed
+    key_nodes:
+    - url_contains: phones/touch
+    assert:
+      url_contains: phones/touch
