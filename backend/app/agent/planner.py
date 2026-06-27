@@ -151,12 +151,22 @@ _PEEK_PLAN_PROMPT = (
 # elements and asks for a revised plan from here. It carries the ACCUMULATED failure log
 # across replans and asks for a DIFFERENT strategy, so repeated replans escalate the
 # approach instead of re-issuing the same losing plan.
-_REPLAN_PROMPT = """You are the planner for a browser-automation agent, RE-PLANNING. The
-agent is CURRENTLY on a page (its real elements are listed at the end). The attempts under
-"FAILED ALREADY" have NOT worked — do NOT repeat those strategies; try a DIFFERENT approach
-(a different element, a different action, or navigate directly if a listed link's target
-already satisfies the goal). Prefer the visible element whose label best matches the intent
-even if the wording differs (e.g. "Log in" for "Sign In").
+_REPLAN_PROMPT = """You are the planner for a browser-automation agent, REPAIRING one failed
+step. The agent is CURRENTLY on a page (its real elements are listed at the end). ONE step just
+failed — it is the LAST entry under "FAILED ALREADY"; the agent could not carry it out.
+
+Output ONLY the replacement step(s) that achieve THAT failed step's immediate intent a DIFFERENT
+way — a different element, a different action, or a direct navigate. Do NOT repeat any strategy
+under "FAILED ALREADY". Prefer the visible element whose label best matches the intent even if
+the wording differs (e.g. "Log in" for "Sign In"). Usually one step; occasionally a couple if
+the intent genuinely needs them.
+
+CRITICAL: the LATER steps of the plan are PRESERVED and run AUTOMATICALLY after your repair — the
+executor splices them back in, so reproducing any of them makes it run TWICE (a double submit /
+double click). Output ONLY the repair for the failed step; NEVER re-output a later step. They are
+shown here only so you know what comes next:
+__REMAINING__
+
 The element list below is the most relevant slice of the page and is WIDENED on each retry.
 Always target a label that ACTUALLY appears in the list — never invent a placeholder name
 (e.g. "first result", "first button"); a guessed label that matches nothing just fails again.
@@ -165,19 +175,12 @@ If what you need is not listed yet, pick the closest element that IS shown.
 Each sub-task is one of: navigate (needs "url"), click (needs "target": the visible label),
 fill (needs "target" and "value"), press (needs "target" and "value": a key such as
 "Enter"). A click/press may carry "expect" — {"text_visible":"..."} / {"selector_visible":
-"css"} / {"url_contains":"..."} — the observable result that proves it worked.
+"css"} / {"url_contains":"..."} — the observable result that proves it worked. Respond with
+ONLY a JSON array of the repair step(s), no prose.
 
-Your plan must COMPLETE THE WHOLE TASK from here, not just fix the failed step. The original
-plan still had these remaining goal steps, which you are replacing:
-__REMAINING__
-Keep EVERY one of those goals — do NOT drop the later ones. In particular, if the task's
-FINAL goal (e.g. clicking a specific result/item, or reaching a target page) has not happened
-yet, your plan MUST still include it and END with it. Respond with ONLY a JSON array of the
-remaining steps from here, no prose.
+User task (for context): __TASK__
 
-User task: __TASK__
-
-FAILED ALREADY (do not repeat these strategies):
+FAILED ALREADY (do not repeat these strategies; the LAST one is the step to repair):
 __FAILURES__
 
 Elements currently on the page:
@@ -245,8 +248,9 @@ def _mock_raw(subtasks: list[SubTask]) -> str:
 
 
 def _format_remaining(remaining: list[SubTask] | None) -> str:
-    """Render the original remaining-goal steps the replan is REPLACING, so the planner
-    re-includes every downstream goal (esp. the final one) instead of dropping it."""
+    """Render the PRESERVED future steps (the ones after the failed step) as context.
+    The executor splices these back in after the repair, so the planner is told NOT to
+    reproduce them — it repairs only the failed step (localized step-repair)."""
     if not remaining:
         return "(none recorded)"
     lines = []

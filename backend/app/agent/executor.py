@@ -200,12 +200,12 @@ class Executor:
                         perception = await perceive(page)
                         view_scope = min(view_scope * 2, len(perception.elements))
                         observation = _format_observation(perception, limit=view_scope)
-                        # Pass the ORIGINAL remaining steps (the failed one + every
-                        # downstream goal) so the replanner re-plans the WHOLE remaining
-                        # task and does not silently drop a later goal (e.g. "click the
-                        # 3rd item"), which would let a truncated plan "complete" falsely.
+                        # Show the replanner the PRESERVED future steps (subtasks[i+1:]) so it
+                        # repairs ONLY the failed step and does NOT reproduce them — the
+                        # executor splices those steps back in after the repair (localized
+                        # step-repair), so a later goal can never be dropped.
                         result = await self._planner.replan(
-                            task, failure_log, observation, remaining=subtasks[i:]
+                            task, failure_log, observation, remaining=subtasks[i + 1:]
                         )
                         new_subtasks = result.subtasks
                         raw = result.raw
@@ -213,12 +213,13 @@ class Executor:
                         new_subtasks = None
                         raw = ""
                     if new_subtasks:
-                        # `steps`/`reasoning`/`failures` describe THIS replan version (the
-                        # suffix the LLM produced and the failure log it was given), for the
-                        # plan-history panel. `plan` stays the FULL reconciled list because
-                        # the frontend seeds step ids (`${run_id}-s${i+1}`) off it.
+                        # Splice the repair in place of ONLY the failed step i; the executor
+                        # (not the LLM) keeps subtasks[i+1:], so a later goal can never be
+                        # dropped and a preserved step that itself fails just gets its own
+                        # repair next loop. `plan` must stay the FULL reconciled list — the
+                        # frontend seeds step ids (`${run_id}-s${i+1}`) off it.
                         suffix_steps = [_args(s) for s in new_subtasks]
-                        subtasks = subtasks[:i] + new_subtasks
+                        subtasks = subtasks[:i] + new_subtasks + subtasks[i + 1:]
                         yield events.plan_ready(
                             run_id, [_args(s) for s in subtasks],
                             version=replans_used + 1, kind="replan", reasoning=raw,
