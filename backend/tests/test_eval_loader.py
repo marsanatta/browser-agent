@@ -7,7 +7,57 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from eval.loader import load_tasks
+from eval.loader import load_tasks, select_splits
+
+
+def _write_split_yaml(tmp_path):
+    p = tmp_path / "split.yaml"
+    p.write_text(
+        "tasks:\n"
+        "  - {id: d1, instruction: i, start_url: 'http://a', domain: x, task_type: action,\n"
+        "     difficulty: single, split: dev, key_nodes: [], assert: {url_contains: a}}\n"
+        "  - {id: h1, instruction: i, start_url: 'http://b', domain: x, task_type: action,\n"
+        "     difficulty: single, split: holdout, key_nodes: [], assert: {url_contains: b}}\n"
+        "  - {id: s1, instruction: i, start_url: 'http://c', domain: x, task_type: action,\n"
+        "     difficulty: single, split: sealed, key_nodes: [], assert: {url_contains: c}}\n"
+        "  - {id: legacy, instruction: i, start_url: 'http://d', domain: x, task_type: action,\n"
+        "     difficulty: single, held_out: true, key_nodes: [], assert: {url_contains: d}}\n",
+        encoding="utf-8",
+    )
+    return p
+
+
+def test_split_parsing_and_held_out_derivation(tmp_path):
+    by_id = {t.id: t for t in load_tasks(_write_split_yaml(tmp_path))}
+    assert by_id["d1"].split == "dev" and by_id["d1"].held_out is False
+    assert by_id["h1"].split == "holdout" and by_id["h1"].held_out is True
+    # sealed is "unseen" too, so held_out is derived True
+    assert by_id["s1"].split == "sealed" and by_id["s1"].held_out is True
+    # legacy held_out:true with no split -> derived to holdout
+    assert by_id["legacy"].split == "holdout" and by_id["legacy"].held_out is True
+
+
+def test_bad_split_rejected(tmp_path):
+    bad = tmp_path / "bad.yaml"
+    bad.write_text(
+        "tasks:\n"
+        "  - {id: x, instruction: i, start_url: u, domain: d, task_type: action,\n"
+        "     difficulty: single, split: train, key_nodes: [], assert: {url_contains: a}}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError):
+        load_tasks(bad)
+
+
+def test_select_splits_seals_off_sealed_by_default(tmp_path):
+    tasks = load_tasks(_write_split_yaml(tmp_path))
+    # default: dev + holdout only, sealed EXCLUDED (cannot leak into a routine run)
+    routine = select_splits(tasks)
+    assert {t.id for t in routine} == {"d1", "h1", "legacy"}
+    assert all(t.split != "sealed" for t in routine)
+    # explicit final pass: ONLY sealed
+    final = select_splits(tasks, include_sealed=True)
+    assert {t.id for t in final} == {"s1"}
 
 
 def test_eval_set_loads_and_is_modest():

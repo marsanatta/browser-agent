@@ -13,6 +13,7 @@ independent state checks), then writes a dated raw table to eval/REPORT.md.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,7 +23,7 @@ from app.agent.models import LLMGateway
 
 from eval import audit
 from eval.harness import _CountingGateway, _run_once
-from eval.loader import EvalTask, load_tasks
+from eval.loader import EvalTask, load_tasks, select_splits
 
 LIVE_PATH = Path(__file__).resolve().parent / "eval_set" / "live_real_world.yaml"
 REPORT_PATH = Path(__file__).resolve().parent / "REPORT.md"
@@ -83,16 +84,18 @@ async def _run(tasks: list[EvalTask]):
 
 def _table(rows) -> str:
     lines = [
-        "| task | site | type | deterministic? | nominal | verified | abstained |",
-        "|---|---|---|---|---|---|---|",
+        "| task | site | type | split | deterministic? | nominal | verified | abstained |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for t, rec, err in rows:
         det = "no (live)" if _is_live(t) else "yes (inline)"
         if err:
-            lines.append(f"| {t.id} | {_site(t)} | {t.task_type} | {det} | ERROR | ERROR | - |")
+            lines.append(
+                f"| {t.id} | {_site(t)} | {t.task_type} | {t.split} | {det} | ERROR | ERROR | - |"
+            )
         else:
             lines.append(
-                f"| {t.id} | {_site(t)} | {t.task_type} | {det} | "
+                f"| {t.id} | {_site(t)} | {t.task_type} | {t.split} | {det} | "
                 f"{rec.nominal} | {rec.verified} | {rec.asked} |"
             )
     return "\n".join(lines)
@@ -103,9 +106,22 @@ def _verified(rows) -> int:
 
 
 async def main() -> None:
-    live = load_tasks(LIVE_PATH)
-    by_id = {t.id: t for t in load_tasks()}
-    day3 = [by_id[i] for i in DAY3_BATCH if i in by_id]
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--sealed", action="store_true",
+        help="score ONLY the sealed split — the once-only final pass. Without this flag "
+             "sealed tasks are never run, so they can't leak into the keep loop.",
+    )
+    args = ap.parse_args()
+
+    live = select_splits(load_tasks(LIVE_PATH), include_sealed=args.sealed)
+    if args.sealed:
+        day3 = []
+        report_path = REPORT_PATH.parent / "REPORT_sealed.md"
+    else:
+        by_id = {t.id: t for t in load_tasks()}
+        day3 = [by_id[i] for i in DAY3_BATCH if i in by_id]
+        report_path = REPORT_PATH
 
     live_rows, c1, live_traces = await _run(live)
     day3_rows, c2, day3_traces = await _run(day3)
@@ -178,11 +194,11 @@ genuine agent gaps:
   cannot type into the TinyMCE body. Verified by a frame-aware check
   (`iframe_text_equals`) so an iframe-piercing fix would pass it later.
 """
-    REPORT_PATH.write_text(body, encoding="utf-8")
+    report_path.write_text(body, encoding="utf-8")
     all_traces = live_traces + day3_traces
     AUDIT_PATH.write_text(audit.render_md(all_traces, when), encoding="utf-8")
     cov = audit.attribution_coverage(all_traces)
-    print(f"REPORT written: {REPORT_PATH}")
+    print(f"REPORT written: {report_path}")
     print(f"AUDIT written:  {AUDIT_PATH}  (attribution_coverage={cov:.3f})")
     print(
         f"live tier: {_verified(live_rows)}/{len(live_rows)} verified | "

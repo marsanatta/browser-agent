@@ -15,6 +15,7 @@ import yaml
 
 _VALID_TYPES = {"action", "retrieval", "side_effect"}
 _VALID_ABSTAIN_REASONS = {"blocked", "impossible"}
+_VALID_SPLITS = {"dev", "holdout", "sealed"}
 _VALID_PRIMITIVES = {
     "url_contains", "text_contains", "h1_equals", "selector_text_equals", "iframe_text_equals"
 }
@@ -46,6 +47,11 @@ class EvalTask:
     # guards against future regressions. Flag it so the harness keeps it OUT of the
     # headline success rate (it would only inflate it) while still running it.
     regression_anchor: bool = False
+    # Three-way generalization split (eval-expansion plan). dev = drives engine changes
+    # (RCA'd per-case); holdout = selection keep-gate (scored every round, never RCA'd);
+    # sealed = the once-only honest final metric, scored a single time at the very end and
+    # never used for any keep decision. Splits are disjoint BY SITE.
+    split: str = "dev"
 
 
 def _validate_primitive(where: str, spec: dict[str, Any]) -> None:
@@ -98,6 +104,17 @@ def load_tasks(path: Path | str = EVAL_SET_PATH) -> list[EvalTask]:
             _validate_primitive(f"{tid}.assert", assertion)
         elif not expect_abstain:
             raise ValueError(f"{tid}: 'assert' is required unless expect_abstain is true")
+        # `split` is authoritative when present (it derives held_out); else fall back to
+        # the legacy `held_out` bool (held_out -> holdout, otherwise dev). Sealed and
+        # holdout are both "unseen" so both set held_out=True.
+        split = it.get("split")
+        if split is not None:
+            if split not in _VALID_SPLITS:
+                raise ValueError(f"{tid}: bad split {split!r} (valid: {_VALID_SPLITS})")
+            held_out = split in {"holdout", "sealed"}
+        else:
+            held_out = bool(it.get("held_out", False))
+            split = "holdout" if held_out else "dev"
         tasks.append(
             EvalTask(
                 id=tid,
@@ -106,12 +123,23 @@ def load_tasks(path: Path | str = EVAL_SET_PATH) -> list[EvalTask]:
                 domain=it["domain"],
                 task_type=it["task_type"],
                 difficulty=it["difficulty"],
-                held_out=bool(it.get("held_out", False)),
+                held_out=held_out,
                 key_nodes=list(it.get("key_nodes", [])),
                 assertion=assertion,
                 expect_abstain=expect_abstain,
                 abstain_reason=abstain_reason,
                 regression_anchor=bool(it.get("regression_anchor", False)),
+                split=split,
             )
         )
     return tasks
+
+
+def select_splits(tasks: list[EvalTask], *, include_sealed: bool = False) -> list[EvalTask]:
+    """Filter tasks for a run. SEALED is the once-only final set: it is EXCLUDED unless
+    `include_sealed` is explicitly True, so sealed tasks can never leak into a routine
+    dev/holdout run. With `include_sealed=True` ONLY sealed tasks are returned (the final
+    pass scores them in isolation, then they are never touched again)."""
+    if include_sealed:
+        return [t for t in tasks if t.split == "sealed"]
+    return [t for t in tasks if t.split in {"dev", "holdout"}]
