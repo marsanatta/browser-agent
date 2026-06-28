@@ -80,3 +80,13 @@ tasks:
   - text_contains: Tata Consultancy
   assert:
     url_contains: /company/TCS
+
+- id: live_screenerin_sort_loginwall_abstain
+  purpose: loginwall_abstain
+  split: dev
+  instruction: On screener.in, open the 'Highest Dividend Yield Shares' screen and sort the result table by P/E ratio.
+  start_url: https://www.screener.in/screens/3/highest-dividend-yield-shares/
+  domain: finance
+  task_type: action
+  difficulty: multi_same_domain
+  expect_abstain: true
