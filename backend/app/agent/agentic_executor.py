@@ -48,6 +48,8 @@ VerifyHook = Callable[[Any], Awaitable[bool]]
 _DEFAULT_MODEL = os.getenv("PILOT_MODEL", "claude-haiku-4.5")
 _DEBUG = bool(os.getenv("AGENT_DEBUG"))
 _DONE = object()  # queue sentinel: send_and_wait has returned, stop draining
+_STALE_INDEX = ("STALE_INDEX: that index is no longer valid — the page changed since your last "
+                "observe. Observe again to get fresh indices, then act on the one you want.")
 
 
 def _model_for(gateway: Any) -> str:
@@ -74,9 +76,25 @@ async def _miss_message(page: Any, target: str, kind: str) -> str:
             f"menu/expander — observe with an empty target to list ALL elements, then act; or finish.")
 
 
+def _observe_row(e: Any) -> dict:
+    """One observe-list row. When the element carries an index (`aid`), include it as `i`
+    plus its disambiguating `near` context, so the agent can act on a SPECIFIC one of several
+    same-named controls by index; otherwise the bare role+name (by-name acting) as before."""
+    row: dict = {"role": e.role, "name": e.name}
+    if e.aid is not None:
+        row["i"] = e.aid
+        if e.ctx:
+            row["near"] = e.ctx
+    return row
+
+
 # --- tool param schemas (Pydantic, as the SDK requires) ---------------------
 class _Target(BaseModel):
-    target: str = Field(description="Exact visible text/label of the element")
+    target: str = Field(default="", description="Exact visible text/label of the element (omit when using index)")
+    index: int | None = Field(
+        default=None,
+        description="The 'i' index from the latest observe — use to act on a SPECIFIC element when several share the SAME name",
+    )
 
 
 class _Read(BaseModel):
@@ -84,8 +102,12 @@ class _Read(BaseModel):
 
 
 class _Fill(BaseModel):
-    target: str = Field(description="Exact label of the field to fill")
+    target: str = Field(default="", description="Exact label of the field to fill (omit when using index)")
     value: str = Field(description="Text to type into the field")
+    index: int | None = Field(
+        default=None,
+        description="The 'i' index from the latest observe — use to fill a SPECIFIC field among same-named ones",
+    )
 
 
 class _Url(BaseModel):
@@ -336,11 +358,11 @@ class AgenticExecutor:
                 emit(events.tool_call_start(step_id, "observe", call_id))
                 emit(events.tool_call_args(call_id, {"target": p.target}))
                 try:
-                    els = await asyncio.wait_for(cdp.perceive(page, p.target), HANDLER_TIMEOUT)
+                    els = await asyncio.wait_for(cdp.perceive_indexed(page, p.target), HANDLER_TIMEOUT)
                 except asyncio.TimeoutError:
                     return self._finish_tool(emit, step_id, call_id, page, "observe timeout", False,
                                              "OBSERVE_TIMEOUT: page slow; pick a different target or finish.")
-                payload = json.dumps([{"role": e.role, "name": e.name} for e in els[:20]])
+                payload = json.dumps([_observe_row(e) for e in els[:20]])
                 await shot(step_id, None, f"observe: {p.target}")
                 emit(events.tool_call_end(call_id, f"{len(els)} elements"))
                 emit(events.step_finished(step_id, "ok"))
@@ -364,23 +386,28 @@ class AgenticExecutor:
                 return txt
 
             async def click(p: _Target) -> str:
-                if (g := gate("click", p.target)) is not None:
+                label = p.target if p.index is None else f"#{p.index}"
+                if (g := gate("click", label)) is not None:
                     return g
                 state["last_verify_ok"] = False  # page state changes -> stale verify must not gate finish
                 step_id, call_id = next_ids()
-                emit(events.step_started(step_id, f"click: {p.target}"))
+                emit(events.step_started(step_id, f"click: {label}"))
                 emit(events.tool_call_start(step_id, "click", call_id))
-                emit(events.tool_call_args(call_id, {"target": p.target}))
+                emit(events.tool_call_args(call_id, {"target": p.target, "index": p.index}))
                 try:
                     before = await asyncio.wait_for(cdp.snapshot(page), HANDLER_TIMEOUT)
-                    loc = await asyncio.wait_for(cdp.ground(page, p.target), HANDLER_TIMEOUT)
+                    if p.index is not None:
+                        loc = await asyncio.wait_for(cdp.resolve_aid(page, p.index), HANDLER_TIMEOUT)
+                    else:
+                        loc = await asyncio.wait_for(cdp.ground(page, p.target), HANDLER_TIMEOUT)
                 except asyncio.TimeoutError:
                     return self._finish_tool(emit, step_id, call_id, page, "click timeout", False,
                                              "CLICK_TIMEOUT: page slow; try a different target or finish.")
                 if loc is None:
                     return self._finish_tool(emit, step_id, call_id, page, "not found", False,
-                                             await _miss_message(page, p.target, "element"))
-                await shot(step_id, loc, f"click: {p.target}")
+                                             _STALE_INDEX if p.index is not None
+                                             else await _miss_message(page, p.target, "element"))
+                await shot(step_id, loc, f"click: {label}")
                 try:
                     await asyncio.wait_for(cdp.click(loc), HANDLER_TIMEOUT)
                 except asyncio.TimeoutError:
@@ -396,22 +423,27 @@ class AgenticExecutor:
                 return json.dumps({"changed": ch, "url": page.url})
 
             async def fill(p: _Fill) -> str:
-                if (g := gate("fill", p.target)) is not None:
+                label = p.target if p.index is None else f"#{p.index}"
+                if (g := gate("fill", label)) is not None:
                     return g
                 state["last_verify_ok"] = False  # page state changes -> stale verify must not gate finish
                 step_id, call_id = next_ids()
-                emit(events.step_started(step_id, f"fill: {p.target}"))
+                emit(events.step_started(step_id, f"fill: {label}"))
                 emit(events.tool_call_start(step_id, "fill", call_id))
-                emit(events.tool_call_args(call_id, {"target": p.target, "value": p.value}))
+                emit(events.tool_call_args(call_id, {"target": p.target, "value": p.value, "index": p.index}))
                 try:
-                    loc = await asyncio.wait_for(cdp.ground(page, p.target), HANDLER_TIMEOUT)
+                    if p.index is not None:
+                        loc = await asyncio.wait_for(cdp.resolve_aid(page, p.index), HANDLER_TIMEOUT)
+                    else:
+                        loc = await asyncio.wait_for(cdp.ground(page, p.target), HANDLER_TIMEOUT)
                 except asyncio.TimeoutError:
                     return self._finish_tool(emit, step_id, call_id, page, "fill timeout", False,
                                              "FILL_TIMEOUT: page slow; try a different target or finish.")
                 if loc is None:
                     return self._finish_tool(emit, step_id, call_id, page, "not found", False,
-                                             await _miss_message(page, p.target, "field"))
-                await shot(step_id, loc, f"fill: {p.target}")
+                                             _STALE_INDEX if p.index is not None
+                                             else await _miss_message(page, p.target, "field"))
+                await shot(step_id, loc, f"fill: {label}")
                 try:
                     await asyncio.wait_for(cdp.fill(loc, p.value), HANDLER_TIMEOUT)
                 except asyncio.TimeoutError:

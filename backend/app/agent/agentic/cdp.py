@@ -20,18 +20,26 @@ from typing import Any
 @dataclass
 class Element:
     """A perceived interactive element: ARIA role + accessible name (the stable
-    user-facing contract) plus locator-grade attributes for the cascade."""
+    user-facing contract) plus locator-grade attributes for the cascade.
+
+    `aid` + `ctx` are set ONLY by the indexed-observe path (perceive_indexed): `aid` is a
+    stable per-observe index injected as `data-aid` so the agent can address ONE of several
+    identically-named controls by number; `ctx` is the nearest container text (the row /
+    section the control sits in) that disambiguates which same-named element is which."""
 
     role: str
     name: str
     attrs: dict[str, str] = field(default_factory=dict)
+    aid: int | None = None
+    ctx: str = ""
 
 
-# One in-browser pass: compute ARIA role + accessible name for every interactive
-# node, then FILTER to those whose name overlaps the step target. The filter is the
-# 0.07x token lever — it runs in the page, so an enormous link list costs zero tokens.
-_SCAN_JS = r"""(target) => {
-  const sel = 'a,button,input,textarea,select,[role]';
+# Shared in-browser helpers: the interactive selector + ARIA role + accessible name.
+# Factored so the filtered scan (_SCAN_JS) and the indexed observe (_OBSERVE_JS) compute
+# role/name IDENTICALLY — they must never drift, or click-by-name and click-by-index would
+# disagree about what an element is called.
+_RN_HELPERS = r"""
+  const SEL = 'a,button,input,textarea,select,[role]';
   const roleOf = (el) => {
     const r = el.getAttribute('role');
     if (r) return r.toLowerCase();
@@ -55,22 +63,25 @@ _SCAN_JS = r"""(target) => {
     (el.id && (document.querySelector('label[for="' + el.id + '"]')||{}).innerText) ||
     el.value || el.innerText || el.getAttribute('title') || ''
   ).trim();
-
-  const tgt = (target || '').trim().toLowerCase();
-  const toks = tgt.split(/\s+/).filter(Boolean);
-  const relevant = (name) => {
-    if (!tgt) return true;                 // no target -> keep all (capped below)
+  const relevantTo = (name, target) => {
+    const tgt = (target || '').trim().toLowerCase();
+    if (!tgt) return true;                 // no target -> keep all (capped by caller)
     const n = name.toLowerCase();
     if (n.includes(tgt) || tgt.includes(n)) return true;
-    return toks.some(t => t.length > 2 && n.includes(t));
+    return tgt.split(/\s+/).filter(Boolean).some(t => t.length > 2 && n.includes(t));
   };
+"""
 
+# One in-browser pass: compute ARIA role + accessible name for every interactive
+# node, then FILTER to those whose name overlaps the step target. The filter is the
+# 0.07x token lever — it runs in the page, so an enormous link list costs zero tokens.
+_SCAN_JS = "(target) => {" + _RN_HELPERS + r"""
   const out = [];
-  for (const el of document.querySelectorAll(sel)) {
+  for (const el of document.querySelectorAll(SEL)) {
     const role = roleOf(el);
     const name = nameOf(el);
     if (!role || !name) continue;
-    if (!relevant(name)) continue;
+    if (!relevantTo(name, target)) continue;
     out.push({
       role, name,
       id: el.id || '',
@@ -80,6 +91,37 @@ _SCAN_JS = r"""(target) => {
       cls: (typeof el.className === 'string' ? el.className : '') || '',
     });
     if (out.length >= 40) break;           // hard cap: never explode the candidate set
+  }
+  return out;
+}"""
+
+
+# Indexed observe: like _SCAN_JS but (a) does NOT dedup, (b) injects a stable `data-aid`
+# index per match so the agent can address ONE of several identically-named controls by
+# number, and (c) returns `ctx` = the nearest container text (row/section), which is what
+# disambiguates one row's action link from the identical link in another row. ONLY this path
+# injects data-aid; the filtered _SCAN_JS (run on every ground) must not, or it would
+# clobber the indices between observe and the click that uses them. Stale aids from a prior
+# observe are cleared first so an index always refers to the LATEST observe.
+_OBSERVE_JS = "(target) => {" + _RN_HELPERS + r"""
+  document.querySelectorAll('[data-aid]').forEach(e => e.removeAttribute('data-aid'));
+  const ctxOf = (el, name) => {
+    const box = el.closest('li,tr,section,article,fieldset,nav,dd,dt');
+    let t = box ? (box.innerText || '').trim() : '';
+    if (name && t) t = t.split(name).join(' ');   // drop the control's own label
+    return t.replace(/\s+/g, ' ').trim().slice(0, 60);
+  };
+  const out = [];
+  let idx = 0;
+  for (const el of document.querySelectorAll(SEL)) {
+    const role = roleOf(el);
+    const name = nameOf(el);
+    if (!role || !name) continue;
+    if (!relevantTo(name, target)) continue;
+    el.setAttribute('data-aid', String(idx));
+    out.push({ aid: idx, role, name, ctx: ctxOf(el, name) });
+    idx++;
+    if (out.length >= 20) break;   // match the observe display cap: every injected index is shown
   }
   return out;
 }"""
@@ -192,6 +234,33 @@ async def perceive(page: Any, target: str) -> list[Element]:
             continue  # detached / cross-origin / not-yet-loaded frame
         _rows_to_elements(frows, seen, elements)
     return elements
+
+
+async def perceive_indexed(page: Any, target: str) -> list[Element]:
+    """Observe-only perception: assigns a stable `data-aid` index per matched element and a
+    disambiguating `ctx` (its row/section text), and does NOT dedup same-name elements — so
+    the agent can SEE and address each of several identically-named controls. Main-frame only
+    for the indexed path; if the main frame yields nothing (e.g. a rich-text editor lives in a
+    child frame) it falls back to the by-name perceive so iframe tasks are unaffected."""
+    try:
+        rows = await page.evaluate(_OBSERVE_JS, target or "")
+    except Exception:
+        rows = []
+    out = [Element(role=r["role"], name=r["name"], aid=r["aid"], ctx=r["ctx"]) for r in rows]
+    if out or not _is_page(page):
+        return out
+    return await perceive(page, target)
+
+
+async def resolve_aid(page: Any, aid: int) -> Any | None:
+    """Resolve an index from the latest indexed observe to its exact element via the injected
+    data-aid — no name re-match, so it cannot pick the wrong same-named element. Returns None
+    if the index is stale (the page changed since observe) so the caller can re-observe."""
+    loc = page.locator(f'[data-aid="{int(aid)}"]')
+    try:
+        return loc if await loc.count() == 1 else None
+    except Exception:
+        return None
 
 
 # READ: surface page TEXT (not interactive elements). perceive() only returns
@@ -362,11 +431,11 @@ class Snapshot:
 
 async def snapshot(page: Any) -> Snapshot:
     try:
-        body = await page.evaluate("() => document.body ? document.body.innerHTML : ''")
+        body = await page.evaluate("() => (document.body ? document.body.innerHTML : '').replace(/ data-aid=\"\\d+\"/g, '')")
     except Exception:
         try:
             await page.wait_for_load_state("domcontentloaded", timeout=5000)
-            body = await page.evaluate("() => document.body ? document.body.innerHTML : ''")
+            body = await page.evaluate("() => (document.body ? document.body.innerHTML : '').replace(/ data-aid=\"\\d+\"/g, '')")
         except Exception:
             body = ""
     return Snapshot(url=page.url, dom_hash=hash(body))
