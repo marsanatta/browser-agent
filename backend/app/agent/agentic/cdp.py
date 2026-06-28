@@ -286,7 +286,32 @@ async def _lone_visible(loc: Any) -> Any | None:
                 visible.append(c)
         except Exception:
             continue
-    return visible[0] if len(visible) == 1 else None
+    if len(visible) == 1:
+        return visible[0]
+    if len(visible) > 1 and await _same_destination(visible):
+        # Not a genuine ambiguity: every match is the SAME link destination, so
+        # clicking any one reaches the identical page (Wikipedia routinely links the
+        # same article from both the infobox and the body). Picking the first is still
+        # no-silent-WRONG-pick — there is no wrong choice among identical destinations.
+        return visible[0]
+    return None
+
+
+async def _same_destination(locs: list[Any]) -> bool:
+    """True iff every locator is a link to the SAME real href. Excludes non-link
+    elements (href None) and '#'/empty placeholders (a bare '#' may bind different JS
+    handlers), so only genuine duplicate navigation targets collapse — differing or
+    placeholder hrefs stay ambiguous."""
+    hrefs = set()
+    for c in locs:
+        try:
+            hrefs.add(await c.get_attribute("href"))
+        except Exception:
+            return False
+    if len(hrefs) != 1:
+        return False
+    href = next(iter(hrefs))
+    return bool(href) and href != "#"
 
 
 # --- ACT (Playwright on the provider-supplied page) -------------------------
