@@ -1,0 +1,110 @@
+# REFERENCE-MECHANISM EVAL SET (round-3) — REVISED after the independent adversarial
+# audit (see ANTI-CHEAT-GATE.md / the audit findings). The first draft was rejected: 5/10
+# probes duplicated diagnostic.yaml, Family B's "cost" axis was unmeasurable at 40-element
+# scale, mech_A1 was rigged-to-pass, and Families B/D were passable by the wide-observe
+# PROMPT patch the author also controls (not the code pillar). This revision keeps ONLY the
+# gaps the cheap prompt patch provably CANNOT fake:
+#   ① stable-ID / structured index — SAME-NAME MULTIPLICITY. The engine dedups perceive rows
+#      by (role,name) and locate stops on ambiguity, so it literally cannot represent or
+#      address "the 2nd of three 'Edit' links". The wide-observe prompt cannot disambiguate
+#      two identically-named controls.
+#   ② index-all + structural PRUNE — LARGE-DOM COVERAGE (not token cost; cost is noise at this
+#      scale). A renamed target sits AFTER a big hidden nav in DOM order, past the 40-cap, so
+#      name-filter misses it (renamed) AND wide-observe returns the first-40 hidden-nav cruft.
+#      Only dropping hidden/occluded cruft (the prune) surfaces the real target.
+# Families ③ (change-signal) and ④ (graduated loop) are DROPPED: ③ is covered by #4a +
+# diag_decoy; ④'s only real case was the grounding bug already fixed (round-2). Markers and
+# labels here MUST NOT appear in any implementation diff (G-LEAK).
+tasks:
+  # ===== Family A — same-name multiplicity (target: ① stable-ID + structured index) =====
+  # Each probe needs the agent to address a SPECIFIC element among identically-named ones.
+  # Baseline: perceive dedups to one row; click(name) -> locate count>1 -> ambiguous -> None.
+  - id: mech_A_dup_action
+    instruction: "Open the Report."
+    inline_html: |
+      <section>Settings <button id="s">Open</button></section>
+      <section>Report <button id="p">Open</button></section>
+      <p id="r"></p>
+      <script>document.getElementById('s').addEventListener('click',function(){document.getElementById('r').textContent='WRONG_SETTINGS'});document.getElementById('p').addEventListener('click',function(){document.getElementById('r').textContent='RPT_DONE'});</script>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    split: dev
+    purpose: same_name_dup_action
+    assert: { text_contains: "RPT_DONE" }
+
+  - id: mech_A_list_edit
+    instruction: "Edit the entry for Banana."
+    inline_html: |
+      <ul>
+        <li>Apple <a id="e1" href="#">Edit</a></li>
+        <li>Banana <a id="e2" href="#">Edit</a></li>
+        <li>Cherry <a id="e3" href="#">Edit</a></li>
+      </ul>
+      <p id="r"></p>
+      <script>for (const [id,m] of [['e1','WRONG_APPLE'],['e2','BANANA_EDIT'],['e3','WRONG_CHERRY']]) document.getElementById(id).addEventListener('click',function(e){e.preventDefault();document.getElementById('r').textContent=m});</script>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    split: dev
+    purpose: same_name_list_pick
+    assert: { text_contains: "BANANA_EDIT" }
+
+  - id: mech_A_dup_diff_href
+    instruction: "Download the 2024 annual report (the second file)."
+    inline_html: |
+      <a id="d1" href="/files/2023.pdf">Download</a>
+      <a id="d2" href="/files/2024.pdf">Download</a>
+      <p id="r"></p>
+      <script>document.getElementById('d1').addEventListener('click',function(e){e.preventDefault();document.getElementById('r').textContent='WRONG_2023'});document.getElementById('d2').addEventListener('click',function(e){e.preventDefault();document.getElementById('r').textContent='DL_2024'});</script>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    split: dev
+    purpose: same_name_diff_href
+    assert: { text_contains: "DL_2024" }
+
+  - id: mech_A_same_dest_control
+    instruction: "Go to the next page."
+    inline_html: |
+      <a id="n1" href="#page2">Next</a>
+      <a id="n2" href="#page2">Next</a>
+      <p id="r"></p>
+      <script>for (const id of ['n1','n2']) document.getElementById(id).addEventListener('click',function(e){e.preventDefault();document.getElementById('r').textContent='NEXT_OK'});</script>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    split: dev
+    purpose: same_dest_control
+    assert: { text_contains: "NEXT_OK" }
+
+  # ===== Family B — large-DOM coverage via prune (target: ② index-all + structural prune) =====
+  # The big nav is display:none, so wide-observe's first-40 returns hidden cruft and the real
+  # (renamed) target past it is never seen. Dropping hidden elements (the prune) surfaces it.
+  - id: mech_B_hidden_nav_coverage
+    instruction: "Click the Search button."
+    inline_html: |
+      <nav id="bignav" style="display:none"></nav>
+      <main><button id="b" aria-label="Go">Go</button></main>
+      <p id="r"></p>
+      <script>const nav=document.getElementById('bignav');for(let i=0;i<300;i++){const a=document.createElement('a');a.href='#n'+i;a.textContent='Link '+i;nav.appendChild(a);}document.getElementById('b').addEventListener('click',function(){document.getElementById('r').textContent='SEARCH_RUN'});</script>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    split: dev
+    purpose: largedom_hidden_nav_coverage
+    assert: { text_contains: "SEARCH_RUN" }
+
+  - id: mech_B_control_match
+    instruction: "Click the Search button."
+    inline_html: |
+      <nav id="bignav" style="display:none"></nav>
+      <main><button id="b" aria-label="Search">Search</button></main>
+      <p id="r"></p>
+      <script>const nav=document.getElementById('bignav');for(let i=0;i<300;i++){const a=document.createElement('a');a.href='#n'+i;a.textContent='Link '+i;nav.appendChild(a);}document.getElementById('b').addEventListener('click',function(){document.getElementById('r').textContent='SEARCH_RUN'});</script>
+    domain: synthetic
+    task_type: action
+    difficulty: single
+    split: dev
+    purpose: largedom_control_match
+    assert: { text_contains: "SEARCH_RUN" }
