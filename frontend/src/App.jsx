@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { StepDetail } from "./StepDetail.jsx";
 import { LiveActivity } from "./LiveActivity.jsx";
 import { Hint, LanguageSwitcher } from "./Hint.jsx";
+import { ExampleGallery } from "./ExampleGallery.jsx";
+import { EXAMPLES } from "./examples.js";
 import { maskArgs, MASK } from "./mask.js";
 
 const BACKEND = import.meta.env.VITE_BACKEND_URL ?? "";
@@ -202,6 +204,7 @@ export default function App() {
   const [models, setModels] = useState(null); // { menu, defaults, thinking_levels, thinking_defaults }
   const [modelSel, setModelSel] = useState(null); // current per-role model selection
   const [effortSel, setEffortSel] = useState(null); // current per-role thinking level
+  const [agentMode, setAgentMode] = useState("agentic"); // "agentic" | "script" — engine selector
   const [maxReplans, setMaxReplans] = useState(10); // bounded global replans before abstain
   const [critType, setCritType] = useState(""); // optional success criterion (independent goal check)
   const [critValue, setCritValue] = useState("");
@@ -256,27 +259,36 @@ export default function App() {
 
   if (!authed) return <AuthGate onUnlock={unlock} expired={sessionExpired} />;
 
-  function start() {
-    if (!task.trim() || running) return;
+  function start(opts = {}) {
+    const taskV = (opts.task ?? task).trim();
+    if (!taskV || running) return;
     sourceRef.current?.close();
-    dispatch({ type: "RUN_STARTED", payload: { run_id: "—", task } });
+    dispatch({ type: "RUN_STARTED", payload: { run_id: "—", task: taskV } });
     setSelected(null);
     setRunning(true);
 
-    const params = new URLSearchParams({ task });
-    if (url.trim()) params.set("url", url.trim());
-    if (modelSel) {
-      params.set("model_plan", modelSel.plan);
-      params.set("model_exec", modelSel.exec);
-      params.set("model_replanner", modelSel.replanner);
+    const urlV = (opts.url ?? url).trim();
+    const params = new URLSearchParams({ task: taskV });
+    if (urlV) params.set("url", urlV);
+    params.set("agent_mode", agentMode === "script" ? "script-orchestration" : "agentic");
+    if (agentMode === "script") {
+      if (modelSel) {
+        params.set("model_plan", modelSel.plan);
+        params.set("model_exec", modelSel.exec);
+        params.set("model_replanner", modelSel.replanner);
+      }
+      if (effortSel) {
+        params.set("think_plan", effortSel.plan);
+        params.set("think_exec", effortSel.exec);
+        params.set("think_replanner", effortSel.replanner);
+      }
+      params.set("max_replans", String(maxReplans));
+    } else {
+      // agentic = one Copilot session: the single model + thinking is the workhorse (exec role)
+      if (modelSel) params.set("model_exec", modelSel.exec);
+      if (effortSel) params.set("think_exec", effortSel.exec);
     }
-    if (effortSel) {
-      params.set("think_plan", effortSel.plan);
-      params.set("think_exec", effortSel.exec);
-      params.set("think_replanner", effortSel.replanner);
-    }
-    params.set("max_replans", String(maxReplans));
-    const criterion = buildCriterion(critType, critValue, critCss);
+    const criterion = opts.criterion !== undefined ? opts.criterion : buildCriterion(critType, critValue, critCss);
     if (criterion) params.set("criterion", JSON.stringify(criterion));
     // Stream over POST instead of EventSource(GET): Cloudflare quick tunnels
     // buffer SSE-over-GET and flush only at connection close (cloudflared#1449);
@@ -355,6 +367,31 @@ export default function App() {
     setRunning(false);
   }
 
+  function onPick(ex) {
+    if (running) return;
+    setTask(ex.task);
+    setUrl(ex.url || "");
+    const c = ex.criterion ?? null;
+    if (c?.selector_text_equals) {
+      setCritType("selector_text_equals");
+      setCritCss(c.selector_text_equals.css);
+      setCritValue(c.selector_text_equals.value);
+    } else if (c?.h1_equals != null) {
+      setCritType("h1_equals");
+      setCritValue(c.h1_equals);
+      setCritCss("");
+    } else if (c?.url_contains != null) {
+      setCritType("url_contains");
+      setCritValue(c.url_contains);
+      setCritCss("");
+    } else {
+      setCritType("");
+      setCritValue("");
+      setCritCss("");
+    }
+    start({ task: ex.task, url: ex.url, criterion: c });
+  }
+
   return (
     <main className="app">
       <header className="head">
@@ -427,6 +464,8 @@ export default function App() {
         )}
       </form>
 
+      <ExampleGallery examples={EXAMPLES} running={running} onPick={onPick} />
+
       <details className="criterion">
         <summary>
           {t("criterion.heading")}
@@ -472,51 +511,98 @@ export default function App() {
       {models && modelSel && effortSel && (
         <details className="models">
           <summary>{t("models.heading")}</summary>
-          <div className="models-grid">
-            {["plan", "exec", "replanner"].map((role) => (
-              <div key={role} className="model-row">
-                <span className="model-role">{t(`models.${role}`)}</span>
-                <label className="field">
-                  <span>{t("models.model")}</span>
-                  <select
-                    value={modelSel[role]}
-                    onChange={(e) => setModelSel((s) => ({ ...s, [role]: e.target.value }))}
-                  >
-                    {models.menu.map((id) => (
-                      <option key={id} value={id} translate="no">
-                        {id}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  <span>{t("models.thinking")}</span>
-                  <select
-                    value={effortSel[role]}
-                    onChange={(e) => setEffortSel((s) => ({ ...s, [role]: e.target.value }))}
-                  >
-                    {models.thinking_levels.map((lv) => (
-                      <option key={lv} value={lv} translate="no">
-                        {lv}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            ))}
-            <label className="field model-replans">
-              <span>{t("models.maxReplans")}</span>
-              <input
-                type="number"
-                min={0}
-                max={10}
-                value={maxReplans}
-                onChange={(e) =>
-                  setMaxReplans(Math.max(0, Math.min(10, Number(e.target.value) || 0)))
-                }
-              />
-            </label>
+          <div className="gallery-seg engine-seg" role="tablist" aria-label={t("models.engine")}>
+            {[["agentic", "models.engineAgentic"], ["script", "models.engineScript"]].map(
+              ([m, key]) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  aria-selected={agentMode === m}
+                  className={`gallery-seg-btn${agentMode === m ? " on" : ""}`}
+                  onClick={() => setAgentMode(m)}
+                >
+                  {t(key)}
+                </button>
+              )
+            )}
           </div>
+          {agentMode === "agentic" ? (
+            <div className="criterion-grid">
+              <label className="field">
+                <span>{t("models.model")}</span>
+                <select
+                  value={modelSel.exec}
+                  onChange={(e) => setModelSel((s) => ({ ...s, exec: e.target.value }))}
+                >
+                  {models.menu.map((id) => (
+                    <option key={id} value={id} translate="no">
+                      {id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>{t("models.thinking")}</span>
+                <select
+                  value={effortSel.exec}
+                  onChange={(e) => setEffortSel((s) => ({ ...s, exec: e.target.value }))}
+                >
+                  {models.thinking_levels.map((lv) => (
+                    <option key={lv} value={lv} translate="no">
+                      {lv}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          ) : (
+            <div className="models-grid">
+              {["plan", "exec", "replanner"].map((role) => (
+                <div key={role} className="model-row">
+                  <span className="model-role">{t(`models.${role}`)}</span>
+                  <label className="field">
+                    <span>{t("models.model")}</span>
+                    <select
+                      value={modelSel[role]}
+                      onChange={(e) => setModelSel((s) => ({ ...s, [role]: e.target.value }))}
+                    >
+                      {models.menu.map((id) => (
+                        <option key={id} value={id} translate="no">
+                          {id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>{t("models.thinking")}</span>
+                    <select
+                      value={effortSel[role]}
+                      onChange={(e) => setEffortSel((s) => ({ ...s, [role]: e.target.value }))}
+                    >
+                      {models.thinking_levels.map((lv) => (
+                        <option key={lv} value={lv} translate="no">
+                          {lv}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ))}
+              <label className="field model-replans">
+                <span>{t("models.maxReplans")}</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={10}
+                  value={maxReplans}
+                  onChange={(e) =>
+                    setMaxReplans(Math.max(0, Math.min(10, Number(e.target.value) || 0)))
+                  }
+                />
+              </label>
+            </div>
+          )}
         </details>
       )}
 

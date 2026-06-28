@@ -226,6 +226,7 @@ def _build_executor(
     exec_effort: str,
     replanner_effort: str,
     max_replans: int = 10,
+    agent_mode: str | None = None,
     verify_hook: VerifyHook | None = None,
 ) -> Executor:
     gateway = LLMGateway(
@@ -237,16 +238,17 @@ def _build_executor(
     planner: object = LLMPlanner(gateway, model=plan_model, reasoning_effort=plan_effort)
     if url:
         planner = _StartUrlPlanner(planner, url)
-    # AGENT_MODE selects the executor ENGINE at construction time — the two engines are
-    # independent same-interface implementations that never call each other (this is an
-    # engine selector, NOT a runtime fallback). Default = the LLM-in-loop AgenticExecutor,
-    # adopted after the head-to-head in
-    # research/executor-ab-plan-mode-vs-llm-in-loop.md (higher verified, far fewer silent
-    # failures at equal model). AGENT_MODE=script-orchestration selects the legacy
-    # plan-then-execute engine (the plan_model/replanner/max_replans knobs below only apply
-    # to that one). peek-plan is the default; verify_hook is set only when the caller supplies
-    # a success criterion (else the run is self-report only — never falsely shown as "verified").
-    cls = Executor if os.getenv("AGENT_MODE") == "script-orchestration" else AgenticExecutor
+    # The engine is selected at construction time — the two engines are independent
+    # same-interface implementations that never call each other (this is an engine selector,
+    # NOT a runtime fallback). Default = the LLM-in-loop AgenticExecutor, adopted after the
+    # head-to-head in research/executor-ab-plan-mode-vs-llm-in-loop.md (higher verified, far
+    # fewer silent failures at equal model). The per-request `agent_mode` wins over the
+    # AGENT_MODE env default; "script-orchestration" selects the legacy plan-then-execute engine
+    # (the plan_model/replanner/max_replans knobs only apply to that one). peek-plan is the
+    # default; verify_hook is set only when the caller supplies a success criterion (else the
+    # run is self-report only — never falsely shown as "verified").
+    mode = agent_mode or os.getenv("AGENT_MODE")
+    cls = Executor if mode == "script-orchestration" else AgenticExecutor
     return cls(_make_provider(), planner, gateway=gateway,
                peek_plan=True, start_url=url, max_replans=max_replans,
                verify_hook=verify_hook)
@@ -266,6 +268,7 @@ async def agent_run(
     think_exec: str | None = None,
     think_replanner: str | None = None,
     max_replans: int = 10,
+    agent_mode: str | None = None,
     criterion: str | None = None,
 ):
     """Drive the real M1 loop. The planner lazy-connects to Copilot on first use;
@@ -290,6 +293,7 @@ async def agent_run(
         exec_effort=resolve_effort(think_exec, "exec"),
         replanner_effort=resolve_effort(think_replanner, "replanner"),
         max_replans=max(0, min(int(max_replans), 10)),  # clamp to a sane range
+        agent_mode=agent_mode,
         verify_hook=verify_hook,
     )
 
