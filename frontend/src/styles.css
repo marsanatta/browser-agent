@@ -1131,7 +1131,6 @@ li.is-active .steprow {
   background: color-mix(in srgb, var(--muted) 10%, transparent);
 }
 
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

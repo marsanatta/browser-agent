@@ -55,6 +55,7 @@ def anyio_backend():
 async def test_url_contains_true_and_false():
     page = _FakePage("https://x.com/login?next=1", "hello", {})
     assert await state_check(page, {"url_contains": "/login"}) is True
+    assert await state_check(page, {"url_contains": "/LOGIN"}) is True  # case-insensitive
     assert await state_check(page, {"url_contains": "/secure"}) is False
 
 

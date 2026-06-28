@@ -1,5 +1,12 @@
 # Executor Architecture A/B/C: Deterministic Plan-Mode (step-repair) vs LLM-in-Loop (agentic)
 
+> **Correction (post-hoc):** `internet_modal` is counted as a silent failure in this doc's
+> per-engine CuP, but it was later found to be a **verifier case-sensitivity bug** — the modal
+> title renders UPPERCASE via CSS `text-transform` while the assertion expected the mixed-case
+> source text, so a correct read false-failed. It is engine-independent (every column's CuP drops
+> by 1), so the deltas here are unaffected; the corrected agentic figure is **73/80, CuP 0**. Fixed
+> in `app/verify/state.py` (case-insensitive text match); see README.md / ANALYSIS.md.
+
 - **Date:** 2026-06-28
 - **Question:** For the same browser-automation task set, which executor *architecture* wins on
   (1) independent verified-rate, (2) silent-failure rate (CuP), and (3) cost — and how much of the

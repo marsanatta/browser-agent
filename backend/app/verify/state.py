@@ -49,7 +49,7 @@ def _eq_text(got: str | None, value: Any) -> bool:
 
 async def _check_one(page: Any, kind: str, spec: Any) -> bool:
     if kind == "url_contains":
-        return str(spec) in page.url
+        return str(spec).lower() in page.url.lower()
     if kind == "text_contains":
         return str(spec).lower() in (await _body_text(page)).lower()
     if kind == "h1_equals":
