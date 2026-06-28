@@ -57,6 +57,23 @@ def _model_for(gateway: Any) -> str:
     return getattr(gateway, "workhorse_model", None) or _DEFAULT_MODEL
 
 
+async def _miss_message(page: Any, target: str, kind: str) -> str:
+    """#2 (strategy signal): on a locate miss, distinguish AMBIGUOUS (the name matched
+    elements but none resolved uniquely) from ABSENT (nothing matched), so the agent can
+    switch strategy — disambiguate vs wide-observe — instead of blind retry. The locator
+    cascade already knows this; surface it here (principle: the cascade outcome — ambiguous
+    vs absent — must reach the agent)."""
+    try:
+        cands = await cdp.perceive(page, target)
+    except Exception:
+        cands = []
+    if cands:
+        return (f"AMBIGUOUS: several {kind}s relate to {target!r} but none resolves uniquely — "
+                f"use a MORE SPECIFIC label (the exact visible text).")
+    return (f"NOT_FOUND: nothing matched {target!r}. The {kind} may be RENAMED or HIDDEN in a "
+            f"menu/expander — observe with an empty target to list ALL elements, then act; or finish.")
+
+
 # --- tool param schemas (Pydantic, as the SDK requires) ---------------------
 class _Target(BaseModel):
     target: str = Field(description="Exact visible text/label of the element")
@@ -350,7 +367,7 @@ class AgenticExecutor:
                                              "CLICK_TIMEOUT: page slow; try a different target or finish.")
                 if loc is None:
                     return self._finish_tool(emit, step_id, call_id, page, "not found", False,
-                                             f"NOT_FOUND: no element matched {p.target!r}; observe again or finish.")
+                                             await _miss_message(page, p.target, "element"))
                 await shot(step_id, loc, f"click: {p.target}")
                 try:
                     await asyncio.wait_for(cdp.click(loc), HANDLER_TIMEOUT)
@@ -381,7 +398,7 @@ class AgenticExecutor:
                                              "FILL_TIMEOUT: page slow; try a different target or finish.")
                 if loc is None:
                     return self._finish_tool(emit, step_id, call_id, page, "not found", False,
-                                             f"NOT_FOUND: no field matched {p.target!r}; observe again or finish.")
+                                             await _miss_message(page, p.target, "field"))
                 await shot(step_id, loc, f"fill: {p.target}")
                 try:
                     await asyncio.wait_for(cdp.fill(loc, p.value), HANDLER_TIMEOUT)
