@@ -10,7 +10,7 @@ Metrics (grounded):
        k=3 (eval/02 §C1/F2). Estimated as (#tasks where all k runs verified)/(#tasks).
   silent_failure_gap (CuP)  fraction of tasks where the agent reported success
        (nominal) but the independent assertion failed (verified=False)
-       (eval/01 §4, DESIGN §6). This is the headline silent-failure metric.
+       (eval/01 §4). This is the headline silent-failure metric.
   mean_se  Bernoulli standard error sqrt(p(1-p)/n) (eval/02 §C2/F3).
 
 A task is "verified" iff its independent assertion passed — never the agent's

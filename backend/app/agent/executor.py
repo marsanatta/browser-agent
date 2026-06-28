@@ -371,7 +371,7 @@ class Executor:
         (VerifyResult|None, FailureClass, Located|None, ScreenshotAnnotated|None).
 
         The Located surfaces the chosen locator tier and the screenshot is the
-        annotated diagnostic for this step (DESIGN §8). The screenshot is taken
+        annotated diagnostic for this step. The screenshot is taken
         BEFORE the action so the highlight box references the element on the page
         the agent acted on (after a click that navigates, the element detaches and
         its box would be empty)."""

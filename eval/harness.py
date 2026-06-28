@@ -54,8 +54,8 @@ def score_abstain(abstain_reason: str | None, *, asked: bool, nominal: bool, blo
 
 
 class _CountingGateway:
-    """Wraps the real LLMGateway to count Copilot calls (the binding cost metric —
-    DESIGN §11: requests-per-task, not $/token). Delegates everything else."""
+    """Wraps the real LLMGateway to count Copilot calls (the binding cost metric is
+    requests-per-task, not $/token). Delegates everything else."""
 
     def __init__(self, inner: LLMGateway) -> None:
         self._inner = inner

@@ -173,7 +173,7 @@ class LLMGateway:
         replanner_effort: str = REPLANNER_EFFORT,
     ) -> None:
         # If COPILOT_HOST/PORT are configured, connect to a separately-run
-        # headless server (the DESIGN.md deployment shape) via for_uri. Otherwise
+        # headless server via for_uri. Otherwise
         # use stdio against the SDK's bundled binary, which works out-of-box with
         # `gh` auth and needs no separate server.
         self._host = host or os.getenv("COPILOT_HOST")

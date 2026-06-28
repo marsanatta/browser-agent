@@ -211,7 +211,7 @@ def _make_provider():
     """Browser-runtime escalation hook: when `BROWSER_CDP_URL` is set, drive an
     externally-managed REAL Chrome over CDP (the Steel.dev/Browserbase tier) — this
     bypasses the headless anti-bot walls that fail sites like Amazon on a fresh
-    headless browser (UNSUPPORTED_SITES.md). Default is self-hosted headless Playwright."""
+    headless browser. Default is self-hosted headless Playwright."""
     cdp_url = os.getenv("BROWSER_CDP_URL")
     return CDPProvider(cdp_url) if cdp_url else PlaywrightProvider(headless=True)
 

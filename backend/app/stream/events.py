@@ -93,8 +93,7 @@ def step_finished(
 
 
 def locator_resolved(step_id: str, tier: int, strategy: str, ground: str = "RESOLVED") -> Event:
-    """Surface the grounding outcome + chosen locator (DESIGN §8: chosen locator +
-    cascade level is part of the inspectable per-step diagnostics). `ground` is the
+    """Surface the grounding outcome + chosen locator. `ground` is the
     observe-only grounding outcome: RESOLVED (deterministic cascade) or AMBIGUOUS_L2
     (resolved by the L2 LLM re-rank). A NOT_FOUND step emits no LOCATOR_RESOLVED."""
     return Event(

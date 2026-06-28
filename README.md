@@ -1,306 +1,393 @@
 # browser-agent
 
-Natural-language browser-automation agent. See [`DESIGN.md`](./DESIGN.md) for the full
-design, [`ANALYSIS.md`](./ANALYSIS.md) for runtime/cost/scalability/correctness analysis,
-[`UNSUPPORTED_SITES.md`](./UNSUPPORTED_SITES.md) for the real supported/unsupported probe,
-and [`docs/`](./docs/INDEX.md) for the grounding research.
+A browser agent that takes a plain-English task and runs it on a real website — then
+measures, with an independent check, whether it actually succeeded or only *looked* like it did.
 
-**Status: M0–M5 complete.** Core (M0–M2): FastAPI + SSE, `BrowserProvider`, Copilot LLM
-gateway, redaction, the perceive -> locate -> act -> verify loop with the bounded recovery
-ladder. Eval (M3): self-built eval set + scoring harness (key-node TCR/TSR, pass^k,
-nominal-vs-verified silent-failure gap, budget-matched baseline) — see [Eval](#eval-m3).
-Frontend/deploy (M4): React frontend with a live step timeline and an
-**inspectable-failure view** (per step: annotated screenshot, chosen locator tier,
-`failure_category`, recovery/retry chain, and an honest run verdict — goal-verified /
-not-goal-verified / failed), per-step screenshot
-capture served out-of-band, and a desktop self-host + Cloudflare quick-tunnel deploy. Docs
-+ honest disclosures (M5): this README, `ANALYSIS.md`, `UNSUPPORTED_SITES.md`. `/agent/run`
-streams real step events; `/sse/stream` is the M0 placeholder. The deterministic core needs
-no LLM; the planner lazy-connects to Copilot on first use.
+> **Three terms, defined once:**
+> - **Browser agent** — a program that reads a natural-language task (for example "open the
+>   Helium article on Wikipedia") and drives a real web browser to do it: click, type, scroll,
+>   navigate.
+> - **DOM / accessibility tree** — the structured data a web page exposes. The agent reads
+>   these (not a raw screenshot) to find elements like buttons and links.
+> - **Nominal vs verified** — *nominal* success means the agent ended the task claiming success.
+>   *Verified* success means an independent check confirmed the goal on the final page. The gap
+>   between them is the **silent-failure rate** — the most important reliability number here.
 
-## Architecture (one paragraph)
+The agent does two hard things beyond clicking: it **self-corrects** (on failure it diagnoses
+the cause from what the browser actually shows, then changes strategy) and it **self-maintains**
+(when a selector breaks, it re-finds the element through a cascade of fallbacks). It is honest
+about where it fails: walled sites (login / CAPTCHA / anti-bot) are reported as failures, never
+evaded.
 
-NL task -> **planner** (decompose into sub-tasks) -> per sub-task a deterministic
-**perceive -> locate -> act -> verify -> classify -> recover** loop, with **self-maintenance**
-(a 10-tier deterministic locator cascade -> fingerprint heal -> LLM re-rank -> vision, behind
-a 2-layer cache so a hit costs zero tokens) and **self-correction** (predict the expected
-effect, diff actual vs predicted after acting, classify the failure from *observable browser
-state* — never the LLM's opinion — then re-ground / wait-scroll-dismiss / state-wait /
-replan). All LLM calls route through the **GitHub Copilot SDK used as a model gateway** (hard
-constraint), kept out of the hot path. The **frontend** subscribes over **SSE** and renders a
-live timeline plus an inspectable per-step failure trace. An **eval harness** grades every run
-by independent programmatic assertions on the live page (not the agent's self-report). Full
-rationale with source citations in [`DESIGN.md`](./DESIGN.md).
+---
 
-## Supported / unsupported (honest disclosure)
+## Table of contents
 
-Scope: **bot-wall-free public sites only.** Login / MFA / CAPTCHA / anti-bot walls are out of
-scope; the agent holds no credentials and solves no CAPTCHAs, so on those sites it **fails
-closed and reports failure — it never evades**. The full list with **real probe evidence**
-(HTTP status, element counts, observed failure mode for github.com/login, a reCAPTCHA demo,
-and a DataDome-walled site) and the passing supported patterns is in
-[`UNSUPPORTED_SITES.md`](./UNSUPPORTED_SITES.md).
+- [What it does](#what-it-does)
+- [How it works](#how-it-works)
+- [Run it](#run-it)
+- [Live frontend](#live-frontend)
+- [Key design decisions](#key-design-decisions)
+- [Decisions that changed (and why)](#decisions-that-changed-and-why)
+- [Works well (with examples)](#works-well-with-examples)
+- [Known limitations (with examples)](#known-limitations-with-examples)
+- [How quality is checked](#how-quality-is-checked)
+- [Cost, scalability, correctness](#cost-scalability-correctness)
+- [Repo layout](#repo-layout)
+- [Where AI helped](#where-ai-helped)
+- [Security](#security)
 
-## Honest disclosure: intent drift & silent failure
+---
 
-**Intent drift is an open problem we mitigate but cannot eliminate.** A self-healed locator
-can click a *plausible-but-wrong* element while a naive check stays green — nominal success,
-verified failure. We mitigate with **verify-after-act** (predict -> diff -> re-ground) and by
-making **nominal-vs-verified completion (CuP) the headline eval metric** (DESIGN §5, §6); we do
-**not** claim to eliminate false success. The eval harness grades success by independent
-programmatic assertions on the live page, never the agent's self-report, precisely so silent
-failures are measurable rather than hidden.
+## What it does
 
-**In production (`/agent/run`) verification is opt-in and honest about it.** The same
-deterministic `state_check` runs **only when you supply a success criterion** (a
-`url_contains` / `h1_equals` / element-text assertion — never a loose body-text match).
-With one, **"verified ✓" means that independent check actually passed on the final page**,
-and a silent failure surfaces as `verified=false` even when the agent claims success.
-Without one there is nothing to assert against, so no check runs and the run is shown as
-**"actions completed — not goal-verified" (self-report only)** — deliberately distinct from a
-verified pass. The eval harness always verifies (every task ships a hand-written assertion);
-production verifies on demand. We do **not** sell "verified" as a blanket production guarantee.
+You type a task in plain English. The agent runs it in a real browser and streams its progress
+to a web page in real time. When a step fails, you can open an **inspectable-failure view** for
+that step: the screenshot, the element it tried, the failure category, the retry chain, and an
+honest final verdict (goal-verified / actions-completed / failed).
 
-**Concrete honest example (a real FAIL in `eval/REPORT.md`):** `books_open_light_in_attic`
-gives a *truncated* title (`"A Light in the ..."`) and asserts the exact `h1`
-`"A Light in the Attic"`; the agent does not reliably resolve the truncation, so the task is
-`verified=FAIL`. Critically it is **also `nominal=FAIL`** — the agent did not falsely claim
-success — so CuP stays 0.000 on this run (11/12 verified, TSR 0.917 ± 0.080). This is the
-behaviour we want: a real miss surfaced honestly, not a silent pass.
+The default engine is **LLM-in-loop (also called agentic)**: one language-model session drives
+the browser, deciding each step from what the page actually shows. This was not the first
+design. The project started with a deterministic "plan-then-execute" engine and switched after a
+controlled experiment — see [Decisions that changed](#decisions-that-changed-and-why).
+
+---
+
+## How it works
+
+The default engine runs **one Copilot tool-calling session per task**. The language model (LLM)
+decides each step by calling tools; deterministic code grounds the elements and decides success.
+
+```
+plain-English task
+  → one tool-calling session, looping until "finish":
+       observe → (read | click | fill | navigate) → verify → finish
+```
+
+- **observe(target)** — filtered perception. It lists only the interactive elements whose
+  accessibility name relates to `target` (an ARIA role + name list). The agent never reads raw
+  page HTML; that would blow up cost.
+- **click / fill(target)** — a deterministic grounding cascade resolves the visible text or
+  label to a real element: role + name → role → id → test-id → aria-label → href → text. The
+  reply tells the model whether the page actually changed.
+- **read(target)** — read text off the page (a price, a fact, body prose), for tasks that
+  extract a value.
+- **verify(goal)** — a deterministic check against the live page: `url_contains`,
+  `text_visible`, or `selector_visible`. It reads the real DOM and URL. It does **not** trust the
+  model's claim.
+- **finish(success)** — ends the task. **`finish(success=true)` is rejected unless the
+  deterministic `verify` just passed and the page is not blocked.** This is the trustable-success
+  backstop: the model's word is never accepted as success.
+
+This is *self-correction* and *self-maintenance* in one loop: the model sees the real page at
+every step. If a click misses (the page did not change), it observes again and picks a better
+target. If it hits a login or CAPTCHA wall, it gives up immediately and reports failure — it
+never tries to log in or solve a CAPTCHA. The loop is bounded: at most 25 tool calls and 120
+seconds per task.
+
+A second engine — the original deterministic **plan-then-execute** ("script-orchestration") — is
+still in the repo and can be selected with `AGENT_MODE=script-orchestration`, but it is no longer
+the default. The reason is measured, below.
+
+All LLM calls route through the **GitHub Copilot SDK used as a model gateway** (a hard constraint
+of this assignment) — never a direct Anthropic or OpenAI call.
+
+---
+
+## Run it
+
+**Prerequisites.** Docker, plus a GitHub Copilot login for live LLM calls. The deterministic
+parts and the offline tests need no Copilot.
+
+### Option A — Docker + public tunnel (what the frontend uses)
+
+```bash
+cp .env.example .env
+# In .env, set two values:
+#   GH_TOKEN            = output of `gh auth token` (reuses your Copilot login)
+#   AGENT_ACCESS_TOKEN  = a long random secret that gates the public endpoints
+#                         (python -c "import secrets; print(secrets.token_urlsafe(32))")
+
+docker compose up --build          # starts the app on port 8123 + a Cloudflare tunnel
+docker compose logs cloudflared    # prints the public https://<...>.trycloudflare.com URL
+```
+
+The default tunnel is a Cloudflare **quick tunnel**: no Cloudflare account, no token. It prints
+a temporary `*.trycloudflare.com` URL. To use a **stable named tunnel** instead, set
+`CLOUDFLARE_TUNNEL_TOKEN` in `.env` and swap the `cloudflared` command in `docker-compose.yml`
+(see the comments there).
+
+### Option B — Local (Windows desktop, one command)
+
+```powershell
+# Build the backend virtual environment once (see backend/pyproject.toml for extras):
+cd backend; python -m venv .venv; .venv\Scripts\pip install -e ".[dev]"; cd ..
+
+# Build the frontend, serve the app on http://localhost:8123, and start a quick tunnel:
+.\scripts\run-local.ps1 -Tunnel
+```
+
+`run-local.ps1` builds `frontend/dist`, runs the backend (which serves the API, the SSE stream,
+the built frontend, and screenshots from one origin), and — with `-Tunnel` — auto-generates an
+`AGENT_ACCESS_TOKEN`, saves it to the git-ignored `backend/.env`, and prints it. Share that
+token only with people who should drive the agent.
+
+### Option C — Tests
+
+```powershell
+cd backend
+.venv\Scripts\python -m pytest -m "not live" -q   # offline unit tests, network-free, no Copilot
+.venv\Scripts\python -m pytest -q                 # adds live Playwright tests over the real network
+```
+
+---
+
+## Live frontend
+
+The web page accepts a task, shows the live step timeline, and makes failures inspectable. It
+is served by the backend behind a Cloudflare tunnel.
+
+Two facts a reviewer should know:
+
+- **The quick-tunnel URL is temporary.** It changes every time the tunnel restarts and dies
+  when the process stops, so the URL ships with the submission, not hardcoded here. The desktop
+  must stay awake for the whole evaluation window.
+- **The stream uses POST, not the browser's `EventSource`.** Cloudflare quick tunnels buffer
+  Server-Sent Events (SSE) sent over GET and release them only at the end (cloudflared issue
+  #1449). Sending the same stream over POST makes it arrive live. This is why progress updates
+  appear step by step, not all at once at the end.
+
+The public endpoints require the access token (sent as a cookie or an `Authorization: Bearer`
+header — never in the URL). Only `/health` and the static frontend are open.
+
+---
+
+## Key design decisions
+
+Each decision is backed by a reason or by measured evidence.
+
+| Decision | Reason or evidence |
+|----------|--------------------|
+| **LLM-in-loop is the default engine** | A controlled A/B test on the 80-task eval set, with the model held identical, showed the agentic loop beats deterministic plan-then-execute by **+40 points verified and 18× fewer silent failures**, at slightly lower cost. See [Decisions that changed](#decisions-that-changed-and-why). |
+| **Cost is perception size × call count × model tier — not whether the LLM is in the loop** | The agentic loop makes more calls per task (~10), but each call's perception is **filtered** to elements related to the target, so each call is small. Measured, it is **~16% cheaper** than plan-then-execute at the same model. Cost is measured, never inferred from loop shape. |
+| **Hybrid perception, never raw HTML** | `observe` returns an ARIA role + name element list filtered to the target. Raw HTML would blow up token cost and add noise. |
+| **Self-maintenance = a deterministic grounding cascade** | `click` / `fill` resolve the visible text to a real element through role + name → role → id → test-id → aria-label → href → text. When a click misses, the model observes again and picks a better target. |
+| **Success is decided by a deterministic check, never self-report** | `finish(success=true)` is rejected unless an independent check (`url_contains` / `text_visible` / `selector_visible`) passed on the live page **and** the page is not blocked. The model's claim is recorded as *nominal*; the independent check is *verified*. |
+| **The verify condition must be strict and specific** | A loose check that passes on the wrong page is the main cause of false success. The agent is told to verify the specific URL path **and** a goal-unique landmark, not generic page text. |
+| **Anti-bot: route, don't evade** | On a login / CAPTCHA / anti-bot wall the agent gives up on the first sign and reports failure. It holds no credentials and solves no CAPTCHA. |
+| **All LLM calls via the Copilot SDK gateway** | A hard assignment constraint. The agentic loop runs one cheap model (`claude-haiku-4.5`) per session. |
+
+---
+
+## Decisions that changed (and why)
+
+Two decisions were tried, measured, and then changed. Both are kept here because they show the
+design is evidence-driven.
+
+### 1. Script-orchestration → LLM-in-loop (the main one)
+
+The agent was first built as **deterministic plan-then-execute** ("script-orchestration"): the
+LLM writes a plan once, then Python runs the steps; the LLM stays out of the per-step loop. The
+guiding belief was "keep the LLM out of the hot path to save cost."
+
+That design has a structural weakness. It commits to a plan made **before** seeing the page, so
+it cannot react to what it actually lands on — and it often **claims success on a page it never
+checked** (a silent failure). We built the alternative (LLM-in-loop) and ran a controlled A/B
+test on the 80-task eval set, holding the model identical (both `claude-haiku-4.5`):
+
+| Engine (same model) | Verified | Silent failures (CuP) | Cost |
+|---------------------|----------|-----------------------|------|
+| Plan-then-execute (script-orchestration) | 0.500 (40/80) | 18 | $3.85 |
+| **LLM-in-loop (agentic)** | **0.900 (72/80)** | **1** | **$3.24** |
+
+The agentic loop wins by **+40 points verified, 18× fewer silent failures, and ~16% lower cost**.
+Plan-then-execute loses even when given an expensive `opus` planner (0.762 verified, at ~2.9× the
+cost). An earlier belief that plan-then-execute was "~5× cheaper" turned out to be **~90% the
+model choice, not the architecture**. So we switched the default to LLM-in-loop; the old engine
+stays as `AGENT_MODE=script-orchestration`. Full method, per-split numbers, and caveats are in
+[`research/executor-ab-plan-mode-vs-llm-in-loop.md`](./research/executor-ab-plan-mode-vs-llm-in-loop.md).
+
+### 2. Two of three "silent failures" were eval-design flaws, not agent bugs
+
+When we re-checked a silent-failure cluster, two test cases had vague or knowledge-mixed
+instructions. We rewrote them as clean browser-navigation tasks, and they then verified
+correctly. The lesson: validate the test before blaming the system.
+
+---
+
+## Works well (with examples)
+
+These patterns are reliable. Each row names a real site and operation, drawn from the live eval
+set (`eval/eval_set/live_real_world.yaml`).
+
+| Site | Operation that works | Why it works |
+|------|----------------------|--------------|
+| `the-internet.herokuapp.com` | Dynamic Loading: click Start and wait for the hidden text to load; Status Codes: click the link for HTTP 200 and confirm the page | Server-rendered, stable ARIA roles and links. |
+| `en.wikipedia.org` | Open a named article (Helium, Oxygen); type in the search box and press Enter; pick an autocomplete suggestion (Argon); click the Sign In link | Clear link/role names; the largest slice of the eval set (19 cases). |
+| `books.toscrape.com` | Open a book category from the sidebar; open a product page and report its price or stock count | Static e-commerce; deterministic text extraction. |
+| `docs.python.org`, `developer.mozilla.org`, `arxiv.org`, `www.gov.uk`, `stackoverflow.com`, `news.ycombinator.com`, `www.gnu.org` | Open a named navigation page (Help, Blog, Questions, Licenses, "new", a standard-library module page) | Server-rendered public docs with stable navigation links. |
+
+**Population evidence (not just hand-picked cases).** The live eval set has **80 tasks across 19
+domains**, split by site into dev / holdout / sealed so "generalization" is real, not
+memorization. Scored by the independent check, on the default agentic engine:
+
+| Split | Tasks | Verified | Silent failures |
+|-------|-------|----------|-----------------|
+| dev | 39 | 0.897 | 1 |
+| holdout | 21 | 0.810 | 0 |
+| sealed (scored once) | 20 | 1.000 | 0 |
+| **Total** | **80** | **0.900 (72/80)** | **1** |
+
+Source: [`research/executor-ab-plan-mode-vs-llm-in-loop.md`](./research/executor-ab-plan-mode-vs-llm-in-loop.md)
+(the agentic column). This is a single run; live sites flake by a few tasks, so treat
+small per-split differences as noise. The sealed split is scored only once, so its number cannot
+be over-fit.
+
+---
+
+## Known limitations (with examples)
+
+These cases are hard, unstable, or unsupported. They are listed **on purpose**. With one named
+exception, every one is **detected and reported**, not silently wrong.
+
+| Case | Real example | Status |
+|------|--------------|--------|
+| **Login wall** | `github.com/login` — page loads, but the task needs credentials the agent does not hold | Honest give-up. The agent sees the login form and reports failure on the first sign. |
+| **CAPTCHA** | `google.com/recaptcha/api2/demo` — Submit is gated by a reCAPTCHA | Honest give-up. The agent will not solve or bypass a CAPTCHA. |
+| **Anti-bot wall** | `g2.com` — HTTP 403 with zero perceivable elements (a DataDome challenge shell) | Fails closed. No fingerprint spoofing is attempted. |
+| **Headless anti-bot** | `amazon.com` on the default headless browser often returns a tiny "Continue shopping" interstitial instead of the real page | **Unsupported on the default runtime.** Driving a real browser over CDP (Chrome DevTools Protocol, the designed escalation tier) reaches the full page — it is a browser-layer block, not an agent-logic one. |
+| **Wrong-page silent failure** | `the-internet.herokuapp.com/entry_ad` (read a modal title) — the agent claims success but the independent check disagrees | **The one measured silent failure (1 of 80).** A no-oracle ceiling that both engines share. |
+| **iframe contents** | `the-internet.herokuapp.com/iframe` — typing inside a rich-text editor in an iframe | The grounding cannot act inside the iframe, so the agent **gives up honestly** (not silent). |
+| **Grounding miss on a dense page** | `en.wikipedia.org` periodic-table navigation; some `stackoverflow.com` navigation | Honest non-completion: the agent cannot locate the target, burns its step budget, and gives up. |
+| **Failures are expensive** | any task where the target cannot be found | The agentic loop retries up to its 25-step budget (~$0.08–0.10/task), so a failure costs more than plan-then-execute's early give-up. |
+
+**One honest gap in how walls are handled.** The agent gives up on a wall, but it does **not** yet
+emit a distinct "unsupported: login / CAPTCHA / anti-bot" label — it ends in a generic give-up. A
+pre-flight detector (HTTP 403, a CAPTCHA iframe, a password field on a sign-in page) would give a
+cleaner verdict. The probe script `backend/probe_unsupported.py` is the seed for it; wiring it
+into the loop is future work.
+
+### Unsupported — real probe evidence
+
+These three walls were probed with the real browser (`backend/probe_unsupported.py`: headless
+Chromium, `domcontentloaded`, 30 s timeout). Each row is the observed state, not a guess. The point
+is that the agent **fails closed and reports failure** — it never tries to log in, solve a CAPTCHA,
+or spoof a fingerprint.
+
+| Wall type | Site | What the probe saw | Why it is unsupported |
+|-----------|------|--------------------|-----------------------|
+| Login | `github.com/login` | HTTP 200, title "Sign in to GitHub", a real `input[type=password]` among 25 elements | The page loads, but the task needs credentials the agent does not hold (no credential store, no cookie injection). |
+| CAPTCHA | `google.com/recaptcha/api2/demo` | HTTP 200, the form fields visible; the reCAPTCHA itself is a cross-origin challenge iframe the agent cannot act on | The agent can fill the form, but Submit is gated by a CAPTCHA it will not solve. |
+| Anti-bot (DataDome) | `g2.com` | HTTP 403, empty body, **0 perceivable elements** (a ~2.5 KB DataDome challenge shell) | The site blocks the automated client at the edge before any content loads; with zero elements there is nothing to act on. |
+
+Routed-away categories (never evaded): Cloudflare Turnstile / DataDome / PerimeterX, CAPTCHA
+pages, login / MFA gates, and banking / SSO / healthcare sites.
+
+---
+
+## How quality is checked
+
+The differentiator is that success is graded by an **independent check**, never the agent's own
+claim.
+
+- **Independent ground truth.** The eval harness grades each run by re-deriving success from the
+  actual DOM / URL the agent left, using a check that is **separate code** from the in-loop
+  `verify` tool the agent calls. The verifier never grades itself with its own formula.
+- **The headline metric is the silent-failure gap** (nominal vs verified), not raw accuracy. The
+  system is allowed to be wrong only when it says so. On the default engine the gap is **1 in 80**.
+- **Two-pass eval admission.** Every task passed (1) a real-browser probe confirming the check
+  holds at the solution page and the path is wall-free, and (2) an independent reviewer
+  confirming the check is true *only if* the task is actually done. Weak checks were dropped.
+- **In production, verification is opt-in and labeled honestly.** When you supply a success
+  criterion, "verified ✓" means that independent check really passed on the final page. Without
+  one, the run is shown as **"actions completed — not goal-verified"**, deliberately distinct from
+  a verified pass. We do not sell "verified" as a blanket guarantee.
+
+---
+
+## Cost, scalability, correctness
+
+See [`ANALYSIS.md`](./ANALYSIS.md) for the full discussion; the architecture numbers are in
+[`research/executor-ab-plan-mode-vs-llm-in-loop.md`](./research/executor-ab-plan-mode-vs-llm-in-loop.md).
+
+- **Runtime.** Per-task time is dominated by the Copilot round-trips, not the browser. The
+  agentic loop makes about **10 tool-calling round-trips per task**, bounded by 25 steps and 120
+  seconds. The browser actions themselves run in milliseconds.
+- **Cost.** The Copilot subscription is **flat-rate, not per-token**, so the real limit is
+  **requests per task** (~10), bounded by the Copilot quota and rate limit — not a dollar bill.
+  For comparison only, the per-task cost modeled from Copilot's own token ledger is about
+  **$0.04 on `claude-haiku-4.5`**, ~16% lower than plan-then-execute at the same model. Dollar
+  figures from earlier research are different-model estimates and are **not** quoted as facts.
+- **Scalability.** The browser is **stateless and ephemeral per task** (~300–500 MB each,
+  recycled on close), so no state leaks between tasks and you scale by running more workers. The
+  binding ceiling is the Copilot rate limit, not browser RAM. A queue + autoscale shape is
+  designed-for but **not built** — an honest limitation. Deployment today is a single desktop.
+- **Correctness.** Graded by the independent check, reported as nominal vs verified. See
+  [How quality is checked](#how-quality-is-checked).
+
+---
+
+## Repo layout
+
+```
+backend/app/agent/agentic_executor.py  the DEFAULT engine: one LLM-in-loop tool-calling session
+backend/app/agent/agentic/             agentic support: cdp.py (perceive + grounding cascade), skill.py (prompt + budgets)
+backend/app/agent/executor.py          the legacy plan-then-execute engine (AGENT_MODE=script-orchestration)
+backend/app/agent/                     planner, locate (plan-mode cascade), perceive, act, classify, recover
+backend/app/agent/verify.py            the deterministic success check (surfaced as the agentic `verify` tool)
+backend/app/browser/                   swappable browser runtime (Playwright default; CDP escalation seam)
+backend/app/obs/                       tracing + redact (secrets masked before any log / span / SSE / screenshot)
+backend/app/stream/                    SSE event vocabulary (live timeline + annotated-screenshot events)
+backend/app/main.py                    FastAPI server: /agent/run (POST stream), /auth, /health, static frontend
+frontend/                              React + Vite: task input, live timeline, inspectable-failure view
+eval/                                  live eval set (80 tasks, dev/holdout/sealed) + scoring harness + REPORT.md
+docs/                                  design grounding research (browser-agent papers/theses)
+prompts/                               dated, verbatim key prompts — the AI-collaboration trail
+research/                              autoresearch findings, the executor A/B experiment, eval-report.md
+ANALYSIS.md                            efficiency, cost, extensibility, correctness analysis
+```
+
+---
 
 ## Where AI helped
 
-This repo was built AI-first; the prompt records in [`prompts/`](./prompts/) are the actual
-log. AI was used to:
-- **Ground the design in research** — a self-scoring research loop built the `docs/`
-  knowledge base from SOTA browser-agent papers/theses before any code
-  (`prompts/2026-06-22-170558-grounding-research-loop.md`).
-- **Make that knowledge navigable + gated** — a `browser-agent-expert` retrieval skill over
-  `docs/`, validated with an agent-teams routing gate
-  (`prompts/2026-06-22-180206-...index-skill-gate.md`).
-- **Encode the grounded principles into `.claude/CLAUDE.md`** so every later step inherited
-  them (`prompts/2026-06-22-180737-...encode-design-principles...md`).
-- **Gate-review and grill the design** — `/grill-me` + an agent-teams review loop hardened
-  `DESIGN.md` before implementation (`prompts/2026-06-22-191141-design-planning-gate-and-grill.md`).
-- **Build it with the eng-pipe pipeline** (ground -> plan -> code -> review -> test -> debug)
-  (`prompts/2026-06-22-191141-implement-plan-eng-pipe.md`).
+This repo was built AI-first. The prompt records in [`prompts/`](./prompts/) are the actual log,
+not reconstructions. The main places AI helped:
 
-## Prompt records
+1. **Grounding the design in research.** A self-scoring research loop read state-of-the-art
+   browser-agent papers and built the `docs/` knowledge base **before any code**. Those grounded
+   principles were encoded into `.claude/CLAUDE.md` so every later step inherited them — and were
+   **corrected later** when first-party measurements disagreed (for example, the "keep the LLM out
+   of the loop" cost belief).
+2. **Hardening the design and building it.** A grill session plus a multi-agent review loop
+   stress-tested the design, and the implementation was built through an engineering pipeline
+   (ground → plan → code → review → test → debug) with a fresh-context reviewer at each step.
+3. **An eval-driven improvement loop, with AI doing the loop and the review.** AI ran rounds of
+   "expand the eval set → find a failure cluster → try a fix → check for regressions", and ran the
+   controlled A/B that decided the engine. My role was to watch the key metrics and make the final
+   keep / discard call. One important result was a **measured reversal**: the deterministic
+   "LLM-out-of-the-loop" engine was replaced by the agentic loop only after the numbers showed it
+   was both more reliable and not more expensive.
 
-Key prompts that drove development live in [`prompts/`](./prompts/) (the assignment asks for
-these; they are the real records, not reconstructions).
+Every "passed" or "verified" claim was checked from the code — often by an independent AI
+reviewer — before it was kept.
 
-## Prerequisites (Windows desktop self-host)
-
-- **Python 3.11–3.12** (`github-copilot-sdk` requires >= 3.11; the Windows wheel is
-  pinned to 1.0.2 — 1.0.3 ships macOS-only wheels).
-- **Node 18+** for the frontend.
-- **Chromium** for Playwright: `.venv\Scripts\python -m playwright install chromium`.
-- **GitHub Copilot** for live LLM calls (not required for the deterministic core or its
-  tests). By default the gateway talks to the SDK's bundled binary over stdio and uses
-  your `gh` / `copilot login` auth — no separate server needed. To target a separately-run
-  headless server instead, set `COPILOT_HOST` + `COPILOT_PORT` in `.env`.
-
-## Backend
-
-```powershell
-cd backend
-uv venv --python 3.11           # or: python -m venv .venv
-uv pip install -e ".[dev]"      # or: .venv\Scripts\pip install -e ".[dev]"
-copy .env.example .env          # placeholders; edit if running live Copilot
-.venv\Scripts\python -m uvicorn app.main:app --port 8000 --reload
-```
-
-- Health: `http://localhost:8000/health`
-- M0 placeholder stream: `http://localhost:8000/sse/stream?task=demo`.
-- **M1 agent loop**: `http://localhost:8000/agent/run?task=<NL task>` — plans with the
-  Copilot LLM, then runs perceive/locate/act/verify and streams real step events.
-
-Run tests (includes live seed-site integration tests over the real network):
-
-```powershell
-cd backend
-.venv\Scripts\python -m pytest -q
-.venv\Scripts\python -m pytest -m "not live" -q   # offline subset only
-```
-
-## Eval (M3)
-
-A self-built eval set (`eval/eval_set/tasks.yaml`, ~12 NL tasks across
-domain/type/difficulty, with **≥20% held-out on quotes.toscrape.com**, a site never
-used in dev) plus a scoring harness that runs each task through the real agent and
-grades success by **independent programmatic assertions on the live page** — never the
-agent's self-report. Metrics: **key-node TCR/TSR**, **pass^k (k=3)** for side-effecting
-tasks, and the headline **nominal-vs-verified (CuP) silent-failure gap**, each with a
-**budget-matched vanilla baseline** column (the non-negotiable ablation rule). The
-verification layer (`eval/verify/`) is REAL — programmatic state check + a
-Semantic-Entropy-style consistency check; SVDD / Inspect AI / full REAL are marked
-seams (`eval/verify/seams.py`). Scoring math is unit-tested offline (no Copilot).
-
-```powershell
-# Full run (a few dozen Copilot calls); regenerates eval/REPORT.md.
-.\scripts\run-eval.ps1
-.\scripts\run-eval.ps1 -Limit 3        # smoke run on the first 3 tasks
-```
-
-`eval/REPORT.md` is generated from an actual run (metric table, per-task pass/fail,
-approximate Copilot call count, honest caveats). Scoring/verify/loader unit tests:
-
-```powershell
-cd backend
-.venv\Scripts\python -m pytest tests/test_eval_scoring.py tests/test_eval_verify.py tests/test_eval_loader.py -q
-```
-
-## Frontend
-
-```powershell
-cd frontend
-npm install
-npm run dev        # http://localhost:5173, subscribes to the backend SSE endpoint
-```
-
-During development the frontend runs on Vite (`:5173`) and calls the backend via
-`VITE_BACKEND_URL` (default `http://localhost:8000`). For the public deploy the built
-`dist/` is served by the backend itself from the same origin (see below), so screenshots
-and the SSE stream share one host and no CORS/tunnel cross-origin config is needed.
-
-## Docker (container + Cloudflare named tunnel)
-
-A multi-stage build packages the whole app into one Linux image: stage 1
-(`node:20`) builds `frontend/dist`; stage 2 (`mcr.microsoft.com/playwright/python:v1.55.0-noble`,
-matching the pinned `playwright==1.55.0` and shipping Python 3.12 + bundled
-Chromium) installs the backend (including `github-copilot-sdk==1.0.2`, which has
-a glibc `manylinux_2_28` wheel) and serves the built frontend same-origin. The
-container runs **non-root** under `tini`.
-
-Auth inside the container is **non-interactive** — the Copilot SDK reads
-`COPILOT_GITHUB_TOKEN` from the environment; there is no `gh auth login` step.
-
-```powershell
-# 1. Create .env (git-ignored) from the template and fill the three secrets.
-cp .env.example .env   # then edit:
-#   COPILOT_GITHUB_TOKEN   - a GitHub fine-grained PAT with the "Copilot Requests"
-#                            permission (the SDK authenticates from this env var)
-#   AGENT_ACCESS_TOKEN     - long random secret gating /agent /sse /screenshots
-#                            (python -c "import secrets; print(secrets.token_urlsafe(32))")
-#   CLOUDFLARE_TUNNEL_TOKEN- connector token for a NAMED Cloudflare tunnel
-
-# 2. Build + run the app and the tunnel.
-docker compose up --build
-```
-
-`docker compose` starts two services: `app` (uvicorn on `:8123`) and
-`cloudflared` running a **named** tunnel (`tunnel run --token $CLOUDFLARE_TUNNEL_TOKEN`).
-A named tunnel is the default because **SSE needs a stable connection that quick
-tunnels do not reliably support**. Create the tunnel and a public hostname route
-to `http://app:8123` in the Cloudflare Zero Trust dashboard, then paste the
-connector token into `.env`.
-
-> **Quick-tunnel fallback** (ephemeral `*.trycloudflare.com`, no Cloudflare
-> account, but unreliable for SSE): replace the `cloudflared` command in
-> `docker-compose.yml` with `tunnel --no-autoupdate --url http://app:8123` and
-> read the printed URL from `docker compose logs cloudflared`.
-
-To run only the app without a tunnel (e.g. for local testing):
-
-```powershell
-docker build -t browser-agent .
-docker run --rm -p 8123:8123 --env-file .env browser-agent
-```
-
-The app boots **without** Copilot or a token configured — `/health` returns
-`{"status":"ok"}` and the LLM gateway lazy-connects on first agent use. The
-gated endpoints fail closed (503 if `AGENT_ACCESS_TOKEN` is unset, 401 if the
-supplied token is wrong). As with the host deploy, **the machine running the
-container must stay awake** for the whole evaluation window — if it sleeps or the
-`cloudflared` container stops, the public URL goes dead.
-
-## Public deploy (desktop self-host + Cloudflare quick tunnel)
-
-The backend serves the built frontend at `/` and per-step screenshots at `/screenshots/*`,
-so one origin serves the whole app. A Cloudflare **quick tunnel** then exposes it on a
-temporary `*.trycloudflare.com` URL — no Cloudflare account or DNS setup required.
-
-```powershell
-# 1. Build the frontend (output: frontend/dist, served by the backend)
-cd frontend; npm install; npm run build
-
-# 2. Run the backend (serves API + SSE + dist + screenshots)
-cd ..\backend
-.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8123
-
-# 3. Expose it publicly (separate terminal). cloudflared needs no login for a quick tunnel.
-#    Install if missing: winget install --id Cloudflare.cloudflared
-cloudflared tunnel --url http://localhost:8123
-#   -> prints https://<random>.trycloudflare.com  (the public URL)
-```
-
-`scripts/run-local.ps1` runs steps 1–2 in one command; pass `-Tunnel` to also start the
-quick tunnel and print the public URL.
-
-> **The quick-tunnel URL is ephemeral / single-use.** It exists only while the
-> `cloudflared` process runs: it **dies when the process stops and rotates to a new random
-> URL on every restart** — there is no stable named hostname. So the URL shared for
-> evaluation is valid only for that session, and **the desktop must stay awake** (no sleep /
-> hibernate) with both `uvicorn` and `cloudflared` running for the whole evaluation window
-> (DESIGN §9). If the box sleeps or either process exits, the public URL goes dead.
-
-> **Protect the tunnel with an access token.** Before exposing the tunnel, the operator MUST
-> set `AGENT_ACCESS_TOKEN` to a long random secret (kept out of git — put it in the
-> git-ignored `.env`, never commit it) and share that token with evaluators out-of-band. The
-> agent / SSE / screenshot endpoints require it (sent as `Authorization: Bearer <token>`, or
-> `?token=<token>` for the SSE stream where headers are awkward); only `/health` stays open.
-> The frontend prompts for the token and stores it in `localStorage`. **Exposing the tunnel
-> WITHOUT a token is unsafe** — the URL is world-reachable, so an open agent endpoint invites
-> quota abuse and arbitrary automation against your desktop browser.
-
-When the frontend is served by the backend, leave `VITE_BACKEND_URL` unset before
-building so it defaults to same-origin (`""`).
-
-## Live LLM (Copilot SDK gateway)
-
-All LLM calls route through the GitHub Copilot SDK used as a model gateway — never a
-direct Anthropic/OpenAI call. By default the gateway connects over **stdio** to the SDK's
-bundled binary and uses your existing GitHub auth:
-
-```powershell
-gh auth login        # or: copilot login
-```
-
-The gateway connects **lazily** on the first LLM call. To target a separately-run headless
-server instead, set `COPILOT_HOST` + `COPILOT_PORT` in `.env`. Model IDs
-(`backend/app/agent/models.py`) are verified against `client.list_models()`; the judge uses
-a different model family from the actor.
+---
 
 ## Security
 
-Redaction runs **before** any data reaches a span, an SSE `data:` field, a log, or a
-stored trace (`backend/app/obs/tracing.py::redact`). Secrets (`sk-*`, Bearer tokens,
-`Authorization`/`Cookie` headers, `api_key=`, GitHub tokens) and obvious PII (emails) are
-masked. Captured cookies / auth / page state are treated as secrets and are git-ignored.
-Never commit `.env`.
+- **Redaction runs before any output.** Secrets (`sk-*`, Bearer tokens, `Authorization` /
+  `Cookie` headers, API keys, GitHub tokens) and obvious PII (emails) are masked in
+  `backend/app/obs/tracing.py::redact` before data reaches a log, a span, the SSE stream, or a
+  stored screenshot. Captured cookies and page state are treated as secrets and are git-ignored.
+  Never commit `.env`.
+- **The public endpoints are gated by one shared secret** (`AGENT_ACCESS_TOKEN`). It is checked
+  in constant time, **fails closed** (unset → 503, wrong → 401), and is exchanged once at
+  `POST /auth` for an httponly cookie. The token is **never accepted in a `?token=` URL** —
+  URL-borne tokens leak through logs, history, and `Referer`.
+- **Threat model.** This is a **single-operator demo** on a temporary tunnel. The gate stops a
+  stranger who learns the URL from draining the operator's Copilot quota. It has no per-user
+  identity or revocation by design — real user accounts are out of scope for this assignment.
 
-**Public-tunnel access control.** The agent/SSE/screenshot routes are gated by a single
-shared secret, `AGENT_ACCESS_TOKEN` (see the deploy section); `/health` and the static
-frontend are open.
-
-*Threat model.* This is a **single-operator demo** exposed over an ephemeral tunnel. The
-gate exists to stop a stranger who learns the URL from driving the agent and burning the
-operator's Copilot quota — not to support multiple end users. Against that bar a shared
-secret is the appropriate control, and it is implemented conservatively:
-
-- **Constant-time** comparison (`secrets.compare_digest`) — no timing oracle.
-- **Fail-closed**: unset token → `503`; wrong/absent token → `401`.
-- Token is exchanged once at `POST /auth` for an **httponly** cookie (`Secure` when served
-  over HTTPS); the cookie then rides SSE (`EventSource`) and `<img>` screenshot loads, which
-  cannot set headers. A direct `Authorization: Bearer <token>` is also accepted.
-- The token is **never accepted in a `?token=` query param** — URL-borne tokens leak via
-  access logs, proxy logs, browser history, and `Referer`. Keep it in the cookie/header only.
-
-*Known limitation (out of scope here).* A single shared secret has **no per-user identity,
-revocation, or audit** — fine for one operator, not for a multi-tenant product. Supporting
-real users would mean OAuth/OIDC sign-in with per-user sessions; that is deliberately not
-built, as user accounts are not part of this assignment.
-
-The token is a secret — set it in the git-ignored `.env`, share it with evaluators
-out-of-band, and never commit it or print it in logs/screenshots.
+Public or self-created material only. Set the access token in the git-ignored `.env`, share it
+out-of-band, and never commit or print it.

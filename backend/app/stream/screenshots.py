@@ -1,7 +1,7 @@
 """Per-step screenshot capture + local static serving.
 
-DESIGN §8: the inspectable-failure view needs an annotated screenshot per step
-(highlighted element). DESIGN explicitly prefers a SERVED URL over base64 on the
+The inspectable-failure view needs an annotated screenshot per step
+(highlighted element). We deliberately prefer a SERVED URL over base64 on the
 SSE hot path, so this writes PNG bytes to a git-ignored directory and the SSE
 event carries only an opaque `/screenshots/<id>.png` reference plus the element's
 bounding box (CSS pixels). Image bytes never touch the SSE `data:` field.

@@ -68,9 +68,9 @@ class PlaywrightProvider(BrowserProvider):
 
 class CDPProvider(BrowserProvider):
     """Drive an externally-managed REAL browser over CDP — the Steel.dev / Browserbase
-    escalation tier behind the same seam (DESIGN §infra). A real (non-headless, real
+    escalation tier behind the same seam. A real (non-headless, real
     profile/fingerprint) Chrome bypasses the headless anti-bot walls that fail the
-    default `PlaywrightProvider` on sites like Amazon (UNSUPPORTED_SITES.md). The
+    default `PlaywrightProvider` on sites like Amazon. The
     browser is NOT owned by us: `close()` detaches our tab and disconnects the local
     driver, and NEVER closes the external browser or its other tabs."""
 

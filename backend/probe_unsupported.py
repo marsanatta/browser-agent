@@ -1,6 +1,6 @@
 """One-off M5 probe: visit known bot-walled / login / CAPTCHA sites with the
 real PlaywrightProvider + perceive(), record the OBSERVED state. Not a test;
-run manually to populate UNSUPPORTED_SITES.md with real evidence."""
+run manually to produce the probe evidence."""
 
 from __future__ import annotations
 
