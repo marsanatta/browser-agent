@@ -32,4 +32,6 @@ export const EXAMPLES = [
     url: "https://www.google.com/recaptcha/api2/demo" },
   { id: "g2-datadome", group: "limitation", badge: "blocked",
     task: "Open the marketing software category page on g2.com.", url: "https://www.g2.com/" },
+  { id: "cloudflare-wall", group: "limitation", badge: "blocked",
+    task: "Open this page and read the main heading.", url: "https://nowsecure.nl/" },
 ];
