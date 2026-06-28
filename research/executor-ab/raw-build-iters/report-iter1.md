@@ -1,0 +1,136 @@
+# Eval Report — live evidence
+
+Generated **2026-06-27 17:53 UTC** from a REAL harness run. Every "verified" below is an
+INDEPENDENT programmatic state check on the live page (URL / first-h1 / scoped
+selector) — never the agent's self-report, and never a loose `text_contains`.
+Copilot calls this run: 624.
+
+## Test architecture — what gates vs what's evidence
+
+- **Offline CI gate — 97 pytest tests (`pytest -m "not live"`): NO network, NO
+  Copilot, deterministic, must stay green.** No real-site task is in this gate.
+- **Sandbox eval set (`eval/eval_set/tasks.yaml`)** — inline-deterministic fixtures
+  plus practice-site (toscrape / herokuapp) tasks; run through the harness with Copilot.
+- **Live real-world tier (`eval/eval_set/live_real_world.yaml`)** — REAL public sites,
+  diverse domains/types. Flaky and changing, so run ON DEMAND
+  (`python -m eval.run_live_tier`) and reported here. NOT part of the CI gate; a
+  red row here is evidence, not a broken build.
+
+## Live real-world tier — 53/60 verified
+
+| task | site | type | split | deterministic? | nominal | verified | abstained |
+|---|---|---|---|---|---|---|---|
+| live_wikipedia_helium_retrieval | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_pydocs_json_nav | docs.python.org | action | dev | no (live) | True | True | False |
+| live_google_search_steam | www.google.com | action | dev | no (live) | False | True | True |
+| live_wikipedia_signin_synonym | en.wikipedia.org | action | dev | no (live) | True | True | False |
+| live_wikipedia_search_submit | en.wikipedia.org | action | dev | no (live) | True | True | False |
+| live_wikipedia_autocomplete | en.wikipedia.org | action | dev | no (live) | True | True | False |
+| live_internet_lazyload | the-internet.herokuapp.com | action | dev | no (live) | True | True | False |
+| live_internet_modal | the-internet.herokuapp.com | action | dev | no (live) | True | False | False |
+| live_internet_iframe | the-internet.herokuapp.com | action | dev | no (live) | False | False | True |
+| live_example_more_info_nav | example.com | action | holdout | no (live) | True | True | False |
+| live_hackernews_newest_nav | news.ycombinator.com | action | dev | no (live) | True | True | False |
+| live_gnu_licenses_nav | www.gnu.org | action | holdout | no (live) | False | False | False |
+| live_osm_login_nav | www.openstreetmap.org | action | holdout | no (live) | True | True | False |
+| live_lobsters_comments_nav | lobste.rs | action | holdout | no (live) | True | True | False |
+| live_mdn_blog_nav | developer.mozilla.org | action | holdout | no (live) | True | True | False |
+| live_archive_login_nav | archive.org | action | holdout | no (live) | False | False | True |
+| live_govuk_help_nav | www.gov.uk | action | holdout | no (live) | True | True | False |
+| live_arxiv_help_nav | arxiv.org | action | holdout | no (live) | False | False | True |
+| live_stackoverflow_questions_nav | stackoverflow.com | action | holdout | no (live) | False | False | True |
+| live_internet_status_code_200 | the-internet.herokuapp.com | action | dev | no (live) | True | True | False |
+| live_internet_challenging_dom_intro | the-internet.herokuapp.com | retrieval | dev | no (live) | True | True | False |
+| live_books_sapiens_price | books.toscrape.com | retrieval | dev | no (live) | True | True | False |
+| live_books_open_mystery_category | books.toscrape.com | action | dev | no (live) | True | True | False |
+| live_books_sapiens_stock | books.toscrape.com | retrieval | dev | no (live) | True | True | False |
+| live_books_grand_design_price | books.toscrape.com | retrieval | dev | no (live) | True | True | False |
+| live_books_dune_price | books.toscrape.com | retrieval | dev | no (live) | True | True | False |
+| live_books_page2_pagination | books.toscrape.com | action | dev | no (live) | True | True | False |
+| live_wikipedia_oxygen_search | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_periodic_table_nav | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_einstein_body_text | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_pydocs_tutorial_nav | docs.python.org | action | dev | no (live) | True | True | False |
+| live_hackernews_show_then_ask | news.ycombinator.com | action | dev | no (live) | True | True | False |
+| live_mdn_html_input | developer.mozilla.org | retrieval | holdout | no (live) | True | True | False |
+| live_mdn_css_flex | developer.mozilla.org | retrieval | holdout | no (live) | True | True | False |
+| live_govuk_bank_holidays | www.gov.uk | retrieval | holdout | no (live) | True | True | False |
+| live_govuk_vat_rates | www.gov.uk | retrieval | holdout | no (live) | True | False | False |
+| live_govuk_min_wage | www.gov.uk | retrieval | holdout | no (live) | True | True | False |
+| live_govuk_check_uk_visa | www.gov.uk | action | holdout | no (live) | True | True | False |
+| live_govuk_driving_licences | www.gov.uk | action | holdout | no (live) | True | True | False |
+| live_wikipedia_jupiter | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_books_fiction_page2 | books.toscrape.com | action | dev | no (live) | True | True | False |
+| live_arxiv_attention_paper | arxiv.org | retrieval | holdout | no (live) | True | True | False |
+| live_wikipedia_preferences_abstain | en.wikipedia.org | action | dev | no (live) | False | True | True |
+| live_wikipedia_watchlist_abstain | en.wikipedia.org | action | dev | no (live) | False | True | True |
+| live_github_settings_abstain | github.com | action | dev | no (live) | False | True | True |
+| live_github_notifications_abstain | github.com | action | dev | no (live) | False | True | True |
+| live_github_new_repo_abstain | github.com | action | dev | no (live) | False | True | True |
+| live_gitlab_profile_abstain | gitlab.com | action | holdout | no (live) | False | True | True |
+| live_gitlab_new_project_abstain | gitlab.com | action | holdout | no (live) | False | True | True |
+| live_arxiv_account_abstain | arxiv.org | action | holdout | no (live) | False | True | True |
+| live_bitbucket_account_abstain | bitbucket.org | action | holdout | no (live) | False | True | True |
+| live_wikipedia_decoy_mercury_planet | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_python_snake | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_java_proglang | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_phoenix_city | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_apple_company | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_turkey_bird | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_saturn_god | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_amazon_rainforest | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_signup_captcha_abstain | en.wikipedia.org | action | dev | no (live) | False | True | True |
+
+## Day-3 realistic batch (folded in, reproducible) — 8/8 verified
+
+| task | site | type | split | deterministic? | nominal | verified | abstained |
+|---|---|---|---|---|---|---|---|
+| internet_form_auth_nav | the-internet.herokuapp.com | action | dev | no (live) | True | True | False |
+| internet_login_page_reached | the-internet.herokuapp.com | action | dev | no (live) | True | True | False |
+| books_open_light_in_attic | books.toscrape.com | retrieval | dev | no (live) | True | True | False |
+| books_open_travel_category | books.toscrape.com | action | dev | no (live) | True | True | False |
+| books_price_visible | books.toscrape.com | retrieval | dev | no (live) | True | True | False |
+| quotes_open_einstein_author | quotes.toscrape.com | retrieval | holdout | no (live) | True | True | False |
+| quotes_open_login | quotes.toscrape.com | action | holdout | no (live) | True | True | False |
+| synonym_label_signin_vs_login | (inline data: URL) | action | dev | yes (inline) | True | True | False |
+
+## Notes
+
+- **deterministic?** "yes (inline)" rows use a data: URL fixture (no network);
+  every other row hits a live site over the network and may vary run-to-run.
+- **abstained** = the agent asked the user instead of acting — an honest
+  non-completion, never a silent wrong action. Where nominal == verified on a row,
+  there was no silent failure on that run.
+- The 97 offline pytest tests remain the network-free green gate; this live tier is
+  separate and does not gate.
+
+## Honest caveats
+
+- **Bot-walls are now detected and ABSTAINED, not silently passed.** With
+  interstitial detection (`verify.detect_block`) a CAPTCHA / `/sorry/` / "unusual
+  traffic" page is routed blocked-unsupported (route, don't evade) — the agent asks
+  the user instead of claiming success. Example: `live_google_search_steam` — the
+  press/Enter submits (its `/sorry/` `continue=` URL is `/search?q=steam`), Google
+  serves its anti-bot `/sorry/` CAPTCHA, the agent detects it and abstains ->
+  `nominal=False, verified=True (expect_abstain), asked=True`. Before this detection
+  it was a silent `nominal=True, verified=False`.
+- **The press/submit action is proven deterministically** by the offline test
+  `tests/test_ambiguity_grounding.py::test_press_action_submits_form` (no network, part
+  of the 97-green gate); `live_wikipedia_search_submit` proves it live on a site that
+  does not bot-block (fill 'Oxygen' + Enter -> the Oxygen article).
+- A live row that abstains (asked=True) is an honest non-completion; only a
+  `nominal=True, verified=False` row is a silent failure worth chasing.
+
+## Widget coverage — the honest fails are real gaps, not verifier bugs
+
+Each widget verifier was confirmed correct on a fresh page; the fails document
+genuine agent gaps:
+- `live_internet_lazyload`: the result renders ~5s AFTER the click; the agent has
+  no explicit wait action, so the state check runs before it appears. (Verifier
+  confirmed: click + wait -> `#finish h4` == "Hello World!".)
+- `live_internet_modal`: the modal shows correctly (verifier passes on a fresh
+  page — note its title renders UPPERCASE via CSS), but the agent tends to dismiss
+  it rather than just confirm its title — a modal-handling gap.
+- `live_internet_iframe`: the locator cascade does not pierce iframes, so the agent
+  cannot type into the TinyMCE body. Verified by a frame-aware check
+  (`iframe_text_equals`) so an iframe-piercing fix would pass it later.
