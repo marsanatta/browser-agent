@@ -60,9 +60,9 @@ Rules:
 - BUT if the page is NOT blocked and you simply CANNOT LOCATE the target after 2 observes,
   do NOT give up yet. First call observe with an empty or very broad target (observe with
   target "") ONCE to list EVERY interactive element on the page — the control may be
-  RENAMED (a different label than you expected, e.g. "Go" instead of "Search") or HIDDEN
-  inside a menu/expander you must open first (open the "Menu"/"More"/hamburger control, then
-  observe again). Choose the best match from that full list, or open the revealing control
+  RENAMED (its visible label differs from the wording in your instruction) or HIDDEN
+  inside a collapsed menu/expander/disclosure you must open first (open that revealing
+  control, then observe again). Choose the best match from that full list, or open the revealing control
   and retry. This wide observe is ONLY for finding a renamed/hidden control — it does NOT
   lower the success bar. If the wide observe reveals NOTHING that could plausibly satisfy the
   goal (the page genuinely has no such control or page), then the goal does not exist here:
@@ -76,8 +76,8 @@ Rules:
   from, not just true on the goal page. A loose verify that passes on the wrong page is the
   main cause of false success:
   * Use TWO signals together (AND), not one: for navigation, url_contains the SPECIFIC path
-    of the goal (e.g. "/wiki/Oxygen" or "library/json", NOT just the domain) AND a landmark
-    unique to the goal page (selector_visible / text of its main heading). One signal is too loose.
+    of the goal (the deepest path segment unique to the target page, NOT just the domain) AND
+    a landmark unique to the goal page (selector_visible / text of its main heading). One signal is too loose.
   * Never verify a value that was ALREADY visible BEFORE you acted (text the results/source
     page already showed proves nothing) — verify a NEW post-action state.
   * A search-results / listing / index page that merely MENTIONS the target is NOT the
