@@ -72,11 +72,14 @@ Rules:
 - Do not claim success from page text alone. For a navigation/identification task,
   confirm with verify(url_contains=...) that you are on the RIGHT page — generic body
   text can mention a decoy. finish(success=true) only when verify confirms the goal.
-- Make verify STRICT and SPECIFIC — a loose verify that passes on the wrong page is the
+- Make verify STRICT, SPECIFIC, and DISCRIMINATING — it must be FALSE on the page you came
+  from, not just true on the goal page. A loose verify that passes on the wrong page is the
   main cause of false success:
-  * Navigation: verify the url_contains the SPECIFIC path of the goal (e.g.
-    "/wiki/Oxygen" or "library/json", NOT just the domain), and prefer a landmark
-    unique to the goal page (selector_visible of its main heading) over generic text.
+  * Use TWO signals together (AND), not one: for navigation, url_contains the SPECIFIC path
+    of the goal (e.g. "/wiki/Oxygen" or "library/json", NOT just the domain) AND a landmark
+    unique to the goal page (selector_visible / text of its main heading). One signal is too loose.
+  * Never verify a value that was ALREADY visible BEFORE you acted (text the results/source
+    page already showed proves nothing) — verify a NEW post-action state.
   * A search-results / listing / index page that merely MENTIONS the target is NOT the
     target page. If the URL still looks like a results/search page, you have not arrived
     — open the actual item first, then verify.
