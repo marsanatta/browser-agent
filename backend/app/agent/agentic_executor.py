@@ -138,6 +138,7 @@ class AgenticExecutor:
         page = None
         launched = False
         verified = None
+        send_task = None
         # Shared state the (possibly cross-thread) tool handlers mutate.
         state: dict[str, Any] = {
             "finished": False,
@@ -178,16 +179,20 @@ class AgenticExecutor:
                 if item is _DONE:
                     break
                 yield item
-            try:
-                await send_task  # surface any driver exception
-            except Exception as exc:
-                # A non-timeout driver error (SDK/connection/create_session failure) must
-                # NOT skip RUN_FINISHED: emit RUN_ERROR carrying the message, then fall
-                # through so the ledger is still accrued and the stream terminates cleanly.
-                yield Event(
-                    events.EventType.RUN_ERROR,
-                    {"run_id": run_id, "error": f"{type(exc).__name__}: {exc}"},
-                )
+            # Verdict path. If finish() ended the task the verdict is already decided, so do
+            # NOT wait for the model's (unneeded) closing turn — go straight to verify + emit.
+            # Only the non-finish path (driver error / session timeout) awaits send_task, to
+            # surface a real driver exception as RUN_ERROR.
+            if not state["finished"]:
+                try:
+                    await send_task
+                except asyncio.CancelledError:
+                    pass
+                except Exception as exc:
+                    yield Event(
+                        events.EventType.RUN_ERROR,
+                        {"run_id": run_id, "error": f"{type(exc).__name__}: {exc}"},
+                    )
 
             # step_hook on the final page (key-node checkpoints), like Executor.
             if self._step_hook is not None:
@@ -204,7 +209,33 @@ class AgenticExecutor:
                     verified = await self._verify_hook(page)
                 except Exception:
                     verified = False
+
+            # Bridge the real per-session call count to where the harness reads it. The int
+            # _CountingGateway (harness path) records the agentic calls; the live list-based
+            # LLMGateway.calls (which appends prompts) is left untouched. The cancelled closing
+            # turn's usage event may race this read by ±1 call — accepted: the verdict is already
+            # decided and the call/token ledger is best-effort.
+            if isinstance(getattr(self._gateway, "calls", None), int):
+                self._gateway.calls += ledger["calls"]
+
+            # Emit the verdict NOW — before the SDK/browser teardown — so the UI renders the
+            # result immediately instead of waiting on client.stop() / provider.close().
+            yield events.run_finished(
+                run_id,
+                nominal=bool(state["success"]),
+                verified=verified,
+                goal_checked=self._verify_hook is not None,
+                tokens=self._tokens(ledger),
+            )
         finally:
+            # Teardown AFTER the verdict is sent. A still-running session (the finish path)
+            # is cancelled rather than awaited for its closing turn.
+            if send_task is not None and not send_task.done():
+                send_task.cancel()
+                # gather(return_exceptions=True) absorbs send_task's OWN cancellation without
+                # raising, while still propagating an ambient cancel of run()'s task — don't
+                # swallow a CancelledError we didn't request.
+                await asyncio.gather(send_task, return_exceptions=True)
             client = state.get("client")
             if client is not None:
                 try:
@@ -213,20 +244,6 @@ class AgenticExecutor:
                     pass
             if launched:
                 await self._provider.close()
-
-        # Bridge the real per-session call count to where the harness reads it. The int
-        # _CountingGateway (harness path) records the agentic calls; the live list-based
-        # LLMGateway.calls (which appends prompts) is left untouched.
-        if isinstance(getattr(self._gateway, "calls", None), int):
-            self._gateway.calls += ledger["calls"]
-
-        yield events.run_finished(
-            run_id,
-            nominal=bool(state["success"]),
-            verified=verified,
-            goal_checked=self._verify_hook is not None,
-            tokens=self._tokens(ledger),
-        )
 
     def _tokens(self, ledger: dict) -> dict:
         """The run's token ledger, in the run_finished/gateway.tokens shape. Also push
@@ -452,6 +469,9 @@ class AgenticExecutor:
                     emit(events.ask_user(step_id, p.note or "Stopping: goal not reachable or blocked."))
                 else:
                     emit(events.step_finished(step_id, "ok"))
+                # The verdict is decided — release run()'s drain loop NOW so RUN_FINISHED is
+                # emitted immediately, instead of waiting for the model's (unneeded) closing turn.
+                emit(_DONE)  # type: ignore[arg-type]
                 return "ack — end your turn now."
 
             tools = [
