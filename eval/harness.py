@@ -19,10 +19,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.agent.agentic_executor import AgenticExecutor
 from app.agent.executor import Executor
 from app.agent.models import LLMGateway
 from app.agent.planner import LLMPlanner, PlanResult, SubTask
@@ -165,10 +167,16 @@ async def _run_once(
     calls_before = gateway.calls
     tokens_before = dict(gateway.tokens)
     planner = _StartUrlPlanner(LLMPlanner(gateway), task.start_url)
-    executor = Executor(
+    # AGENT_MODE selects the executor ENGINE (build-time, not a runtime fallback — the
+    # two engines never call each other). Default = the LLM-in-loop AgenticExecutor;
+    # AGENT_MODE=script-orchestration selects the legacy plan-then-execute engine. Agentic
+    # always carries the gateway (its single session's model + token ledger); the full/baseline
+    # ablation (max_attempts 4 vs 1, L2 heal) is a plan-engine concept and does not apply to it.
+    cls = Executor if os.getenv("AGENT_MODE") == "script-orchestration" else AgenticExecutor
+    executor = cls(
         PlaywrightProvider(headless=True),
         planner,
-        gateway=gateway if full else None,   # L2 LLM heal only in the full agent
+        gateway=gateway if (full or cls is AgenticExecutor) else None,
         verify_hook=verify_hook,
         step_hook=step_hook,
         max_attempts=4 if full else 1,        # budget-matched: baseline gets 1 attempt

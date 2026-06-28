@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from starlette.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
+from app.agent.agentic_executor import AgenticExecutor
 from app.agent.executor import Executor, VerifyHook
 from app.agent.models import (
     EFFORT_DEFAULTS,
@@ -236,14 +237,19 @@ def _build_executor(
     planner: object = LLMPlanner(gateway, model=plan_model, reasoning_effort=plan_effort)
     if url:
         planner = _StartUrlPlanner(planner, url)
-    # peek-plan is the default (autoresearch KEEP: more verified, net cheaper, M3->0).
-    # It activates only when a start URL is given (something to peek); else blind.
-    # verify_hook is set only when the caller supplies a success criterion: with it,
-    # `verified` is a real independent state_check; without it the run is self-report
-    # only (verified=None) — never falsely shown as "verified".
-    return Executor(_make_provider(), planner, gateway=gateway,
-                    peek_plan=True, start_url=url, max_replans=max_replans,
-                    verify_hook=verify_hook)
+    # AGENT_MODE selects the executor ENGINE at construction time — the two engines are
+    # independent same-interface implementations that never call each other (this is an
+    # engine selector, NOT a runtime fallback). Default = the LLM-in-loop AgenticExecutor,
+    # adopted after the head-to-head in
+    # research/executor-ab-plan-mode-vs-llm-in-loop.md (higher verified, far fewer silent
+    # failures at equal model). AGENT_MODE=script-orchestration selects the legacy
+    # plan-then-execute engine (the plan_model/replanner/max_replans knobs below only apply
+    # to that one). peek-plan is the default; verify_hook is set only when the caller supplies
+    # a success criterion (else the run is self-report only — never falsely shown as "verified").
+    cls = Executor if os.getenv("AGENT_MODE") == "script-orchestration" else AgenticExecutor
+    return cls(_make_provider(), planner, gateway=gateway,
+               peek_plan=True, start_url=url, max_replans=max_replans,
+               verify_hook=verify_hook)
 
 
 # POST is the path the frontend uses: Cloudflare quick tunnels buffer SSE-over-GET

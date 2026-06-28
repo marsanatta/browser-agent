@@ -112,7 +112,11 @@ def test_planner_defaults_and_overrides():
     assert p._effort == "medium"
 
 
-def test_build_executor_threads_models_and_efforts():
+def test_build_executor_threads_models_and_efforts(monkeypatch):
+    # plan/exec/replanner model routing is plan-ENGINE plumbing; the default engine is now
+    # the LLM-in-loop AgenticExecutor (one model, no planner), so select the legacy engine
+    # explicitly to exercise this routing.
+    monkeypatch.setenv("AGENT_MODE", "script-orchestration")
     ex = _build_executor(
         None,
         plan_model="gpt-5-mini",
