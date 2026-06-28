@@ -3,3 +3,4 @@ iteration	commit	metric	status	description
 baseline	364b9f0	0.875	baseline	#18 before: 7/8 passk, hidden_menu FAILS, renamed costs 14 calls, false_success=0, 170 calls/$0.71
 1	9b90802	1.000	keep	#3a wide-observe-before-giveup (rework): diag 0.875->1.0 (hidden_menu fixed), renamed 14->6 calls, false_success 0, total 170->146 calls, gate green, G2/G3 pass
 2	b377c8b	n/a	keep	#4b caller-criterion finish gate (production-only, eval-clean): gate 220 green, wiring test locks it, harness never passes it. Verified by gate+trace; live amazon replay deferred
+3	4b63eb3	1.000	keep	#2 ambiguous/absent + #4a discriminating-verify + #1 stagnation-nudge: pass^k stays 1.0, false_success 0 (G3 holds, no abstain bleed), 150 calls (G2 ok), gate 220 green
