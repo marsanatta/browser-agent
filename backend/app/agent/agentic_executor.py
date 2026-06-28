@@ -171,6 +171,7 @@ class AgenticExecutor:
             "counter": 0,         # step/call id counter, like Executor (run_id + n)
             "last_verify_ok": False,
             "blocked": False,
+            "history": [],        # #1: recent (action, target) keys for stagnation detection
             "client": None,
         }
         # Honest token ledger (browser-pilot pattern): accrued from the assistant.usage
@@ -300,15 +301,26 @@ class AgenticExecutor:
                 n = state["counter"]
                 return f"{run_id}-s{n}", uuid.uuid4().hex[:8]
 
-            def gate() -> str | None:
-                """Pre-flight for the acting tools: stop once finished; force a wrap-up
-                past the budget. Keeps the session from looping to the wall-clock timeout."""
+            def gate(action: str | None = None, target: str | None = None) -> str | None:
+                """Pre-flight for the acting tools: stop once finished; force a wrap-up past
+                the budget; and (#1) break a stagnation streak with a SOFT strategy nudge —
+                NEVER a forced finish (that would bleed into honest abstain, iter3 lesson)."""
                 if state["finished"]:
                     return "TASK ALREADY FINISHED. Stop now and end your turn."
                 state["tools"] += 1
                 if state["tools"] > self._tool_budget:
                     return ("BUDGET_EXCEEDED: too many steps. Call finish(success=false) now "
                             "unless the goal is already reached.")
+                if action is not None and target is not None:
+                    hist = state["history"]
+                    hist.append((action, " ".join(target.split()).lower()))
+                    if len(hist) >= 3 and hist[-1] == hist[-2] == hist[-3]:
+                        hist.clear()  # nudge once per streak, don't spam
+                        return (f"STAGNATION: the same {action} on {target!r} 3x with no progress — "
+                                "STOP repeating it. Step back: observe with an EMPTY target to see the "
+                                "WHOLE page, then take a DIFFERENT path (a renamed control, a menu to "
+                                "open, another element). Do NOT give up unless the page is a "
+                                "login/CAPTCHA wall or the goal cannot exist here.")
                 return None
 
             async def shot(step_id: str, locator: Any, caption: str) -> None:
@@ -317,7 +329,7 @@ class AgenticExecutor:
                     emit(events.screenshot_annotated(s))
 
             async def observe(p: _Target) -> str:
-                if (g := gate()) is not None:
+                if (g := gate("observe", p.target)) is not None:
                     return g
                 step_id, call_id = next_ids()
                 emit(events.step_started(step_id, f"observe: {p.target}"))
@@ -352,7 +364,7 @@ class AgenticExecutor:
                 return txt
 
             async def click(p: _Target) -> str:
-                if (g := gate()) is not None:
+                if (g := gate("click", p.target)) is not None:
                     return g
                 state["last_verify_ok"] = False  # page state changes -> stale verify must not gate finish
                 step_id, call_id = next_ids()
@@ -384,7 +396,7 @@ class AgenticExecutor:
                 return json.dumps({"changed": ch, "url": page.url})
 
             async def fill(p: _Fill) -> str:
-                if (g := gate()) is not None:
+                if (g := gate("fill", p.target)) is not None:
                     return g
                 state["last_verify_ok"] = False  # page state changes -> stale verify must not gate finish
                 step_id, call_id = next_ids()
