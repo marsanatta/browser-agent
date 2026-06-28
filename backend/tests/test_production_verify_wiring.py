@@ -104,6 +104,22 @@ def test_build_executor_forwards_verify_hook():
     assert _build_executor(None, **common)._verify_hook is None
 
 
+def test_build_executor_threads_finish_gate_criterion_to_agentic(monkeypatch):
+    # #4b: the PRODUCTION caller criterion reaches the agentic finish gate, but only there.
+    from app.agent.agentic_executor import AgenticExecutor
+    monkeypatch.delenv("AGENT_MODE", raising=False)  # default engine = agentic
+    common = dict(
+        plan_model="x", exec_model="x", replanner_model="x",
+        plan_effort="medium", exec_effort="medium", replanner_effort="medium",
+    )
+    crit = {"url_contains": "light"}
+    ex = _build_executor(None, finish_gate_criterion=crit, **common)
+    assert isinstance(ex, AgenticExecutor)
+    assert ex._finish_gate_criterion == crit
+    # no criterion -> self-verify only (gate falls back to the verify tool)
+    assert _build_executor(None, **common)._finish_gate_criterion is None
+
+
 def test_parse_criterion_rejects_loose_and_unknown():
     # The hard rule: a loose body-text check or any unknown key cannot become a
     # "verified" pass. Each must 400 rather than silently weaken the assertion.

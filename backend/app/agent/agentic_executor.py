@@ -32,6 +32,7 @@ from pydantic import BaseModel, Field
 
 from app.agent import verify
 from app.agent.agentic import cdp
+from app.verify.state import state_check
 from app.agent.agentic.skill import (
     HANDLER_TIMEOUT,
     SESSION_TIMEOUT,
@@ -105,12 +106,18 @@ class AgenticExecutor:
         start_url: str | None = None,
         max_replans: int | None = None,
         view_scope: int | None = None,  # accepted for parity; observe self-caps at 40
+        finish_gate_criterion: dict | None = None,
     ) -> None:
         self._provider = provider
         self._gateway = gateway
         self._verify_hook = verify_hook
         self._step_hook = step_hook
         self._start_url = start_url
+        # The PRODUCTION caller's success criterion, threaded ONLY from main.py — the eval
+        # harness never passes it, so eval scoring is unaffected (anti-gaming). When set, the
+        # finish gate ALSO requires this deterministic state_check to hold on the live page,
+        # so a loose self-verify can't claim success on a wrong page (the amazon "light" bug).
+        self._finish_gate_criterion = finish_gate_criterion
         # max_attempts / max_replans are plan-era knobs; here there is no replan, so they
         # map onto the agentic equivalent: the tool-call budget (the max iterations the
         # LLM may take before being forced to wrap up). Take the largest hint given, else
@@ -444,8 +451,16 @@ class AgenticExecutor:
                 emit(events.tool_call_args(call_id, {"success": p.success, "note": p.note}))
                 if p.success:
                     block = await verify.detect_block(page)
-                    if block is not None or not state["last_verify_ok"]:
-                        reason = block or "no satisfied verify(goal) before finish"
+                    reason = None
+                    if block is not None:
+                        reason = block
+                    elif not state["last_verify_ok"]:
+                        reason = "no satisfied verify(goal) before finish"
+                    elif self._finish_gate_criterion is not None and not await state_check(
+                        page, self._finish_gate_criterion
+                    ):
+                        reason = "the caller's success criterion is not met on the live page"
+                    if reason is not None:
                         emit(events.tool_call_end(call_id, f"REJECTED: {reason}"))
                         emit(events.step_finished(step_id, "failed"))
                         emit(events.ask_user(step_id, f"Success claim rejected by the verifier: {reason}."))

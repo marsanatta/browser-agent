@@ -228,6 +228,7 @@ def _build_executor(
     max_replans: int = 10,
     agent_mode: str | None = None,
     verify_hook: VerifyHook | None = None,
+    finish_gate_criterion: dict | None = None,
 ) -> Executor:
     gateway = LLMGateway(
         workhorse_model=exec_model,
@@ -249,9 +250,14 @@ def _build_executor(
     # run is self-report only — never falsely shown as "verified").
     mode = agent_mode or os.getenv("AGENT_MODE")
     cls = Executor if mode == "script-orchestration" else AgenticExecutor
-    return cls(_make_provider(), planner, gateway=gateway,
-               peek_plan=True, start_url=url, max_replans=max_replans,
-               verify_hook=verify_hook)
+    kwargs: dict = dict(gateway=gateway, peek_plan=True, start_url=url,
+                        max_replans=max_replans, verify_hook=verify_hook)
+    # #4b: the agentic finish gate also enforces the caller's criterion (production only).
+    # The legacy engine takes no such kwarg, and the eval harness builds its executor
+    # WITHOUT this — so eval scoring is never gamed by feeding the agent its own criterion.
+    if cls is AgenticExecutor and finish_gate_criterion is not None:
+        kwargs["finish_gate_criterion"] = finish_gate_criterion
+    return cls(_make_provider(), planner, **kwargs)
 
 
 # POST is the path the frontend uses: Cloudflare quick tunnels buffer SSE-over-GET
@@ -295,6 +301,7 @@ async def agent_run(
         max_replans=max(0, min(int(max_replans), 10)),  # clamp to a sane range
         agent_mode=agent_mode,
         verify_hook=verify_hook,
+        finish_gate_criterion=parsed_criterion,
     )
 
     async def gen():
