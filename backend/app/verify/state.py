@@ -38,24 +38,31 @@ async def _first_text(page: Any, css: str) -> str | None:
         return None
 
 
+def _eq_text(got: str | None, value: Any) -> bool:
+    """Full-string equality, case-insensitive. `inner_text()` returns the RENDERED text,
+    which reflects CSS `text-transform` (e.g. the-internet `entry_ad` modal's <h3>
+    renders UPPERCASE while its source is mixed case), so a case-SENSITIVE match
+    false-fails a correct read. Case-folding keeps this an EXACT match (not a
+    substring) — it only ignores letter casing."""
+    return got is not None and got.casefold() == str(value).casefold()
+
+
 async def _check_one(page: Any, kind: str, spec: Any) -> bool:
     if kind == "url_contains":
         return str(spec) in page.url
     if kind == "text_contains":
         return str(spec).lower() in (await _body_text(page)).lower()
     if kind == "h1_equals":
-        return (await _first_text(page, "h1")) == str(spec)
+        return _eq_text(await _first_text(page, "h1"), spec)
     if kind == "selector_text_equals":
-        css = spec["css"]
-        value = spec["value"]
-        return (await _first_text(page, css)) == value
+        return _eq_text(await _first_text(page, spec["css"]), spec["value"])
     if kind == "iframe_text_equals":
         # Frame-aware check: pierce a real iframe and assert on an element inside it.
         try:
             loc = page.frame_locator(spec["frame"]).locator(spec["css"]).first
             if await loc.count() == 0:
                 return False
-            return (await loc.inner_text()).strip() == spec["value"]
+            return _eq_text((await loc.inner_text()).strip(), spec["value"])
         except Exception:
             return False
     raise ValueError(f"unknown assertion primitive: {kind!r}")

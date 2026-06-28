@@ -200,6 +200,10 @@ test on the 80-task eval set, holding the model identical (both `claude-haiku-4.
 | Plan-then-execute (script-orchestration) | 0.500 (40/80) | 18 | $3.85 |
 | **LLM-in-loop (agentic)** | **0.900 (72/80)** | **1** | **$3.24** |
 
+(One silent failure in *both* columns, `internet_modal`, was later found to be a verifier case bug,
+not a real failure — engine-independent, so the comparison is unaffected; the corrected agentic
+figure is 73/80, CuP 0.)
+
 The agentic loop wins by **+40 points verified, 18× fewer silent failures, and ~16% lower cost**.
 Plan-then-execute loses even when given an expensive `opus` planner (0.762 verified, at ~2.9× the
 cost). An earlier belief that plan-then-execute was "~5× cheaper" turned out to be **~90% the
@@ -233,15 +237,19 @@ memorization. Scored by the independent check, on the default agentic engine:
 
 | Split | Tasks | Verified | Silent failures |
 |-------|-------|----------|-----------------|
-| dev | 39 | 0.897 | 1 |
+| dev | 39 | 0.923 | 0 |
 | holdout | 21 | 0.810 | 0 |
 | sealed (scored once) | 20 | 1.000 | 0 |
-| **Total** | **80** | **0.900 (72/80)** | **1** |
+| **Total** | **80** | **0.913 (73/80)** | **0** |
 
 Source: [`research/executor-ab-plan-mode-vs-llm-in-loop.md`](./research/executor-ab-plan-mode-vs-llm-in-loop.md)
-(the agentic column). This is a single run; live sites flake by a few tasks, so treat
-small per-split differences as noise. The sealed split is scored only once, so its number cannot
-be over-fit.
+(the agentic column), corrected for one case: that run reported `internet_modal` as a silent
+failure, but it was a **verifier case-sensitivity bug** — the modal title renders UPPERCASE via CSS
+while the assertion expected the mixed-case source text, so a correct read false-failed. With the
+verifier fixed (case-insensitive text match), `internet_modal` verifies, so measured silent
+failures drop from 1 to **0** and the dev/total rates rise by that one case. This is a single run;
+live sites flake by a few tasks, so treat small per-split differences as noise. The sealed split is
+scored only once, so its number cannot be over-fit.
 
 ---
 
@@ -256,7 +264,6 @@ exception, every one is **detected and reported**, not silently wrong.
 | **CAPTCHA** | `google.com/recaptcha/api2/demo` — Submit is gated by a reCAPTCHA | Honest give-up. The agent will not solve or bypass a CAPTCHA. |
 | **Anti-bot wall** | `g2.com` — HTTP 403 with zero perceivable elements (a DataDome challenge shell) | Fails closed. No fingerprint spoofing is attempted. |
 | **Headless anti-bot** | `amazon.com` on the default headless browser often returns a tiny "Continue shopping" interstitial instead of the real page | **Unsupported on the default runtime.** Driving a real browser over CDP (Chrome DevTools Protocol, the designed escalation tier) reaches the full page — it is a browser-layer block, not an agent-logic one. |
-| **Wrong-page silent failure** | `the-internet.herokuapp.com/entry_ad` (read a modal title) — the agent claims success but the independent check disagrees | **The one measured silent failure (1 of 80).** A no-oracle ceiling that both engines share. |
 | **iframe contents** | `the-internet.herokuapp.com/iframe` — typing inside a rich-text editor in an iframe | The grounding cannot act inside the iframe, so the agent **gives up honestly** (not silent). |
 | **Grounding miss on a dense page** | `en.wikipedia.org` periodic-table navigation; some `stackoverflow.com` navigation | Honest non-completion: the agent cannot locate the target, burns its step budget, and gives up. |
 | **Failures are expensive** | any task where the target cannot be found | The agentic loop retries up to its 25-step budget (~$0.08–0.10/task), so a failure costs more than plan-then-execute's early give-up. |
@@ -294,7 +301,9 @@ claim.
   actual DOM / URL the agent left, using a check that is **separate code** from the in-loop
   `verify` tool the agent calls. The verifier never grades itself with its own formula.
 - **The headline metric is the silent-failure gap** (nominal vs verified), not raw accuracy. The
-  system is allowed to be wrong only when it says so. On the default engine the gap is **1 in 80**.
+  system is allowed to be wrong only when it says so. On the default engine the gap is **0** (an
+  earlier reported 1, `internet_modal`, was a verifier case-sensitivity bug — the modal title
+  renders uppercase via CSS — now fixed).
 - **Two-pass eval admission.** Every task passed (1) a real-browser probe confirming the check
   holds at the solution page and the path is wall-free, and (2) an independent reviewer
   confirming the check is true *only if* the task is actually done. Weak checks were dropped.

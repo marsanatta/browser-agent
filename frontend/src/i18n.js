@@ -28,7 +28,6 @@ const en = {
       abstain: "abstain",
       blocked: "blocked",
       needsCdp: "needs CDP",
-      silentFailure: "silent failure",
     },
     items: {
       "wiki-helium": { label: "Open the Helium article (Wikipedia)", why: "Clear ARIA link names — the agent opens the article and the independent check confirms it." },
@@ -39,7 +38,7 @@ const en = {
       "recaptcha": { label: "Submit the reCAPTCHA demo form", why: "Submit is gated by a CAPTCHA the agent will not solve, so it abstains honestly." },
       "g2-datadome": { label: "Open a g2.com page", why: "DataDome anti-bot returns HTTP 403 with zero perceivable elements — the agent fails closed." },
       "amazon-headless": { label: "Search Amazon for a product", why: "On the default headless browser Amazon serves an anti-bot interstitial; unsupported without the CDP escalation tier." },
-      "internet-modal": { label: "Read the modal window title", why: "The agent claims success on a wrong-page state; the independent check flags verified=false — the one measured silent failure." },
+      "internet-modal": { label: "Read the modal window title", why: "A modal pops up on load; the agent reads its title and the independent check confirms it." },
     },
   },
   models: {
@@ -207,7 +206,6 @@ const zhHant = {
       abstain: "誠實放棄",
       blocked: "被封鎖",
       needsCdp: "需 CDP",
-      silentFailure: "靜默失敗",
     },
     items: {
       "wiki-helium": { label: "開啟 Helium（氦）條目（Wikipedia）", why: "ARIA link 名稱清楚 — agent 開啟條目後，由獨立檢查確認結果。" },
@@ -218,7 +216,7 @@ const zhHant = {
       "recaptcha": { label: "提交 reCAPTCHA demo 表單", why: "Submit 被 CAPTCHA 擋住，agent 不會去解，因此誠實放棄。" },
       "g2-datadome": { label: "開啟 g2.com 頁面", why: "DataDome 反爬回 HTTP 403、零個可感知元素 — agent fail closed。" },
       "amazon-headless": { label: "在 Amazon 搜尋商品", why: "預設 headless 瀏覽器下 Amazon 會回反爬 interstitial；沒有 CDP escalation tier 就不支援。" },
-      "internet-modal": { label: "讀取 modal 視窗標題", why: "agent 在錯誤頁面狀態下宣稱成功；獨立檢查標記 verified=false — 唯一一個量到的 silent failure。" },
+      "internet-modal": { label: "讀取 modal 視窗標題", why: "頁面載入時跳出 modal；agent 讀出它的標題，獨立檢查確認無誤。" },
     },
   },
   models: {

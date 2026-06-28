@@ -1131,11 +1131,6 @@ li.is-active .steprow {
   background: color-mix(in srgb, var(--muted) 10%, transparent);
 }
 
-.gallery-badge[data-badge="silentFailure"] {
-  color: var(--fail);
-  border-color: color-mix(in srgb, var(--fail) 45%, var(--border));
-  background: color-mix(in srgb, var(--fail) 10%, transparent);
-}
 
 @media (prefers-reduced-motion: reduce) {
   *,

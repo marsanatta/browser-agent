@@ -81,6 +81,10 @@ executor differs** (`research/executor-ab-plan-mode-vs-llm-in-loop.md`):
 | Plan-then-execute | opus planner | 0.762 (61/80) | 10 | $9.39 | 1.9 | $0.117 |
 | **LLM-in-loop (default)** | **haiku** | **0.900 (72/80)** | **1** | **$3.24** | **10.4** | **$0.040** |
 
+(`internet_modal` was counted as a silent failure in every column but was later found to be a
+verifier case bug, not a real failure — engine-independent, so the deltas are unaffected; the
+corrected default figure is 73/80, CuP 0.)
+
 Reading the table:
 
 - **At equal model (haiku vs haiku), the agentic engine is ~16% cheaper** *and* far more reliable —
@@ -153,9 +157,11 @@ post-hoc assertion.
 
 3. **Nominal vs verified (CuP) is the headline metric.** `eval/scoring.py` counts tasks where the
    agent claimed success (`nominal`) but the independent assertion failed (`verified=false`). On the
-   default agentic engine this is **1 in 80** — the lone silent failure is `internet_modal`
-   (a "read the modal title" task the agent claims done on a wrong-page state), a no-oracle ceiling
-   that **both** engines share. The delta between nominal (~what the agent claims) and verified is
+   default agentic engine this is **0**. (An earlier run reported 1 — the `internet_modal` task —
+   but that was a **verifier case-sensitivity bug**: the modal title renders UPPERCASE via CSS
+   `text-transform` while the assertion expected the mixed-case source text, so a correct read
+   false-failed. With the verifier fixed, `internet_modal` verifies.) The delta between nominal
+   (~what the agent claims) and verified is
    the number that matters; abstained walled tasks do not inflate it (an honest give-up is not a
    silent failure).
 
@@ -163,10 +169,10 @@ post-hoc assertion.
 
    | Split | Tasks | Verified | Silent failures |
    |-------|-------|----------|-----------------|
-   | dev | 39 | 0.897 | 1 |
+   | dev | 39 | 0.923 | 0 |
    | holdout | 21 | 0.810 | 0 |
    | sealed (scored once) | 20 | 1.000 | 0 |
-   | **Total** | **80** | **0.900 (72/80)** | **1** |
+   | **Total** | **80** | **0.913 (73/80)** | **0** |
 
 5. **Two-pass eval admission.** Every task was admitted only after (1) a real-browser probe
    confirmed its assertion holds at the solution page and the path is wall-free, and (2) an
@@ -195,8 +201,9 @@ two-pass admission (#5) is what keeps those assertions strict.
 
 ## 5. Honest limitations (named, not hidden)
 
-- **One silent failure (`internet_modal`).** A wrong-page "read the modal title" case the agentic
-  loop claims done; a no-oracle ceiling shared by both engines.
+- **No silent failures on the eval set.** (An earlier reported 1, `internet_modal`, was a verifier
+  case-sensitivity bug — the modal title renders uppercase via CSS — now fixed; the agent reads the
+  title correctly and it verifies.)
 - **Login / CAPTCHA / anti-bot walls are abstained, not solved.** The agentic loop *sees* the wall
   at each step and gives up on the first sign (route, don't evade). Concrete probes (github.com/login,
   a reCAPTCHA demo, g2.com's DataDome 403) with status codes and element counts are in

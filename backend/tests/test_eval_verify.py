@@ -80,6 +80,21 @@ async def test_selector_text_equals():
 
 
 @pytest.mark.anyio
+async def test_selector_text_equals_case_insensitive():
+    # inner_text() returns CSS-RENDERED text: a title styled `text-transform: uppercase`
+    # comes back UPPERCASE though its source is mixed case. The check must still pass
+    # (full-string match, case ignored). This was the internet_modal false-fail.
+    page = _FakePage("https://x.com", "body", {".modal-title h3": "THIS IS A MODAL WINDOW"})
+    assert await state_check(
+        page, {"selector_text_equals": {"css": ".modal-title h3", "value": "This is a modal window"}}
+    ) is True
+    # different LETTERS still fail (case-insensitive, not substring/fuzzy)
+    assert await state_check(
+        page, {"selector_text_equals": {"css": ".modal-title h3", "value": "A different window"}}
+    ) is False
+
+
+@pytest.mark.anyio
 async def test_missing_selector_is_false_not_error():
     page = _FakePage("https://x.com", "body", {})
     assert await state_check(page, {"h1_equals": "anything"}) is False
