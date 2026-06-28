@@ -389,7 +389,7 @@ tasks:
 - id: live_hackernews_show_then_ask
   purpose: multistep_nav
   split: dev
-  instruction: Starting from the Hacker News front page, first open the Show HN section, then from there navigate to the Ask HN section.
+  instruction: "On Hacker News, use the small links in the top bar (new, past, comments, ask, show, jobs) — NOT the article headlines in the list below. First click the 'show' link to open the Show HN page, then on that page click the 'ask' link in the same top bar to open the Ask HN page."
   start_url: https://news.ycombinator.com/
   domain: news
   task_type: action

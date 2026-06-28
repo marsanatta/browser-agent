@@ -9,7 +9,7 @@ export const EXAMPLES = [
     task: "On Wikipedia, type 'Argon' into the search box and choose 'Argon' from the autocomplete suggestions that appear, to open its article.",
     url: "https://en.wikipedia.org/wiki/Main_Page", criterion: { h1_equals: "Argon" } },
   { id: "hn-show-ask", group: "good", badge: "verified",
-    task: "Starting from the Hacker News front page, first open the Show HN section, then from there navigate to the Ask HN section.",
+    task: "On Hacker News, use the small links in the top bar (new, past, comments, ask, show, jobs) — NOT the article headlines in the list below. First click the 'show' link to open the Show HN page, then on that page click the 'ask' link in the same top bar to open the Ask HN page.",
     url: "https://news.ycombinator.com/", criterion: { url_contains: "/ask" } },
   { id: "govuk-driving", group: "good", badge: "verified",
     task: "Starting from the GOV.UK homepage, open the 'Driving and transport' browse section, then go into its 'Driving licences' subtopic.",
