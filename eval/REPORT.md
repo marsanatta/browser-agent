@@ -1,9 +1,9 @@
 # Eval Report — live evidence
 
-Generated **2026-06-26 15:28 UTC** from a REAL harness run. Every "verified" below is an
+Generated **2026-06-28 11:08 UTC** from a REAL harness run. Every "verified" below is an
 INDEPENDENT programmatic state check on the live page (URL / first-h1 / scoped
 selector) — never the agent's self-report, and never a loose `text_contains`.
-Copilot calls this run: 44.
+Copilot calls this run: 721.
 
 ## Test architecture — what gates vs what's evidence
 
@@ -16,44 +16,83 @@ Copilot calls this run: 44.
   (`python -m eval.run_live_tier`) and reported here. NOT part of the CI gate; a
   red row here is evidence, not a broken build.
 
-## Live real-world tier — 14/21 verified
+## Live real-world tier — 52/60 verified
 
-| task | site | type | deterministic? | nominal | verified | abstained |
-|---|---|---|---|---|---|---|
-| live_wikipedia_helium_retrieval | en.wikipedia.org | retrieval | no (live) | True | True | False |
-| live_pydocs_json_nav | docs.python.org | action | no (live) | False | False | True |
-| live_google_search_steam | www.google.com | action | no (live) | False | True | True |
-| live_wikipedia_signin_synonym | en.wikipedia.org | action | no (live) | True | True | False |
-| live_wikipedia_search_submit | en.wikipedia.org | action | no (live) | True | True | False |
-| live_wikipedia_autocomplete | en.wikipedia.org | action | no (live) | True | True | False |
-| live_internet_lazyload | the-internet.herokuapp.com | action | no (live) | True | True | False |
-| live_internet_modal | the-internet.herokuapp.com | action | no (live) | True | False | False |
-| live_internet_iframe | the-internet.herokuapp.com | action | no (live) | False | False | True |
-| live_example_more_info_nav | example.com | action | no (live) | False | False | True |
-| live_hackernews_newest_nav | news.ycombinator.com | action | no (live) | True | True | False |
-| live_gnu_licenses_nav | www.gnu.org | action | no (live) | False | False | False |
-| live_osm_login_nav | www.openstreetmap.org | action | no (live) | True | True | False |
-| live_lobsters_comments_nav | lobste.rs | action | no (live) | True | True | False |
-| live_mdn_blog_nav | developer.mozilla.org | action | no (live) | True | True | False |
-| live_archive_login_nav | archive.org | action | no (live) | False | False | True |
-| live_govuk_help_nav | www.gov.uk | action | no (live) | True | True | False |
-| live_arxiv_help_nav | arxiv.org | action | no (live) | True | True | False |
-| live_yahoofinance_aapl_quote | finance.yahoo.com | action | no (live) | True | True | False |
-| live_openlibrary_login_nav | openlibrary.org | action | no (live) | True | True | False |
-| live_stackoverflow_questions_nav | stackoverflow.com | action | no (live) | False | False | True |
+| task | site | type | split | deterministic? | nominal | verified | abstained |
+|---|---|---|---|---|---|---|---|
+| live_wikipedia_helium_retrieval | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_pydocs_json_nav | docs.python.org | action | dev | no (live) | True | True | False |
+| live_google_search_steam | www.google.com | action | dev | no (live) | False | True | True |
+| live_wikipedia_signin_synonym | en.wikipedia.org | action | dev | no (live) | True | True | False |
+| live_wikipedia_search_submit | en.wikipedia.org | action | dev | no (live) | True | True | False |
+| live_wikipedia_autocomplete | en.wikipedia.org | action | dev | no (live) | True | True | False |
+| live_internet_lazyload | the-internet.herokuapp.com | action | dev | no (live) | True | True | False |
+| live_internet_modal | the-internet.herokuapp.com | action | dev | no (live) | True | False | False |
+| live_internet_iframe | the-internet.herokuapp.com | action | dev | no (live) | False | True | True |
+| live_example_more_info_nav | example.com | action | holdout | no (live) | True | True | False |
+| live_hackernews_newest_nav | news.ycombinator.com | action | dev | no (live) | True | True | False |
+| live_gnu_licenses_nav | www.gnu.org | action | holdout | no (live) | False | False | False |
+| live_osm_login_nav | www.openstreetmap.org | action | holdout | no (live) | True | True | False |
+| live_lobsters_comments_nav | lobste.rs | action | holdout | no (live) | True | True | False |
+| live_mdn_blog_nav | developer.mozilla.org | action | holdout | no (live) | True | True | False |
+| live_archive_login_nav | archive.org | action | holdout | no (live) | False | False | True |
+| live_govuk_help_nav | www.gov.uk | action | holdout | no (live) | True | True | False |
+| live_arxiv_help_nav | arxiv.org | action | holdout | no (live) | True | True | False |
+| live_stackoverflow_questions_nav | stackoverflow.com | action | holdout | no (live) | False | False | True |
+| live_internet_status_code_200 | the-internet.herokuapp.com | action | dev | no (live) | True | True | False |
+| live_internet_challenging_dom_intro | the-internet.herokuapp.com | retrieval | dev | no (live) | True | True | False |
+| live_books_sapiens_price | books.toscrape.com | retrieval | dev | no (live) | True | True | False |
+| live_books_open_mystery_category | books.toscrape.com | action | dev | no (live) | True | True | False |
+| live_books_sapiens_stock | books.toscrape.com | retrieval | dev | no (live) | True | True | False |
+| live_books_grand_design_price | books.toscrape.com | retrieval | dev | no (live) | True | True | False |
+| live_books_dune_price | books.toscrape.com | retrieval | dev | no (live) | True | True | False |
+| live_books_page2_pagination | books.toscrape.com | action | dev | no (live) | True | True | False |
+| live_wikipedia_oxygen_search | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_periodic_table_nav | en.wikipedia.org | retrieval | dev | no (live) | False | False | False |
+| live_wikipedia_einstein_body_text | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_pydocs_tutorial_nav | docs.python.org | action | dev | no (live) | True | True | False |
+| live_hackernews_show_then_ask | news.ycombinator.com | action | dev | no (live) | True | True | False |
+| live_mdn_html_input | developer.mozilla.org | retrieval | holdout | no (live) | True | True | False |
+| live_mdn_css_flex | developer.mozilla.org | retrieval | holdout | no (live) | True | True | False |
+| live_govuk_bank_holidays | www.gov.uk | retrieval | holdout | no (live) | True | True | False |
+| live_govuk_vat_rates | www.gov.uk | retrieval | holdout | no (live) | True | False | False |
+| live_govuk_min_wage | www.gov.uk | retrieval | holdout | no (live) | False | False | True |
+| live_govuk_check_uk_visa | www.gov.uk | action | holdout | no (live) | True | True | False |
+| live_govuk_driving_licences | www.gov.uk | action | holdout | no (live) | True | True | False |
+| live_wikipedia_jupiter | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_books_fiction_page2 | books.toscrape.com | action | dev | no (live) | True | True | False |
+| live_arxiv_attention_paper | arxiv.org | retrieval | holdout | no (live) | True | True | False |
+| live_wikipedia_preferences_abstain | en.wikipedia.org | action | dev | no (live) | False | True | True |
+| live_wikipedia_watchlist_abstain | en.wikipedia.org | action | dev | no (live) | False | True | True |
+| live_github_settings_abstain | github.com | action | dev | no (live) | False | True | True |
+| live_github_notifications_abstain | github.com | action | dev | no (live) | False | True | True |
+| live_github_new_repo_abstain | github.com | action | dev | no (live) | False | True | True |
+| live_gitlab_profile_abstain | gitlab.com | action | holdout | no (live) | False | True | True |
+| live_gitlab_new_project_abstain | gitlab.com | action | holdout | no (live) | False | True | True |
+| live_arxiv_account_abstain | arxiv.org | action | holdout | no (live) | False | True | True |
+| live_bitbucket_account_abstain | bitbucket.org | action | holdout | no (live) | False | False | False |
+| live_wikipedia_decoy_mercury_planet | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_python_snake | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_java_proglang | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_phoenix_city | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_apple_company | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_turkey_bird | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_saturn_god | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_decoy_amazon_rainforest | en.wikipedia.org | retrieval | dev | no (live) | True | True | False |
+| live_wikipedia_signup_captcha_abstain | en.wikipedia.org | action | dev | no (live) | False | True | True |
 
-## Day-3 realistic batch (folded in, reproducible) — 7/8 verified
+## Day-3 realistic batch (folded in, reproducible) — 8/8 verified
 
-| task | site | type | deterministic? | nominal | verified | abstained |
-|---|---|---|---|---|---|---|
-| internet_form_auth_nav | the-internet.herokuapp.com | action | no (live) | True | True | False |
-| internet_login_page_reached | the-internet.herokuapp.com | action | no (live) | True | True | False |
-| books_open_light_in_attic | books.toscrape.com | retrieval | no (live) | True | True | False |
-| books_open_travel_category | books.toscrape.com | action | no (live) | True | True | False |
-| books_price_visible | books.toscrape.com | retrieval | no (live) | True | True | False |
-| quotes_open_einstein_author | quotes.toscrape.com | retrieval | no (live) | False | False | True |
-| quotes_open_login | quotes.toscrape.com | action | no (live) | True | True | False |
-| synonym_label_signin_vs_login | (inline data: URL) | action | yes (inline) | True | True | False |
+| task | site | type | split | deterministic? | nominal | verified | abstained |
+|---|---|---|---|---|---|---|---|
+| internet_form_auth_nav | the-internet.herokuapp.com | action | dev | no (live) | True | True | False |
+| internet_login_page_reached | the-internet.herokuapp.com | action | dev | no (live) | True | True | False |
+| books_open_light_in_attic | books.toscrape.com | retrieval | dev | no (live) | True | True | False |
+| books_open_travel_category | books.toscrape.com | action | dev | no (live) | True | True | False |
+| books_price_visible | books.toscrape.com | retrieval | dev | no (live) | True | True | False |
+| quotes_open_einstein_author | quotes.toscrape.com | retrieval | holdout | no (live) | True | True | False |
+| quotes_open_login | quotes.toscrape.com | action | holdout | no (live) | True | True | False |
+| synonym_label_signin_vs_login | (inline data: URL) | action | dev | yes (inline) | True | True | False |
 
 ## Notes
 
