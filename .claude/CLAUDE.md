@@ -63,10 +63,10 @@ These distill `docs/00-synthesis-and-design-implications.md`. **Before designing
 
 ### Design
 
-- **Keep the LLM out of the hot path.** Deterministic / cached / rule-based execution first; invoke the LLM only on failure. This is the cost lever *and* the reliability lever at once.
+- **Cost = perception size × call count × model tier — not whether the LLM is in the loop.** Filter perception (never raw DOM), minimize LLM calls, use the cheapest model that works. An LLM-in-loop on filtered perception + a cheap model can beat plan-execute on cost. Measure cost; do not infer it from loop structure. Reliability is a separate lever: the independent deterministic verify gate.
 - **Hybrid perception.** Fused DOM + accessibility-tree indexed element list as primary; screenshot + Set-of-Marks only when DOM grounding is ambiguous, and only with sparse, precise boxes. **Never feed raw DOM** (token blowup).
-- **Verify-after-act is mandatory.** Predict expected effect → act → diff actual vs predicted (DOM / URL / network) → re-ground on NO_CHANGE. Ground every correction signal in observable browser state, **never** in the LLM's self-assessment.
-- **Self-correction = classify-then-respond, not generic retry.** not-found → re-ground/heal; not-interactable → wait/scroll/dismiss overlay; wrong-page → replan; stale/timing → state-wait then retry the *same* action.
+- **Verify-after-act is mandatory, and the verify CONDITION must be discriminating.** Predict expected effect → act → diff actual vs predicted (DOM / URL / network) → re-ground on NO_CHANGE. The condition must be false on the page you came from and use ≥2 signals (URL AND a goal-unique landmark) — a deterministic check of a loose, LLM-chosen goal still passes on the wrong page. Ground every signal in observable browser state, **never** in the LLM's self-assessment, which includes its self-chosen verify goal.
+- **Self-correction = classify-then-respond, not generic retry.** not-found → re-ground/heal; not-interactable → wait/scroll/dismiss overlay; wrong-page → replan; stale/timing → state-wait then retry the *same* action. The locator cascade's outcome (ambiguous vs absent) must reach the agent so it can switch strategy; a self-driving LLM loop must escalate retry → strategy-switch → replan, never collapse to blind retry.
 - **Self-maintenance = semantic-first locator cascade.** `getByRole`+name → `getByLabel` → `getByText`+role → `getByTestId` → heuristic fingerprint → LLM re-rank of ≤5 → vision. Two-layer cache so a hit costs 0 LLM tokens. Avoid CSS/XPath as primary.
 - **Retry only on a new observation.** Escalate retry → local strategy-switch → global replan on exhaustion; **confirm before any side-effecting (write/submit) retry**; expose an explicit `ask_user` escape hatch.
 - **Hierarchical plan + stateless sub-task executor** (fresh context per sub-task to avoid pollution).
@@ -76,7 +76,7 @@ These distill `docs/00-synthesis-and-design-implications.md`. **Before designing
 ### Implementation
 
 - **Swappable browser-runtime interface.** Self-host Playwright/Chromium as default; Steel.dev / Browserbase as escalation. Stateless ephemeral browser per task; recycle to bound memory creep.
-- **Tiered models.** Haiku/o4-mini triage → Sonnet workhorse → Opus/o3 strictly gated on repeated failure. Prompt caching + Batch API on by default. Raw frontier-per-step is a cost trap.
+- **Pick model tier by measured cost.** Frontier-per-step (Opus) is a cost trap. Haiku triage → Sonnet workhorse → Opus gated-on-failure is one option; a single cheap model (Haiku) per step + filtered perception is another, often cheaper and simpler. Prompt caching + Batch API on by default. Flag model confounds when comparing architectures.
 - **Frontend = SSE progress streaming** (`sse-starlette`/FastAPI) with the AG-UI event vocabulary; a Skyvern-style **inspectable-failure view** (annotated screenshot · element tree · prompt+raw response · locator+cascade level · `failure_category` · retry chain · HAR).
 - **Observability backend = Langfuse + OpenTelemetry GenAI spans** (each Playwright action wrapped as a tool span). The trajectory store feeds frontend replay and the anomaly trip-wire.
 - **Deploy headless Chromium in a real container** (`mcr.microsoft.com/playwright` base, `--disable-dev-shm-usage`, non-root, `tini`).
