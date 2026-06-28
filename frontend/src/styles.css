@@ -1118,8 +1118,7 @@ li.is-active .steprow {
   background: color-mix(in srgb, var(--ok) 10%, transparent);
 }
 
-.gallery-badge[data-badge="abstain"],
-.gallery-badge[data-badge="needsCdp"] {
+.gallery-badge[data-badge="abstain"] {
   color: var(--warn);
   border-color: color-mix(in srgb, var(--warn) 45%, var(--border));
   background: color-mix(in srgb, var(--warn) 10%, transparent);

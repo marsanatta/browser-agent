@@ -263,7 +263,6 @@ exception, every one is **detected and reported**, not silently wrong.
 | **Login wall** | `github.com/login` — page loads, but the task needs credentials the agent does not hold | Honest give-up. The agent sees the login form and reports failure on the first sign. |
 | **CAPTCHA** | `google.com/recaptcha/api2/demo` — Submit is gated by a reCAPTCHA | Honest give-up. The agent will not solve or bypass a CAPTCHA. |
 | **Anti-bot wall** | `g2.com` — HTTP 403 with zero perceivable elements (a DataDome challenge shell) | Fails closed. No fingerprint spoofing is attempted. |
-| **Headless anti-bot** | `amazon.com` on the default headless browser often returns a tiny "Continue shopping" interstitial instead of the real page | **Unsupported on the default runtime.** Driving a real browser over CDP (Chrome DevTools Protocol, the designed escalation tier) reaches the full page — it is a browser-layer block, not an agent-logic one. |
 | **iframe contents** | `the-internet.herokuapp.com/iframe` — typing inside a rich-text editor in an iframe | The grounding cannot act inside the iframe, so the agent **gives up honestly** (not silent). |
 | **Grounding miss on a dense page** | `en.wikipedia.org` periodic-table navigation; some `stackoverflow.com` navigation | Honest non-completion: the agent cannot locate the target, burns its step budget, and gives up. |
 | **Failures are expensive** | any task where the target cannot be found | The agentic loop retries up to its 25-step budget (~$0.08–0.10/task), so a failure costs more than plan-then-execute's early give-up. |

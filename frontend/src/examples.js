@@ -19,6 +19,9 @@ export const EXAMPLES = [
     task: "Open this page where a modal window appears, and read the modal window's title.",
     url: "https://the-internet.herokuapp.com/entry_ad",
     criterion: { selector_text_equals: { css: ".modal-title h3", value: "This is a modal window" } } },
+  { id: "amazon-headless", group: "good", badge: "verified",
+    task: "On amazon.com, search for 'usb c cable' and open the first result.",
+    url: "https://www.amazon.com/", criterion: { url_contains: "/dp/" } },
   // ---- limitation (the agent abstains / fails closed) ----
   { id: "github-login", group: "limitation", badge: "abstain",
     task: "Sign in to your GitHub account.", url: "https://github.com/login" },
@@ -27,6 +30,4 @@ export const EXAMPLES = [
     url: "https://www.google.com/recaptcha/api2/demo" },
   { id: "g2-datadome", group: "limitation", badge: "blocked",
     task: "Open the marketing software category page on g2.com.", url: "https://www.g2.com/" },
-  { id: "amazon-headless", group: "limitation", badge: "needsCdp",
-    task: "On amazon.com, search for 'usb c cable' and open the first result.", url: "https://www.amazon.com/" },
 ];

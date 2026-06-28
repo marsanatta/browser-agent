@@ -114,9 +114,9 @@ The system is built so the expensive, risky parts are swappable behind stable se
   third engine could be added the same way.
 - **Swappable browser runtime.** `BrowserProvider` (`backend/app/browser/`) wraps the browser, with
   headless Playwright as the default and a **CDP (Chrome DevTools Protocol) escalation seam** for a
-  real stealth browser (Steel.dev / Browserbase tier). This seam is what turns the
-  amazon-headless-anti-bot wall from a hard stop into a recoverable case (a real browser over CDP
-  reaches the full page; §5).
+  real stealth browser (Steel.dev / Browserbase tier). This seam is what turns a genuinely-blocking
+  anti-bot wall (a Cloudflare / DataDome 403, e.g. g2.com) from a hard stop into a recoverable case
+  (a real browser over CDP loads a page a headless client is served a 403 for).
 - **Model tier is a per-session choice, not baked in.** The agentic loop runs one model per session
   (`claude-haiku-4.5` by default); the gateway accepts any Copilot model, and the judge for any LLM
   scoring is a different model family from the actor.
@@ -208,8 +208,6 @@ two-pass admission (#5) is what keeps those assertions strict.
   at each step and gives up on the first sign (route, don't evade). Concrete probes (github.com/login,
   a reCAPTCHA demo, g2.com's DataDome 403) with status codes and element counts are in
   [`README.md`](./README.md) (Known limitations) and `backend/probe_unsupported.py`.
-- **Headless anti-bot (amazon).** Unsupported on the default headless runtime; the CDP escalation
-  seam (§3) reaches the full page — a browser-layer block, not an agent-logic one.
 - **Bot-wall detection is incomplete.** `detect_block` misses the modern "Just a moment…" Cloudflare
   managed challenge, so a small fraction of sites can slip past as a generic miss rather than a
   labeled abstain — a known gap, with the probe script as the seed for a pre-flight detector.
