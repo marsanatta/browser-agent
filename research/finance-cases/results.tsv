@@ -1,1 +1,7 @@
 iteration	case_id	site	task_type	nominal	verified	asked	blocked	verdict	notes
+1	live_sa_aapl_balancesheet_nav	stockanalysis.com	action	true	true	false	false	GOOD	19 steps; home->AAPL->Financials->BalanceSheet
+2	live_sa_qqq_holdings_nav	stockanalysis.com	action	false	true	true	false	ANOMALY	verified but asked (false abstention); 26 steps; needs eng-debug
+3	live_cmc_apple_marketcap	companiesmarketcap.com	action	true	true	false	false	GOOD	18 steps; ranking list -> /apple/marketcap
+4	live_cmc_nvda_vs_aapl_compare	companiesmarketcap.com	action	true	true	false	false	GOOD	17 steps; compared NVDA>AAPL -> /nvidia/marketcap
+5	live_screenerin_magic_formula	screener.in	action	true	true	false	false	GOOD	7 steps; directory -> /screens/59 magic-formula
+6	live_screenerin_tcs_roce_deepdive	screener.in	retrieval	true	true	false	false	GOOD	17 steps; search TCS -> /company/TCS ROCE
