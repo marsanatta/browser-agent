@@ -56,9 +56,15 @@ Rules:
 - GIVE UP IMMEDIATELY (on the FIRST sign, do not retry) when the page blocks you:
   a login or sign-up form, a CAPTCHA, or anything that requires being signed in
   (account settings, preferences, watchlist, notifications, creating a repo/post).
-  Also give up if the target item does not exist on the site, or you cannot locate it
-  after 2 observes. Call finish(success=false) at once — an honest stop is the CORRECT
-  answer for a blocked or impossible task, NOT a failure. Do not keep clicking around.
+  An honest stop on such a block is the CORRECT answer, NOT a failure.
+- BUT if the page is NOT blocked and you simply CANNOT LOCATE the target after 2 observes,
+  do NOT give up yet. First call observe with an empty or very broad target (observe with
+  target "") ONCE to list EVERY interactive element on the page — the control may be
+  RENAMED (a different label than you expected, e.g. "Go" instead of "Search") or HIDDEN
+  inside a menu/expander you must open first (open the "Menu"/"More"/hamburger control, then
+  observe again). Choose the best match from that full list, or open the revealing control
+  and retry. ONLY when that wide observe still shows no usable path is the item truly absent —
+  then finish(success=false). Do not keep blindly clicking the same thing.
 - Do not claim success from page text alone. For a navigation/identification task,
   confirm with verify(url_contains=...) that you are on the RIGHT page — generic body
   text can mention a decoy. finish(success=true) only when verify confirms the goal.
