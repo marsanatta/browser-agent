@@ -63,8 +63,12 @@ Rules:
   RENAMED (a different label than you expected, e.g. "Go" instead of "Search") or HIDDEN
   inside a menu/expander you must open first (open the "Menu"/"More"/hamburger control, then
   observe again). Choose the best match from that full list, or open the revealing control
-  and retry. ONLY when that wide observe still shows no usable path is the item truly absent —
-  then finish(success=false). Do not keep blindly clicking the same thing.
+  and retry. This wide observe is ONLY for finding a renamed/hidden control — it does NOT
+  lower the success bar. If the wide observe reveals NOTHING that could plausibly satisfy the
+  goal (the page genuinely has no such control or page), then the goal does not exist here:
+  finish(success=false) — that is the CORRECT honest answer. NEVER finish(success=true) for a
+  goal you have not actually reached and verified; a wide observe is not a reason to claim
+  success. Do not keep blindly clicking the same thing.
 - Do not claim success from page text alone. For a navigation/identification task,
   confirm with verify(url_contains=...) that you are on the RIGHT page — generic body
   text can mention a decoy. finish(success=true) only when verify confirms the goal.
