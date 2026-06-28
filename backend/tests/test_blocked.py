@@ -32,6 +32,19 @@ async def test_detect_block_flags_recaptcha_widget(page):
 
 
 @pytest.mark.anyio
+async def test_detect_block_ignores_invisible_recaptcha_helper(page):
+    # Legit pages (e.g. stockanalysis.com) load an invisible reCAPTCHA v3 helper
+    # frame (recaptcha/api2/aframe, 0x0 display:none) for form scoring. It is NOT
+    # a challenge and the page is fully usable, so detect_block must not flag it.
+    await page.set_content(
+        '<h1>NVIDIA</h1><p>Market Cap 4.66T</p>'
+        '<iframe src="https://www.google.com/recaptcha/api2/aframe"'
+        ' style="display:none;width:0;height:0"></iframe>'
+    )
+    assert await verify.detect_block(page) is None
+
+
+@pytest.mark.anyio
 async def test_detect_block_flags_unusual_traffic_text(page):
     await page.set_content(
         "<p>Our systems have detected unusual traffic from your computer network.</p>"

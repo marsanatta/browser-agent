@@ -116,7 +116,11 @@ async def detect_block(page: Any) -> str | None:
             return f"url:{marker}"
     for sel in _BLOCK_SELECTORS:
         try:
-            if await page.locator(sel).count() > 0:
+            # Must be VISIBLE, not merely present: legit pages load an invisible
+            # reCAPTCHA v3 helper frame (recaptcha/api2/aframe, 0x0 display:none)
+            # for form scoring — that is not a challenge. A real challenge widget
+            # (checkbox/popup iframe, cloudflare #challenge-running) renders visibly.
+            if await page.locator(sel).first.is_visible():
                 return f"widget:{sel}"
         except Exception:
             continue
