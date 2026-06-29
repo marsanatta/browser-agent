@@ -76,12 +76,20 @@ ROLE_DEFAULTS = {
 
 def resolve_model(value: str | None, role: str, menu: Collection[str] = MODEL_MENU) -> str:
     """Model id for a role: an explicit override iff it is in `menu` (the live
-    Copilot list when available, else MODEL_MENU), else the role default. Fail-safe
-    — an unknown or empty override never breaks a run; it silently falls back to the
-    researched default rather than passing an unroutable id to Copilot."""
+    Copilot list when available, else MODEL_MENU), else the role default — but the
+    default is itself validated against `menu`. Fail-safe — an unknown/empty override
+    never breaks a run, AND when this Copilot account does not offer the researched
+    default (e.g. a deployed token with no claude models) we still never pass an
+    unroutable id to session.create: fall back to an available model ('auto' if offered,
+    else the first menu entry)."""
     if value and value in menu:
         return value
-    return ROLE_DEFAULTS[role]
+    default = ROLE_DEFAULTS[role]
+    if default in menu:
+        return default
+    if "auto" in menu:
+        return "auto"
+    return next(iter(menu)) if menu else default
 
 
 # Thinking level (reasoning effort) per role. The Copilot SDK exposes a 4-level
