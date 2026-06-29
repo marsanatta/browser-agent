@@ -1,11 +1,12 @@
 """Token gate for the publicly-exposed agent endpoints.
 
-The agent is reachable over a public Cloudflare tunnel; without a gate, anyone
-who learns the URL could drive the browser agent and burn the operator's Copilot
-quota. Protected paths require a shared secret from `AGENT_ACCESS_TOKEN`.
+The agent is reachable over a public URL (e.g. behind the Azure Container Apps
+ingress); without a gate, anyone who learns the URL could drive the browser agent
+and burn the operator's Copilot quota. Protected paths require a shared secret
+from `AGENT_ACCESS_TOKEN`.
 
 Fail-closed: if `AGENT_ACCESS_TOKEN` is unset, protected paths return 503 — the
-operator must configure a token before exposing the tunnel.
+operator must configure a token before exposing it publicly.
 
 The token is accepted from the `agent_token` cookie or an `Authorization:
 Bearer` header. The cookie path is what makes SSE (`EventSource`) and `<img>`

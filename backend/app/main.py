@@ -78,9 +78,9 @@ async def auth(body: _TokenIn, request: Request):
     if not valid(body.token):
         raise HTTPException(status_code=401, detail="invalid token")
     resp = JSONResponse({"ok": True})
-    # Behind the Cloudflare tunnel TLS terminates at the edge and the app sees
-    # http; trust X-Forwarded-Proto so the public leg gets a Secure cookie while
-    # plain-http localhost still works.
+    # Behind an ingress proxy (e.g. Azure Container Apps) TLS terminates at the
+    # edge and the app sees http; trust X-Forwarded-Proto so the public leg gets
+    # a Secure cookie while plain-http localhost still works.
     proto = request.headers.get("x-forwarded-proto", request.url.scheme)
     issue_cookie(resp, body.token, secure=proto == "https")
     return resp
@@ -261,8 +261,8 @@ def _build_executor(
     return cls(_make_provider(), planner, **kwargs)
 
 
-# POST is the path the frontend uses: Cloudflare quick tunnels buffer SSE-over-GET
-# and flush only at connection close (cloudflared#1449), POST streams in real time.
+# POST is the path the frontend uses: some edge proxies/CDNs buffer SSE-over-GET
+# and flush only at connection close, while POST streams in real time.
 # GET is kept for backward-compat (curl/debug). Query params parse the same either way.
 @app.api_route("/agent/run", methods=["GET", "POST"])
 async def agent_run(

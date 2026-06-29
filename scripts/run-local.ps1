@@ -1,17 +1,15 @@
 <#
 .SYNOPSIS
-  Build the frontend, run the backend (serving app + SSE + screenshots), and
-  optionally expose it via a Cloudflare quick tunnel (no Cloudflare account).
+  Build the frontend and run the backend (serving app + SSE + screenshots) on
+  http://localhost:8123.
 
 .EXAMPLE
   .\scripts\run-local.ps1                 # build + serve on http://localhost:8123
   .\scripts\run-local.ps1 -Port 9000      # custom port
-  .\scripts\run-local.ps1 -Tunnel         # also start a *.trycloudflare.com tunnel
 #>
 [CmdletBinding()]
 param(
   [int]$Port = 8123,
-  [switch]$Tunnel,
   [switch]$SkipBuild
 )
 
@@ -33,15 +31,7 @@ if (Test-Path $envFile) {
   }
 }
 if (-not $env:AGENT_ACCESS_TOKEN) {
-  if ($Tunnel) {
-    $env:AGENT_ACCESS_TOKEN = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 40 | ForEach-Object { [char]$_ })
-    Add-Content -Path $envFile -Value "AGENT_ACCESS_TOKEN=$($env:AGENT_ACCESS_TOKEN)"
-    Write-Host "==> Generated AGENT_ACCESS_TOKEN (saved to backend/.env, git-ignored):" -ForegroundColor Yellow
-    Write-Host "    $($env:AGENT_ACCESS_TOKEN)" -ForegroundColor Yellow
-    Write-Host "    Share ONLY with evaluators; the public URL requires it." -ForegroundColor DarkGray
-  } else {
-    Write-Warning "AGENT_ACCESS_TOKEN not set - agent endpoints fail closed (503). Set one in backend/.env before exposing."
-  }
+  Write-Warning "AGENT_ACCESS_TOKEN not set - agent endpoints fail closed (503). Set one in backend/.env before exposing."
 }
 
 if (-not $SkipBuild) {
@@ -50,17 +40,6 @@ if (-not $SkipBuild) {
   if (-not (Test-Path "node_modules")) { npm install }
   npm run build
   Pop-Location
-}
-
-if ($Tunnel) {
-  $cf = (Get-Command cloudflared -ErrorAction SilentlyContinue)?.Source
-  if (-not $cf) {
-    Write-Warning "cloudflared not found. Install: winget install --id Cloudflare.cloudflared"
-  } else {
-    Write-Host "==> Starting Cloudflare quick tunnel -> http://localhost:$Port" -ForegroundColor Cyan
-    Start-Process -FilePath $cf -ArgumentList @("tunnel", "--url", "http://localhost:$Port")
-    Write-Host "    (watch that window for the https://<random>.trycloudflare.com URL)" -ForegroundColor DarkGray
-  }
 }
 
 Write-Host "==> Serving backend + frontend on http://localhost:$Port" -ForegroundColor Cyan

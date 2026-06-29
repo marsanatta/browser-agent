@@ -293,9 +293,9 @@ export default function App() {
     }
     const criterion = opts.criterion !== undefined ? opts.criterion : buildCriterion(critType, critValue, critCss);
     if (criterion) params.set("criterion", JSON.stringify(criterion));
-    // Stream over POST instead of EventSource(GET): Cloudflare quick tunnels
-    // buffer SSE-over-GET and flush only at connection close (cloudflared#1449);
-    // POST streams live. We parse the text/event-stream frames by hand.
+    // Stream over POST instead of EventSource(GET): some edge proxies/CDNs
+    // buffer SSE-over-GET and flush only at connection close; POST streams
+    // live. We parse the text/event-stream frames by hand.
     const controller = new AbortController();
     let terminated = false;
     sourceRef.current = { close: () => { terminated = true; controller.abort(); } };

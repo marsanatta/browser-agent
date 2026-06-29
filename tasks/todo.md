@@ -58,8 +58,8 @@
 ## Plan
 - [ ] Dockerfile (stage1 node:20 build frontend; stage2 playwright/python:v1.55.0-jammy run backend)
 - [ ] .dockerignore
-- [ ] docker-compose.yml (app + cloudflared named tunnel)
-- [ ] .env.example (root) with CLOUDFLARE_TUNNEL_TOKEN + COPILOT_GITHUB_TOKEN + AGENT_ACCESS_TOKEN
+- [ ] docker-compose.yml (app)
+- [ ] .env.example (root) with GH_TOKEN + COPILOT_GITHUB_TOKEN + AGENT_ACCESS_TOKEN
 - [ ] README Docker section
 - [ ] docker build + smoke tests
 - [ ] commit on main, no push

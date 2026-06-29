@@ -130,7 +130,7 @@ The system is built so the expensive, risky parts are swappable behind stable se
   "run more workers" — there is no shared session to coordinate. The binding ceiling is the Copilot
   rate limit, not browser RAM.
 
-**Honest limit.** The single-desktop deployment (self-host + a Cloudflare tunnel) is what exists
+**Honest limit.** The deployment is a single Azure Container Apps replica (or local self-host)
 today; a work-queue + autoscale shape is **designed-for, not built**.
 
 ---

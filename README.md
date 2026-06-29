@@ -99,7 +99,7 @@ of this assignment) — never a direct Anthropic or OpenAI call.
 **Prerequisites.** Docker, plus a GitHub Copilot login for live LLM calls. The deterministic
 parts and the offline tests need no Copilot.
 
-### Option A — Docker + public tunnel (what the frontend uses)
+### Option A — Docker (what the frontend uses)
 
 ```bash
 cp .env.example .env
@@ -108,14 +108,8 @@ cp .env.example .env
 #   AGENT_ACCESS_TOKEN  = a long random secret that gates the public endpoints
 #                         (python -c "import secrets; print(secrets.token_urlsafe(32))")
 
-docker compose up --build          # starts the app on port 8123 + a Cloudflare tunnel
-docker compose logs cloudflared    # prints the public https://<...>.trycloudflare.com URL
+docker compose up --build          # starts the app on http://localhost:8123
 ```
-
-The default tunnel is a Cloudflare **quick tunnel**: no Cloudflare account, no token. It prints
-a temporary `*.trycloudflare.com` URL. To use a **stable named tunnel** instead, set
-`CLOUDFLARE_TUNNEL_TOKEN` in `.env` and swap the `cloudflared` command in `docker-compose.yml`
-(see the comments there).
 
 ### Option B — Local (Windows desktop, one command)
 
@@ -123,14 +117,14 @@ a temporary `*.trycloudflare.com` URL. To use a **stable named tunnel** instead,
 # Build the backend virtual environment once (see backend/pyproject.toml for extras):
 cd backend; python -m venv .venv; .venv\Scripts\pip install -e ".[dev]"; cd ..
 
-# Build the frontend, serve the app on http://localhost:8123, and start a quick tunnel:
-.\scripts\run-local.ps1 -Tunnel
+# Build the frontend and serve the app on http://localhost:8123:
+.\scripts\run-local.ps1
 ```
 
-`run-local.ps1` builds `frontend/dist`, runs the backend (which serves the API, the SSE stream,
-the built frontend, and screenshots from one origin), and — with `-Tunnel` — auto-generates an
-`AGENT_ACCESS_TOKEN`, saves it to the git-ignored `backend/.env`, and prints it. Share that
-token only with people who should drive the agent.
+`run-local.ps1` builds `frontend/dist` and runs the backend (which serves the API, the SSE
+stream, the built frontend, and screenshots from one origin). Set `AGENT_ACCESS_TOKEN` in the
+git-ignored `backend/.env` to gate the public endpoints; share that token only with people who
+should drive the agent.
 
 ### Option C — Tests
 
@@ -145,17 +139,14 @@ cd backend
 ## Live frontend
 
 The web page accepts a task, shows the live step timeline, and makes failures inspectable. It
-is served by the backend behind a Cloudflare tunnel.
+is served by the backend on `http://localhost:8123`.
 
-Two facts a reviewer should know:
+One detail a reviewer should know:
 
-- **The quick-tunnel URL is temporary.** It changes every time the tunnel restarts and dies
-  when the process stops, so the URL ships with the submission, not hardcoded here. The desktop
-  must stay awake for the whole evaluation window.
-- **The stream uses POST, not the browser's `EventSource`.** Cloudflare quick tunnels buffer
-  Server-Sent Events (SSE) sent over GET and release them only at the end (cloudflared issue
-  #1449). Sending the same stream over POST makes it arrive live. This is why progress updates
-  appear step by step, not all at once at the end.
+- **The stream uses POST, not the browser's `EventSource`.** Some edge proxies/CDNs buffer
+  Server-Sent Events (SSE) sent over GET and release them only at the end. Sending the same
+  stream over POST makes it arrive live. This is why progress updates appear step by step, not
+  all at once at the end.
 
 The public endpoints require the access token (sent as a cookie or an `Authorization: Bearer`
 header — never in the URL). Only `/health` and the static frontend are open.
@@ -392,7 +383,7 @@ reviewer — before it was kept.
   in constant time, **fails closed** (unset → 503, wrong → 401), and is exchanged once at
   `POST /auth` for an httponly cookie. The token is **never accepted in a `?token=` URL** —
   URL-borne tokens leak through logs, history, and `Referer`.
-- **Threat model.** This is a **single-operator demo** on a temporary tunnel. The gate stops a
+- **Threat model.** This is a **single-operator demo**. The gate stops a
   stranger who learns the URL from draining the operator's Copilot quota. It has no per-user
   identity or revocation by design — real user accounts are out of scope for this assignment.
 
