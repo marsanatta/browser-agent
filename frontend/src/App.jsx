@@ -409,6 +409,8 @@ export default function App() {
         </p>
       </header>
 
+      <ExampleGallery examples={EXAMPLES} running={running} onPick={onPick} />
+
       <form
         className="runbar"
         onSubmit={(e) => {
@@ -467,8 +469,6 @@ export default function App() {
           </span>
         )}
       </form>
-
-      <ExampleGallery examples={EXAMPLES} running={running} onPick={onPick} />
 
       <details className="criterion">
         <summary>
