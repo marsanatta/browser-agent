@@ -17,6 +17,7 @@ const en = {
     startUrl: "Start URL (optional)",
     run: "Run",
     stop: "Stop",
+    running: "Running",
   },
   gallery: {
     title: "Example cases",
@@ -200,6 +201,7 @@ const zhHant = {
     startUrl: "起始網址（選填）",
     run: "執行",
     stop: "停止",
+    running: "執行中",
   },
   gallery: {
     title: "Example 範例",

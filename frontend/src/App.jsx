@@ -455,10 +455,9 @@ export default function App() {
         </label>
         {running ? (
           <span className="btnwrap">
-            <button type="button" className="btn ghost" onClick={stop}>
-              {t("runbar.stop")}
+            <button type="button" className="btn ghost" disabled>
+              {t("runbar.running")}
             </button>
-            <Hint k="stop" />
           </span>
         ) : (
           <span className="btnwrap">
