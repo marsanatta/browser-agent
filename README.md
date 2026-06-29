@@ -260,7 +260,7 @@ exception, every one is **detected and reported**, not silently wrong.
 
 | Case | Real example | Status |
 |------|--------------|--------|
-| **Login wall** | `github.com/login` — page loads, but the task needs credentials the agent does not hold | Honest give-up. The agent sees the login form and reports failure on the first sign. |
+| **Login wall** | `screener.in` — a public screen opens fine, but sorting/customizing it redirects to a sign-up/login page | Honest give-up. The agent hits the wall **mid-task** (not on a bare login page) and abstains instead of faking the sort. |
 | **CAPTCHA** | `google.com/recaptcha/api2/demo` — Submit is gated by a reCAPTCHA | Honest give-up. The agent will not solve or bypass a CAPTCHA. |
 | **Anti-bot wall** | `g2.com` — HTTP 403 with zero perceivable elements (a DataDome challenge shell) | Fails closed. No fingerprint spoofing is attempted. |
 | **iframe contents** | `the-internet.herokuapp.com/iframe` — typing inside a rich-text editor in an iframe | The grounding cannot act inside the iframe, so the agent **gives up honestly** (not silent). |
@@ -275,14 +275,13 @@ into the loop is future work.
 
 ### Unsupported — real probe evidence
 
-These three walls were probed with the real browser (`backend/probe_unsupported.py`: headless
+These two walls were probed with the real browser (`backend/probe_unsupported.py`: headless
 Chromium, `domcontentloaded`, 30 s timeout). Each row is the observed state, not a guess. The point
 is that the agent **fails closed and reports failure** — it never tries to log in, solve a CAPTCHA,
 or spoof a fingerprint.
 
 | Wall type | Site | What the probe saw | Why it is unsupported |
 |-----------|------|--------------------|-----------------------|
-| Login | `github.com/login` | HTTP 200, title "Sign in to GitHub", a real `input[type=password]` among 25 elements | The page loads, but the task needs credentials the agent does not hold (no credential store, no cookie injection). |
 | CAPTCHA | `google.com/recaptcha/api2/demo` | HTTP 200, the form fields visible; the reCAPTCHA itself is a cross-origin challenge iframe the agent cannot act on | The agent can fill the form, but Submit is gated by a CAPTCHA it will not solve. |
 | Anti-bot (DataDome) | `g2.com` | HTTP 403, empty body, **0 perceivable elements** (a ~2.5 KB DataDome challenge shell) | The site blocks the automated client at the edge before any content loads; with zero elements there is nothing to act on. |
 

@@ -205,8 +205,8 @@ two-pass admission (#5) is what keeps those assertions strict.
   case-sensitivity bug — the modal title renders uppercase via CSS — now fixed; the agent reads the
   title correctly and it verifies.)
 - **Login / CAPTCHA / anti-bot walls are abstained, not solved.** The agentic loop *sees* the wall
-  at each step and gives up on the first sign (route, don't evade). Concrete probes (github.com/login,
-  a reCAPTCHA demo, g2.com's DataDome 403) with status codes and element counts are in
+  at each step and gives up on the first sign (route, don't evade). Concrete probes (a reCAPTCHA
+  demo, g2.com's DataDome 403) with status codes and element counts are in
   [`README.md`](./README.md) (Known limitations) and `backend/probe_unsupported.py`.
 - **Bot-wall detection is incomplete.** `detect_block` misses the modern "Just a moment…" Cloudflare
   managed challenge, so a small fraction of sites can slip past as a generic miss rather than a

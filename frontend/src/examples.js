@@ -41,8 +41,6 @@ export const EXAMPLES = [
   { id: "internet-iframe", group: "limitation", badge: "abstain",
     task: "On this page, type 'browser agent was here' into the rich-text editor inside the iframe.",
     url: "https://the-internet.herokuapp.com/iframe" },
-  { id: "github-login", group: "limitation", badge: "abstain",
-    task: "Sign in to your GitHub account.", url: "https://github.com/login" },
   { id: "recaptcha", group: "limitation", badge: "abstain",
     task: "On this page, fill in the form fields and submit it.",
     url: "https://www.google.com/recaptcha/api2/demo" },
