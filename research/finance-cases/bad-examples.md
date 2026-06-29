@@ -75,3 +75,25 @@ nav), so it is left as a documented failure mode instead.
 
 **Recommended enhancement (prompt, low-risk, NOT yet implemented):** add one line to the executor guidance — "If `click` fails with `TimeoutError` two+ times in a row, the page is likely covered by an interstitial ad / cookie / overlay. Reload the page by navigating to its URL again (this clears one-shot interstitials), then retry; do NOT guess deep-link URLs." This converts the accidental reload into a deliberate, fast recovery and removes the 404-guessing waste. MUST be A/B-measured on the live tier + kept green on the offline gate before merge — it touches the shared system prompt for ALL tasks.
 **Heavier option (code):** detect a viewport-covering high-z-index overlay on click-timeout and surface it / auto-reload; or add a press(Escape) tool. Higher regression risk; design separately.
+
+### RESOLVED (overlay-handling prompt enhancement)
+Implemented the close-first → reload-fallback ladder in `skill.py` (commit "feat(agent):
+teach overlay handling"). The earlier "passes by luck" claim no longer holds: the agent
+now DELIBERATELY handles the vignette —
+```
+click "Apple" -> #google_vignette ; verify -> satisfied=False
+observe "close" -> click "Close Ad X" -> /apple/marketcap/ ; verify -> satisfied=True  (7 steps)
+```
+Closing the vignette continues to the originally-clicked destination. A/B: 4/4 reached the
+goal (2 independently verified=true), ~7–16 steps (was ~20 lucky). Non-overlay cases
+unaffected (magic_formula 7, pydocs 8); offline gate 228 passed. Correction to this BE's
+own earlier note: the close control IS reachable via the agent's `cdp.ground` text-click —
+my `cdp.locate`-based probe hit a decoy/cascade gap and wrongly concluded "close doesn't
+work". The user's close-first instinct was correct.
+
+### Separate latent finding — `cdp.locate` cascade gap (NOT fixed, low priority)
+`cdp.perceive('close')` describes "Close Ad X" but `cdp.locate(element)` returns None,
+whereas `cdp.ground('Close Ad X')` (the agent's actual text-click path) resolves it. So
+text-target clicks are fine; only the perceive→Element→`locate` path (index-based
+`resolve_aid`) has the gap. Root cause across cascade tiers NOT yet traced. Did not block
+this case; flagged for a separate look.
