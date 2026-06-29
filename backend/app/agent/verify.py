@@ -99,6 +99,8 @@ _BLOCK_TEXT_MARKERS = (
     "complete the security check",
     "checking if the site connection is secure",  # cloudflare
     "enable javascript and cookies to continue",   # cloudflare
+    "performing security verification",            # cloudflare "Just a moment..." interstitial
+    "protect against malicious bots",              # cloudflare interstitial body
 )
 
 
