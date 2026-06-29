@@ -220,7 +220,7 @@ set (`eval/eval_set/live_real_world.yaml`).
 | `the-internet.herokuapp.com` | Dynamic Loading: click Start and wait for the hidden text to load; Status Codes: click the link for HTTP 200 and confirm the page | Server-rendered, stable ARIA roles and links. |
 | `en.wikipedia.org` | Open a named article (Helium, Oxygen); type in the search box and press Enter; pick an autocomplete suggestion (Argon); click the Sign In link | Clear link/role names; the largest slice of the eval set (19 cases). |
 | `books.toscrape.com` | Open a book category from the sidebar; open a product page and report its price or stock count | Static e-commerce; deterministic text extraction. |
-| `docs.python.org`, `developer.mozilla.org`, `arxiv.org`, `www.gov.uk`, `stackoverflow.com`, `news.ycombinator.com`, `www.gnu.org` | Open a named navigation page (Help, Blog, Questions, Licenses, "new", a standard-library module page) | Server-rendered public docs with stable navigation links. |
+| `docs.python.org`, `developer.mozilla.org`, `arxiv.org`, `www.gov.uk`, `stackoverflow.com`, `www.gnu.org` | Open a named navigation page (Help, Blog, Questions, Licenses, a standard-library module page) | Server-rendered public docs with stable navigation links. |
 
 **Population evidence (not just hand-picked cases).** The live eval set has **80 tasks across 19
 domains**, split by site into dev / holdout / sealed so "generalization" is real, not

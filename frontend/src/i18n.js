@@ -31,7 +31,6 @@ const en = {
     items: {
       "pydocs-json": { label: "docs.python.org: Std Library → json module", why: "Two-hop documentation navigation: open The Python Standard Library, then the json module page — verified on the URL." },
       "wiki-autocomplete": { label: "Wikipedia: pick 'Argon' from autocomplete", why: "Type 'Argon' and choose the autocomplete suggestion to open the article — a real typeahead-widget interaction." },
-      "hn-show-ask": { label: "Hacker News: Show HN → Ask HN", why: "Two-hop section navigation: open Show HN, then from there reach Ask HN — verified on the URL." },
       "govuk-driving": { label: "GOV.UK: Driving & transport → Driving licences", why: "Two-hop browse: open the 'Driving and transport' section, then its 'Driving licences' subtopic — verified on the URL." },
       "amazon-headless": { label: "Search Amazon for a product", why: "Amazon shows an anti-bot 'Continue shopping' interstitial on headless; the agent clicks through it, searches, and opens the first product." },
       "httpbin-form-fill": { label: "Fill and submit a multi-field order form", why: "A real form — text, tel, email, radio (size), checkboxes (toppings), and a textarea. The agent names each field from its wrapping <label>, fills them all, and submits; verified the submission reached the result endpoint." },
@@ -215,7 +214,6 @@ const zhHant = {
     items: {
       "pydocs-json": { label: "docs.python.org：Std Library → json 模組", why: "兩段式文件導覽：先開 The Python Standard Library，再開 json 模組頁 — 用 URL 驗證。" },
       "wiki-autocomplete": { label: "Wikipedia：從 autocomplete 選 'Argon'", why: "輸入 'Argon' 後從 autocomplete 建議中選取開啟條目 — 真實的 typeahead widget 互動。" },
-      "hn-show-ask": { label: "Hacker News：Show HN → Ask HN", why: "兩段式分區導覽：先開 Show HN，再從那裡到 Ask HN — 用 URL 驗證。" },
       "govuk-driving": { label: "GOV.UK：Driving & transport → Driving licences", why: "兩段式瀏覽：先開『Driving and transport』分區，再進其『Driving licences』子題 — 用 URL 驗證。" },
       "amazon-headless": { label: "在 Amazon 搜尋商品", why: "Amazon 在 headless 下會跳反爬的『Continue shopping』interstitial；agent 會點過去、搜尋、開啟第一個商品。" },
       "httpbin-form-fill": { label: "填寫並送出多欄位表單", why: "真正的表單——text、tel、email、radio（size）、checkbox（toppings）、textarea。agent 依各欄位包住它的 <label> 命名、逐一填寫並送出；驗證送出後到達結果頁。" },
