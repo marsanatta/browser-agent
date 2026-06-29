@@ -61,7 +61,12 @@ _RN_HELPERS = r"""
   const nameOf = (el) => (
     el.getAttribute('aria-label') ||
     (el.id && (document.querySelector('label[for="' + el.id + '"]')||{}).innerText) ||
-    el.value || el.innerText || el.getAttribute('title') || ''
+    el.value || el.innerText || el.getAttribute('title') ||
+    // Implicit label: <label>Name <input></label>. accname/HTML-AAM derive the name from
+    // the WRAPPING <label> too — without this, label-wrapped inputs (no id, no value) get
+    // name '' and are skipped, so the agent can't see them. Kept last so value-named
+    // radios/checkboxes are unchanged; closest('label') is null for non-wrapped controls.
+    (el.closest('label') ? el.closest('label').innerText : '') || ''
   ).trim();
   const relevantTo = (name, target) => {
     const tgt = (target || '').trim().toLowerCase();
