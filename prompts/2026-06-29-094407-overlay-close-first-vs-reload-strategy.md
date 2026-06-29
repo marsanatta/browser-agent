@@ -20,3 +20,16 @@
 - **Conclusion / pushback:** close-first is correct for normal overlays (cookie banners, in-page modals), but fails on this stubborn ad-vignette. Proposed a LADDER prompt: (1) observe + click a close/dismiss control and re-check, then (2) fall back to reloading the URL if still blocked; never guess deep-link URLs. Surfaced this contradiction to the user before editing the shared system prompt rather than silently implementing close-only.
 - **Deferred:** did NOT yet edit `skill.py` or run the A/B — asked the user to choose ladder vs close-only first, since it is a global system-prompt change requiring measurement (cmc-Apple action log + offline gate + a few live cases).
 - Also noted the perceive/locate cascade gap as a separate, independently-fixable code bug.
+
+## Correction (post-A/B — supersedes the "close is a decoy" conclusion above)
+
+The "What I Did" conclusion that clicking the close is a dead-end and "reload is the only
+thing that reliably clears it" was based on a probe using `cdp.locate` + a direct selector
+force-click — a path the agent does NOT use. The subsequent A/B with the shipped prompt
+showed the agent's real click path (`cdp.ground('Close Ad X')`) DOES dismiss the vignette
+and continue to the clicked destination (capture run 1: 7 steps, close → `/apple/marketcap/`).
+Reload is the FALLBACK (capture run 2 used it). So the ladder (close-first → reload-fallback)
+is correct, and `research/finance-cases/bad-examples.md` BE-2 (RESOLVED) is the accurate
+account; this earlier probe-based decoy conclusion is superseded. The separate `cdp.locate`
+cascade gap (perceive sees "Close Ad X" but `cdp.locate` returns None, while `cdp.ground`
+resolves it) remains a real low-priority finding.

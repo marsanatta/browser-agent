@@ -66,7 +66,7 @@ tasks:
   key_nodes:
   - url_contains: screener.in
   assert:
-    url_contains: /screens/59
+    url_contains: /screens/59/
 
 - id: live_screenerin_tcs_roce_deepdive
   purpose: search_to_company_metric
@@ -74,7 +74,7 @@ tasks:
   instruction: On screener.in, search for Tata Consultancy Services (TCS), open its company page, and read its ROCE figure.
   start_url: https://www.screener.in/
   domain: finance
-  task_type: retrieval
+  task_type: action
   difficulty: multi_same_domain
   key_nodes:
   - text_contains: Tata Consultancy
@@ -90,3 +90,4 @@ tasks:
   task_type: action
   difficulty: multi_same_domain
   expect_abstain: true
+  abstain_reason: impossible
