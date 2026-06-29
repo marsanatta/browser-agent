@@ -21,6 +21,9 @@ export const EXAMPLES = [
     task: "Open this page where a modal window appears, and read the modal window's title.",
     url: "https://the-internet.herokuapp.com/entry_ad",
     criterion: { selector_text_equals: { css: ".modal-title h3", value: "This is a modal window" } } },
+  { id: "httpbin-form-fill", group: "good", badge: "verified",
+    task: "On this pizza order form, fill Customer name 'Ada Lovelace', Telephone '5551234', E-mail address 'ada@example.com', choose Pizza Size 'Large', check the 'Bacon' and 'Mushroom' toppings, set Delivery instructions to 'leave at the door', then submit the order.",
+    url: "https://httpbin.org/forms/post", criterion: { url_contains: "httpbin.org/post" } },
   // ---- good: finance/stock cases (autoresearch, non-anti-bot sites) ----
   { id: "sa-balance-sheet", group: "good", badge: "verified",
     task: "On stockanalysis.com, open Apple's stock page and then navigate to its Balance Sheet under the Financials section.",

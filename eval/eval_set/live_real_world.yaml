@@ -1032,3 +1032,15 @@ tasks:
   - url_contains: stocks/aapl
   assert:
     url_contains: /aapl/financials/balance-sheet
+- id: live_httpbin_pizza_form
+  purpose: multi_field_form_fill
+  split: dev
+  instruction: "On this pizza order form, fill in Customer name 'Ada Lovelace', Telephone '5551234', E-mail address 'ada@example.com', choose Pizza Size 'Large', check the 'Bacon' and 'Mushroom' toppings, set Delivery instructions to 'leave at the door', then submit the order."
+  start_url: https://httpbin.org/forms/post
+  domain: forms
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - text_contains: Pizza Size
+  assert:
+    text_contains: Ada Lovelace
