@@ -14,11 +14,14 @@ controlled measurement showed the agentic loop was both more reliable and not mo
 ([§2](#2-cost)). The old engine is kept, selectable with `AGENT_MODE=script-orchestration`, but is
 no longer the default (`backend/app/main.py`).
 
-*Where the numbers come from.* Reliability/cost: the eval harness over a self-built **80-task live
-set** (`eval/eval_set/live_real_world.yaml`) and a controlled A/B
-(`research/executor-ab-plan-mode-vs-llm-in-loop.md`). Runtime: a live instrumented run of 4
-representative tasks against the deployed container, timing real emitted events. Reproduce with
-`python -m eval.run_live_tier` and `python -m pytest -m "not live" -q`.
+*Where the numbers come from.* **Reliability** ([§4](#4-how-correctness-is-verified-the-agent-cannot-grade-itself)):
+the eval harness over a self-built **93-task live set** (`eval/eval_set/live_real_world.yaml`) on
+the current default `claude-opus-4.8` (thinking medium) engine. **Cost** ([§2](#2-cost)): a
+controlled A/B (`research/executor-ab-plan-mode-vs-llm-in-loop.md`) — a `claude-haiku-4.5`-era
+measurement that isolates *architecture from model*; its dollar figures are model-dependent and
+have not been re-measured on opus. **Runtime** ([§1](#1-runtime-performance)): a live instrumented
+run of 4 representative tasks against the deployed container, timing real emitted events. Reproduce
+with `python -m eval.run_live_tier` and `python -m pytest -m "not live" -q`.
 
 > **Two terms, used throughout.** *Nominal* success = the agent ended claiming success. *Verified*
 > success = an independent check confirmed the goal on the final page. The gap between them is the
@@ -43,6 +46,11 @@ launch → LLM round-trips → Playwright tool-exec):
 | GOV.UK (2-hop browse) | 54.8 s | 1.6 s | 43.1 s | 10.1 s | 8 | 79% |
 | amazon.com (search + click) | 67.9 s | 1.5 s | 61.2 s | 5.2 s | 13 | 90% |
 | **Average / task** | **44.9 s** | **1.8 s (4%)** | **38.8 s (86%)** | **4.4 s (10%)** | **7.8** | **86%** |
+
+> *These wall-times were instrumented on the `claude-haiku-4.5`-era default; absolute seconds are
+> **model-dependent** (opus-4.8 has a higher per-call latency) and have not been re-measured. The
+> structural finding is model-independent: **time = calls × per-call**, and the model round-trip —
+> not the browser — is the unit of wall-time.*
 
 - **The bottleneck is the model round-trip: ~86% of wall-time, ~5.2 s per call × ~8 calls.** The
   Playwright actions (click/fill/navigate/observe + screenshot) are only ~10%, and browser launch
@@ -69,7 +77,7 @@ launch → LLM round-trips → Playwright tool-exec):
   and spend.
 
 *Aside — the offline path is sub-second.* The deterministic pieces (perception filtering, the
-verify gate, `detect_block`) are local DOM/arithmetic work; the unit suite of 233 tests runs
+verify gate, `detect_block`) are local DOM/arithmetic work; the unit suite of 238 tests runs
 network-free in minutes. The wall-time above is entirely the model + the live network.
 
 ---
@@ -157,6 +165,11 @@ A-opus row hints at the opposite extreme (pricey *and* the wrong kind of calls),
 unmapped. The honest next step is a per-model sweep (haiku → sonnet → opus as the *in-loop* model)
 scored on verified-rate **and** calls/task **and** $/task together — a more capable model is a win
 only if its trajectory shrinks enough to pay for its price. Noted as future work, not claimed.
+
+Since this experiment, the **default in-loop model has moved to `claude-opus-4.8` (thinking
+medium)** — its reliability is refreshed in [§4.2](#42-results) (0.957 verified, 0 silent failures
+over 93 tasks). Its per-task **cost** has *not* been A/B'd against haiku, so every dollar figure in
+this section remains the haiku-era reference, not a claim about the current default.
 
 ---
 
@@ -285,18 +298,18 @@ behind it.
 
 | Measure | Result | Scope |
 |---|---|---|
-| Verified rate (total) | **0.913 (73/80)** | all 80 tasks |
-| **Silent-failure rate (CuP)** | **0/80** | every miss is an honest abstain or a flagged failure, never a false claim |
+| Verified rate (total) | **0.957 (89/93)** | all 93 tasks |
+| **Silent-failure rate (CuP)** | **0/93** | every miss is an honest abstain or a flagged failure, never a false claim |
 | pass^k (k=5; all 5 runs must verify) | **1.000**, false-success **0/8** | 8 adversarial diagnostic tasks |
 
 Per split, never pooled (pooling lets easy tasks hide hard ones):
 
 | Split | Tasks | Verified | Silent failures |
 |---|---|---|---|
-| dev | 39 | 0.923 | 0 |
-| holdout | 21 | 0.810 | 0 |
+| dev | 52 | 0.962 | 0 |
+| holdout | 21 | 0.905 | 0 |
 | sealed (scored once) | 20 | 1.000 | 0 |
-| **Total** | **80** | **0.913 (73/80)** | **0** |
+| **Total** | **93** | **0.957 (89/93)** | **0** |
 
 **Silent-failure rate is the headline metric:** the system is allowed to be wrong only when it
 *says so*. A silent failure = a claimed success that an independent check refutes; there are none on
@@ -359,12 +372,16 @@ by-site splits are in `eval/eval_set/live_real_world.yaml`; the pass^k ledger is
 
 ## Appendix — the eval set, case by case
 
-Every case in `eval/eval_set/live_real_world.yaml` (**88 cases**). The **80** scored in the §2 A/B
-carry the default agentic engine's per-case verdict; **8 newer dev cases** (finance / form-fill,
-added after that run) are marked `(not in A/B run)` and await the next live run. Each row is the
-literal **mission**, its independent success **criterion** (the assertion checked on the final
-page — never the agent's word), the one capability or failure-mode the case is designed to
-**measure** (its `purpose`), and the **result**.
+This is the per-case detail of the **§2 A/B run** (`claude-haiku-4.5`-era snapshot): the **80**
+cases scored there carry the default agentic engine's per-case verdict; **8 newer dev cases**
+(finance / form-fill, added after that run) are marked `(not in A/B run)`. The live set has since
+grown to **93 cases**, and the current default-engine headline (`claude-opus-4.8`: **0.957**
+verified, **0** silent failures) is in [§4.2](#42-results) — the per-case verdicts below are the
+haiku A/B snapshot, not the latest run (e.g. `internet_modal`'s verifier bug is fixed there, and the
+Wikipedia sign-up case is relabeled to the achievable nav it is). Each row is the literal
+**mission**, its independent success **criterion** (the assertion checked on the final page — never
+the agent's word), the one capability or failure-mode the case is designed to **measure** (its
+`purpose`), and the **result**.
 
 **Result legend.** `verified ✓` — the independent check passed. `abstained ✓` — a login / bot-wall
 case the agent **correctly abstained** on (honest, scored as pass). `honest give-up (gap)` — the

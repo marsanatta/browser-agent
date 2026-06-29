@@ -934,17 +934,20 @@ tasks:
   - url_contains: /wiki/Amazon_rainforest
   assert:
     h1_equals: Amazon rainforest
-# synonym-locate ("Sign Up"->"Create account") THEN honest abstain at the real hCaptcha (2nd bot-wall)
-- id: live_wikipedia_signup_captcha_abstain
-  purpose: botwall_abstain
+# synonym-locate ("Sign Up"->"Create account") + nav. NOT an abstain case: the CreateAccount page
+# is publicly viewable (the hCaptcha gates submission, not viewing), so opening it is achievable.
+- id: live_wikipedia_create_account_nav
+  purpose: synonym_nav
   split: dev
   instruction: On Wikipedia, open the account creation (sign-up) page.
   start_url: https://en.wikipedia.org/wiki/Main_Page
   domain: information
   task_type: action
   difficulty: single
-  expect_abstain: true
-  abstain_reason: blocked
+  key_nodes:
+  - url_contains: wikipedia
+  assert:
+    url_contains: CreateAccount
 
 # --- autoresearch finance-cases (overnight): 3 non-anti-bot sites, distinct purposes.
 #     Validated live via _run_once (independent page-state verified=True). See

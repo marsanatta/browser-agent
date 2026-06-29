@@ -222,25 +222,29 @@ Two of these drove real engine fixes: a **`getByPlaceholder` locator tier** (tod
 is named only by its placeholder, so the cascade couldn't locate it) and **`fill` pressing Enter on a
 trailing newline** (so Enter-to-submit inputs with no button — todomvc, search boxes — actually commit).
 
-**Population evidence (not just hand-picked cases).** The live eval set has **80 tasks across 19
+**Population evidence (not just hand-picked cases).** The live eval set has **93 tasks across 21
 domains**, split by site into dev / holdout / sealed so "generalization" is real, not
-memorization. Scored by the independent check, on the default agentic engine:
+memorization. Scored by the independent check, on the default agentic engine
+(`claude-opus-4.8`, thinking medium):
 
 | Split | Tasks | Verified | Silent failures |
 |-------|-------|----------|-----------------|
-| dev | 39 | 0.923 | 0 |
-| holdout | 21 | 0.810 | 0 |
+| dev | 52 | 0.962 | 0 |
+| holdout | 21 | 0.905 | 0 |
 | sealed (scored once) | 20 | 1.000 | 0 |
-| **Total** | **80** | **0.913 (73/80)** | **0** |
+| **Total** | **93** | **0.957 (89/93)** | **0** |
 
-Source: [`research/executor-ab-plan-mode-vs-llm-in-loop.md`](./research/executor-ab-plan-mode-vs-llm-in-loop.md)
-(the agentic column), corrected for one case: that run reported `internet_modal` as a silent
-failure, but it was a **verifier case-sensitivity bug** — the modal title renders UPPERCASE via CSS
-while the assertion expected the mixed-case source text, so a correct read false-failed. With the
-verifier fixed (case-insensitive text match), `internet_modal` verifies, so measured silent
-failures drop from 1 to **0** and the dev/total rates rise by that one case. This is a single run;
-live sites flake by a few tasks, so treat small per-split differences as noise. The sealed split is
-scored only once, so its number cannot be over-fit.
+Source: a full-set run on the default engine, **process-isolated** (one subprocess per task —
+`research/run_full_metrics.py`). The one measured silent failure was an **eval-design flaw, not an
+agent bug**: a Wikipedia task ("open the sign-up page") was mislabeled `expect_abstain (blocked)`,
+but that page is publicly viewable — the agent correctly opened `Special:CreateAccount`; the
+hCaptcha only gates *submission*, not *viewing*, so the deterministic block-check reads
+not-blocked. Relabeled as the achievable navigation it is (`url_contains CreateAccount`), it
+verifies, so measured silent failures are **0**. The remaining four misses are all **honest** (an
+iframe-editor limitation, two site/anti-bot navigation failures, one `httpbin.org` flake) — the
+agent never claimed success on any of them. This is a single run; live sites flake by a few tasks,
+so treat small per-split differences as noise. The sealed split is scored only once, so its number
+cannot be over-fit.
 
 ---
 
@@ -301,7 +305,7 @@ backend/app/obs/                       tracing + redact (secrets masked before a
 backend/app/stream/                    SSE event vocabulary (live timeline + annotated-screenshot events)
 backend/app/main.py                    FastAPI server: /agent/run (POST stream), /auth, /health, static frontend
 frontend/                              React + Vite: task input, live timeline, inspectable-failure view
-eval/                                  live eval set (80 tasks, dev/holdout/sealed) + scoring harness + REPORT.md
+eval/                                  live eval set (93 tasks, dev/holdout/sealed) + scoring harness + REPORT.md
 docs/                                  design grounding research (browser-agent papers/theses)
 prompts/                               dated, verbatim key prompts — the AI-collaboration trail
 research/                              autoresearch findings, the executor A/B experiment, eval-report.md
