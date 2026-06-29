@@ -35,3 +35,6 @@ screenshots/
 .DS_Store
 .idea/
 .vscode/
+
+# assignment spec — kept local, never committed
+ASSIGNMENT.md
