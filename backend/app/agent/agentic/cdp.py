@@ -61,7 +61,7 @@ _RN_HELPERS = r"""
   const nameOf = (el) => (
     el.getAttribute('aria-label') ||
     (el.id && (document.querySelector('label[for="' + el.id + '"]')||{}).innerText) ||
-    el.value || el.innerText || el.getAttribute('title') ||
+    el.value || el.innerText || el.getAttribute('title') || el.getAttribute('placeholder') ||
     // Implicit label: <label>Name <input></label>. accname/HTML-AAM derive the name from
     // the WRAPPING <label> too — without this, label-wrapped inputs (no id, no value) get
     // name '' and are skipped, so the agent can't see them. Kept last so value-named
@@ -93,6 +93,7 @@ _SCAN_JS = "(target) => {" + _RN_HELPERS + r"""
       testid: el.getAttribute('data-testid') || '',
       aria_label: el.getAttribute('aria-label') || '',
       href: el.getAttribute('href') || '',
+      placeholder: el.getAttribute('placeholder') || '',
       cls: (typeof el.className === 'string' ? el.className : '') || '',
     });
     if (out.length >= 40) break;           // hard cap: never explode the candidate set
@@ -160,6 +161,7 @@ _EDITOR_SCAN_JS = r"""() => {
       testid: el.getAttribute('data-testid') || '',
       aria_label: el.getAttribute('aria-label') || '',
       href: '',
+      placeholder: '',
       cls: (typeof el.className === 'string' ? el.className : '') || '',
     });
   };
@@ -185,7 +187,7 @@ def _rows_to_elements(rows: list, seen: set[tuple[str, str]], elements: list[Ele
         if key in seen:
             continue
         seen.add(key)
-        attrs = {k: r[k] for k in ("id", "testid", "aria_label", "href", "cls")}
+        attrs = {k: r.get(k, "") for k in ("id", "testid", "aria_label", "href", "cls", "placeholder")}
         elements.append(Element(role=r["role"], name=r["name"], attrs=attrs))
 
 
@@ -303,7 +305,7 @@ async def read_text(page: Any, target: str) -> str:
 
 # --- LOCATE: deterministic tier cascade (no LLM). count==1 resolves; ambiguity
 #     STOPS rather than silently resolving the first node (the silent wrong-pick).
-_TIERS = ("role_name", "role", "id", "testid", "aria_exact", "href", "text")
+_TIERS = ("role_name", "role", "placeholder", "id", "testid", "aria_exact", "href", "text")
 
 
 def _build(page: Any, strategy: str, el: Element) -> Any:
@@ -312,6 +314,8 @@ def _build(page: Any, strategy: str, el: Element) -> Any:
         return page.get_by_role(el.role, name=el.name, exact=True)
     if strategy == "role":
         return page.get_by_role(el.role, name=el.name)
+    if strategy == "placeholder":
+        return page.get_by_placeholder(a["placeholder"], exact=True) if a.get("placeholder") else None
     if strategy == "id":
         return page.locator(f"#{a['id']}") if a.get("id") else None
     if strategy == "testid":
@@ -398,6 +402,12 @@ async def click(loc: Any) -> None:
 
 
 async def fill(loc: Any, value: str) -> None:
+    # A trailing newline is the agent's "type then submit" convention: many inputs (search
+    # boxes, todo/chat fields) commit on Enter and have NO submit button. Strip it, fill, then
+    # press Enter so those inputs actually submit.
+    submit = value.endswith("\n")
+    if submit:
+        value = value.rstrip("\n")
     try:
         await loc.fill(value, timeout=8000)
     except Exception as exc:
@@ -408,6 +418,11 @@ async def fill(loc: Any, value: str) -> None:
         if "contenteditable" not in str(exc) and "not an <input>" not in str(exc):
             raise
         await loc.evaluate(_EDITABLE_SET_JS, value)
+    if submit:
+        try:
+            await loc.press("Enter")
+        except Exception:
+            pass
 
 
 # Set text into a rich-text editable host and notify the editor (TinyMCE listens on
