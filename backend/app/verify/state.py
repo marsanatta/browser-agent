@@ -11,6 +11,9 @@ Supported primitives (must match eval/eval_set/tasks.yaml):
   text_contains: <substr>              (case-insensitive over body innerText)
   h1_equals: <str>
   selector_text_equals: {css, value}
+  iframe_text_equals: {frame, css, value}
+  input_value_equals: {css, value}     (form-control .value — mutated input state)
+  element_count: {css, count|min|max}  (locator match count; count==0 asserts absence)
 """
 
 from __future__ import annotations
@@ -36,6 +39,23 @@ async def _first_text(page: Any, css: str) -> str | None:
         return (await loc.inner_text()).strip()
     except Exception:
         return None
+
+
+async def _first_value(page: Any, css: str) -> str | None:
+    loc = page.locator(css).first
+    try:
+        if await loc.count() == 0:
+            return None
+        return (await loc.input_value()).strip()
+    except Exception:
+        return None
+
+
+async def _count(page: Any, css: str) -> int:
+    try:
+        return await page.locator(css).count()
+    except Exception:
+        return 0
 
 
 def _eq_text(got: str | None, value: Any) -> bool:
@@ -65,6 +85,21 @@ async def _check_one(page: Any, kind: str, spec: Any) -> bool:
             return _eq_text((await loc.inner_text()).strip(), spec["value"])
         except Exception:
             return False
+    if kind == "input_value_equals":
+        return _eq_text(await _first_value(page, spec["css"]), spec["value"])
+    if kind == "element_count":
+        # count==0 asserts ABSENCE — but a typo'd css ALSO matches 0 elements, so a
+        # bad selector silently passes. Never use count==0 as the sole assert: pair it
+        # with a positive signal (text_contains / selector_text_equals) that proves
+        # both the right page and the mutation. AND-ed keys in state_check enforce this.
+        n = await _count(page, spec["css"])
+        if "count" in spec:
+            return n == int(spec["count"])
+        if "min" in spec:
+            return n >= int(spec["min"])
+        if "max" in spec:
+            return n <= int(spec["max"])
+        raise ValueError("element_count requires one of: count, min, max")
     raise ValueError(f"unknown assertion primitive: {kind!r}")
 
 

@@ -17,7 +17,8 @@ _VALID_TYPES = {"action", "retrieval", "side_effect"}
 _VALID_ABSTAIN_REASONS = {"blocked", "impossible"}
 _VALID_SPLITS = {"dev", "holdout", "sealed"}
 _VALID_PRIMITIVES = {
-    "url_contains", "text_contains", "h1_equals", "selector_text_equals", "iframe_text_equals"
+    "url_contains", "text_contains", "h1_equals", "selector_text_equals", "iframe_text_equals",
+    "input_value_equals", "element_count",
 }
 
 EVAL_SET_PATH = Path(__file__).resolve().parent / "eval_set" / "tasks.yaml"
@@ -70,6 +71,12 @@ def _validate_primitive(where: str, spec: dict[str, Any]) -> None:
     if kind == "iframe_text_equals":
         if not isinstance(value, dict) or not {"frame", "css", "value"} <= value.keys():
             raise ValueError(f"{where}: iframe_text_equals needs {{frame, css, value}}, got {value!r}")
+    if kind == "input_value_equals":
+        if not isinstance(value, dict) or "css" not in value or "value" not in value:
+            raise ValueError(f"{where}: input_value_equals needs {{css, value}}, got {value!r}")
+    if kind == "element_count":
+        if not isinstance(value, dict) or "css" not in value or not ({"count", "min", "max"} & value.keys()):
+            raise ValueError(f"{where}: element_count needs {{css, count|min|max}}, got {value!r}")
 
 
 def load_tasks(path: Path | str = EVAL_SET_PATH) -> list[EvalTask]:

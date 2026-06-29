@@ -13,32 +13,43 @@ from eval.verify import consistency_check, key_node_check, state_check
 
 
 class _FakeLocator:
-    def __init__(self, text):
+    def __init__(self, text=None, count=None, value=None):
         self._text = text
+        self._count = count
+        self._value = value
 
     @property
     def first(self):
         return self
 
     async def count(self):
-        return 1 if self._text is not None else 0
+        if self._count is not None:
+            return self._count
+        return 1 if (self._text is not None or self._value is not None) else 0
 
     async def inner_text(self):
         if self._text is None:
             raise RuntimeError("no element")
         return self._text
 
+    async def input_value(self):
+        if self._value is None:
+            raise RuntimeError("not a form control")
+        return self._value
+
 
 class _FakePage:
-    """Minimal page double: a URL, a body text, and a css->text map."""
+    """Minimal page double: a URL, a body text, and css->{text,count,value} maps."""
 
-    def __init__(self, url, body, selectors=None):
+    def __init__(self, url, body, selectors=None, counts=None, values=None):
         self.url = url
         self._body = body
         self._sel = selectors or {}
+        self._counts = counts or {}
+        self._values = values or {}
 
     def locator(self, css):
-        return _FakeLocator(self._sel.get(css))
+        return _FakeLocator(self._sel.get(css), self._counts.get(css), self._values.get(css))
 
     async def inner_text(self, sel):
         if sel == "body":
@@ -93,6 +104,43 @@ async def test_selector_text_equals_case_insensitive():
     assert await state_check(
         page, {"selector_text_equals": {"css": ".modal-title h3", "value": "A different window"}}
     ) is False
+
+
+@pytest.mark.anyio
+async def test_input_value_equals():
+    # mutated form-control state: .value reflects what was typed, not innerText
+    page = _FakePage("https://x.com", "body", values={"#name": "Ada Lovelace"})
+    assert await state_check(page, {"input_value_equals": {"css": "#name", "value": "Ada Lovelace"}}) is True
+    assert await state_check(page, {"input_value_equals": {"css": "#name", "value": "Grace Hopper"}}) is False
+
+
+@pytest.mark.anyio
+async def test_input_value_equals_missing_is_false():
+    page = _FakePage("https://x.com", "body", {})
+    assert await state_check(page, {"input_value_equals": {"css": "#name", "value": "x"}}) is False
+
+
+@pytest.mark.anyio
+async def test_element_count_exact_and_absence():
+    page = _FakePage("https://x.com", "body", counts={"#elements .added-manually": 3, "li.completed": 0})
+    assert await state_check(page, {"element_count": {"css": "#elements .added-manually", "count": 3}}) is True
+    assert await state_check(page, {"element_count": {"css": "#elements .added-manually", "count": 2}}) is False
+    # count==0 asserts ABSENCE (e.g. all completed todos deleted)
+    assert await state_check(page, {"element_count": {"css": "li.completed", "count": 0}}) is True
+
+
+@pytest.mark.anyio
+async def test_element_count_min():
+    page = _FakePage("https://x.com", "body", counts={"p.paragraph": 5})
+    assert await state_check(page, {"element_count": {"css": "p.paragraph", "min": 5}}) is True
+    assert await state_check(page, {"element_count": {"css": "p.paragraph", "min": 6}}) is False
+
+
+@pytest.mark.anyio
+async def test_element_count_requires_a_bound():
+    page = _FakePage("https://x.com", "body", counts={"div": 2})
+    with pytest.raises(ValueError):
+        await state_check(page, {"element_count": {"css": "div"}})
 
 
 @pytest.mark.anyio
