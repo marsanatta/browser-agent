@@ -31,7 +31,6 @@ evaded.
 - [Decisions that changed (and why)](#decisions-that-changed-and-why)
 - [Works well (with examples)](#works-well-with-examples)
 - [Known limitations (with examples)](#known-limitations-with-examples)
-- [How quality is checked](#how-quality-is-checked)
 - [Repo layout](#repo-layout)
 - [Where AI helped](#where-ai-helped)
 - [Security](#security)
@@ -165,47 +164,25 @@ Each decision is backed by a reason or by measured evidence.
 | **Success is decided by a deterministic check, never self-report** | `finish(success=true)` is rejected unless an independent check (`url_contains` / `text_visible` / `selector_visible`) passed on the live page **and** the page is not blocked. The model's claim is recorded as *nominal*; the independent check is *verified*. |
 | **The verify condition must be strict and specific** | A loose check that passes on the wrong page is the main cause of false success. The agent is told to verify the specific URL path **and** a goal-unique landmark, not generic page text. |
 | **Anti-bot: route, don't evade** | On a login / CAPTCHA / anti-bot wall the agent gives up on the first sign and reports failure. It holds no credentials and solves no CAPTCHA. |
-| **All LLM calls via the Copilot SDK gateway** | A hard assignment constraint. The agentic loop runs one cheap model (`claude-haiku-4.5`) per session. |
 
 ---
 
 ## Decisions that changed (and why)
 
-Two decisions were tried, measured, and then changed. Both are kept here because they show the
-design is evidence-driven.
+Two decisions were tried, measured, and then changed — the design is evidence-driven, not a priori.
+Full method, numbers, and caveats live in `ANALYSIS.md`; the high-level version:
 
-### 1. Script-orchestration → LLM-in-loop (the main one)
-
-The agent was first built as **deterministic plan-then-execute** ("script-orchestration"): the
-LLM writes a plan once, then Python runs the steps; the LLM stays out of the per-step loop. The
-guiding belief was "keep the LLM out of the hot path to save cost."
-
-That design has a structural weakness. It commits to a plan made **before** seeing the page, so
-it cannot react to what it actually lands on — and it often **claims success on a page it never
-checked** (a silent failure). We built the alternative (LLM-in-loop) and ran a controlled A/B
-test on the 80-task eval set, holding the model identical (both `claude-haiku-4.5`):
-
-| Engine (same model) | Verified | Silent failures (CuP) | Cost |
-|---------------------|----------|-----------------------|------|
-| Plan-then-execute (script-orchestration) | 0.500 (40/80) | 18 | $3.85 |
-| **LLM-in-loop (agentic)** | **0.900 (72/80)** | **1** | **$3.24** |
-
-(One silent failure in *both* columns, `internet_modal`, was later found to be a verifier case bug,
-not a real failure — engine-independent, so the comparison is unaffected; the corrected agentic
-figure is 73/80, CuP 0.)
-
-The agentic loop wins by **+40 points verified, 18× fewer silent failures, and ~16% lower cost**.
-Plan-then-execute loses even when given an expensive `opus` planner (0.762 verified, at ~2.9× the
-cost). An earlier belief that plan-then-execute was "~5× cheaper" turned out to be **~90% the
-model choice, not the architecture**. So we switched the default to LLM-in-loop; the old engine
-stays as `AGENT_MODE=script-orchestration`. Full method, per-split numbers, and caveats are in
-[`research/executor-ab-plan-mode-vs-llm-in-loop.md`](./research/executor-ab-plan-mode-vs-llm-in-loop.md).
-
-### 2. Two of three "silent failures" were eval-design flaws, not agent bugs
-
-When we re-checked a silent-failure cluster, two test cases had vague or knowledge-mixed
-instructions. We rewrote them as clean browser-navigation tasks, and they then verified
-correctly. The lesson: validate the test before blaming the system.
+1. **Default engine: script-orchestration → LLM-in-loop.** The agent first ran as deterministic
+   plan-then-execute (the LLM plans once, Python runs the steps, the LLM stays out of the per-step
+   loop). A controlled A/B on the 80-task eval set — model held identical — showed the LLM-in-loop
+   engine wins by **+40 points verified, 18× fewer silent failures, and ~16% lower cost**. The old
+   "plan-then-execute is ~5× cheaper" belief turned out to be ~90% the model choice, not the
+   architecture. The default switched; the old engine stays as `AGENT_MODE=script-orchestration`.
+   → [ANALYSIS §2.1 — the experiment](./ANALYSIS.md#21-the-experiment--and-why-we-migrated-from-script-orchestration).
+2. **Two of three "silent failures" were eval-design flaws, not agent bugs.** Two cases had vague
+   or knowledge-mixed instructions; rewritten as clean browser-navigation tasks, they verified
+   correctly. The lesson: validate the test before blaming the system.
+   → [ANALYSIS §4 — how correctness is verified](./ANALYSIS.md#4-how-correctness-is-verified-the-agent-cannot-grade-itself).
 
 ---
 
@@ -290,28 +267,6 @@ or spoof a fingerprint.
 
 Routed-away categories (never evaded): Cloudflare Turnstile / DataDome / PerimeterX, CAPTCHA
 pages, login / MFA gates, and banking / SSO / healthcare sites.
-
----
-
-## How quality is checked
-
-The differentiator is that success is graded by an **independent check**, never the agent's own
-claim.
-
-- **Independent ground truth.** The eval harness grades each run by re-deriving success from the
-  actual DOM / URL the agent left, using a check that is **separate code** from the in-loop
-  `verify` tool the agent calls. The verifier never grades itself with its own formula.
-- **The headline metric is the silent-failure gap** (nominal vs verified), not raw accuracy. The
-  system is allowed to be wrong only when it says so. On the default engine the gap is **0** (an
-  earlier reported 1, `internet_modal`, was a verifier case-sensitivity bug — the modal title
-  renders uppercase via CSS — now fixed).
-- **Two-pass eval admission.** Every task passed (1) a real-browser probe confirming the check
-  holds at the solution page and the path is wall-free, and (2) an independent reviewer
-  confirming the check is true *only if* the task is actually done. Weak checks were dropped.
-- **In production, verification is opt-in and labeled honestly.** When you supply a success
-  criterion, "verified ✓" means that independent check really passed on the final page. Without
-  one, the run is shown as **"actions completed — not goal-verified"**, deliberately distinct from
-  a verified pass. We do not sell "verified" as a blanket guarantee.
 
 ---
 
