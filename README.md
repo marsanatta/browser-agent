@@ -253,7 +253,7 @@ exception, every one is **detected and reported**, not silently wrong.
 |------|--------------|--------|
 | **Login wall** | `screener.in` — a public screen opens fine, but sorting/customizing it redirects to a sign-up/login page | Honest give-up. The agent hits the wall **mid-task** (not on a bare login page) and abstains instead of faking the sort. |
 | **CAPTCHA** | `google.com/recaptcha/api2/demo` — Submit is gated by a reCAPTCHA | Honest give-up. The agent will not solve or bypass a CAPTCHA. |
-| **Anti-bot wall** | `g2.com` — HTTP 403 with zero perceivable elements (a DataDome challenge shell) | Fails closed. No fingerprint spoofing is attempted. |
+| **Anti-bot wall** | `g2.com` — HTTP 403; a DataDome challenge shell whose HTML loads `captcha-delivery.com` | Fails closed: the agent abstains honestly (no false success) and never spoofs a fingerprint — a correctly-routed wall, not a wrong result. |
 | **iframe contents** | `the-internet.herokuapp.com/iframe` — typing inside a rich-text editor in an iframe | The grounding cannot act inside the iframe, so the agent **gives up honestly** (not silent). |
 | **Grounding miss on a dense page** | `en.wikipedia.org` periodic-table navigation; some `stackoverflow.com` navigation | Honest non-completion: the agent cannot locate the target, burns its step budget, and gives up. |
 | **Failures are expensive** | any task where the target cannot be found | The agentic loop retries up to its 25-step budget (~$0.08–0.10/task), so a failure costs more than plan-then-execute's early give-up. |
@@ -274,7 +274,7 @@ or spoof a fingerprint.
 | Wall type | Site | What the probe saw | Why it is unsupported |
 |-----------|------|--------------------|-----------------------|
 | CAPTCHA | `google.com/recaptcha/api2/demo` | HTTP 200, the form fields visible; the reCAPTCHA itself is a cross-origin challenge iframe the agent cannot act on | The agent can fill the form, but Submit is gated by a CAPTCHA it will not solve. |
-| Anti-bot (DataDome) | `g2.com` | HTTP 403, empty body, **0 perceivable elements** (a ~2.5 KB DataDome challenge shell) | The site blocks the automated client at the edge before any content loads; with zero elements there is nothing to act on. |
+| Anti-bot (DataDome) | `g2.com` | HTTP 403, empty body — a ~2.5 KB DataDome challenge shell whose HTML loads `captcha-delivery.com` | DataDome blocks the automated client at the edge (403) and serves a challenge shell. The agent abstains honestly — never a false success, never a fingerprint spoof. |
 
 Routed-away categories (never evaded): Cloudflare Turnstile / DataDome / PerimeterX, CAPTCHA
 pages, login / MFA gates, and banking / SSO / healthcare sites.
