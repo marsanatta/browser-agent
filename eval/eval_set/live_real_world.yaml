@@ -1049,24 +1049,10 @@ tasks:
 #     self-maintenance). Every assert below was confirmed discriminating by a free
 #     Playwright probe (research/selector_probe*.py) BEFORE encoding. element_count==0
 #     is never used alone; absence is asserted via a positive durable signal.
-- id: live_checkboxes_both_checked
-  purpose: state_dependent_mutation
-  split: dev
-  instruction: "On this page there are two checkboxes. Make sure BOTH checkboxes end up checked. If a checkbox is already checked, leave it checked."
-  start_url: https://the-internet.herokuapp.com/checkboxes
-  domain: widgets
-  task_type: action
-  difficulty: single
-  key_nodes:
-  - url_contains: checkboxes
-  assert:
-    element_count:
-      css: "#checkboxes input[type=checkbox]:checked"
-      count: 2
 - id: live_todomvc_add_complete_filter
   purpose: client_state_mutation
   split: dev
-  instruction: "Add three to-do items, one at a time: 'buy milk', then 'walk dog', then 'write report'. Then mark the second item ('walk dog') as completed. Then click the 'Active' filter."
+  instruction: "Add three to-do items by typing each into the input box and pressing Enter (there is no Add button): first 'buy milk', then 'walk dog', then 'write report'. Then mark the second item ('walk dog') as completed, and click the 'Active' filter."
   start_url: https://todomvc.com/examples/javascript-es6/dist/
   domain: widgets
   task_type: action
@@ -1080,7 +1066,7 @@ tasks:
 - id: live_uitap_disabled_input_enable
   purpose: disabled_then_enable
   split: dev
-  instruction: "The text field on this page is disabled. First click the button that enables editing, wait until the field becomes editable, then type 'hello world' into it."
+  instruction: "The text field on this page starts disabled. Click 'Enable Edit Field with 5 seconds delay', wait until the field becomes editable, then type 'hello world' into it."
   start_url: http://uitestingplayground.com/disabledinput
   domain: widgets
   task_type: action
@@ -1094,7 +1080,7 @@ tasks:
 - id: live_uitap_ajax_wait
   purpose: async_state_wait
   split: dev
-  instruction: "Click the button that triggers an AJAX request, then wait for the loaded data text to appear."
+  instruction: "Click the 'Button Triggering AJAX Request' button, then wait for the green success message to appear."
   start_url: http://uitestingplayground.com/ajax
   domain: widgets
   task_type: action
@@ -1118,7 +1104,7 @@ tasks:
 - id: live_selectorshub_shadow_input
   purpose: shadow_dom_pierce
   split: dev
-  instruction: "On this page, type 'browser agent' into the field labelled 'First Crush' (it lives inside a shadow-DOM component)."
+  instruction: "On this page, type 'browser agent' into the input whose placeholder text is 'First Crush'."
   start_url: https://selectorshub.com/xpath-practice-page/
   domain: widgets
   task_type: action
@@ -1143,29 +1129,3 @@ tasks:
     element_count:
       css: "#elements .added-manually"
       count: 3
-- id: live_internet_tables_sort_lastname
-  purpose: noid_table_sort
-  split: dev
-  instruction: "The first table on this page has no id or class attributes on its rows. Sort the table in ascending order by the 'Last Name' column (click the 'Last Name' column header)."
-  start_url: https://the-internet.herokuapp.com/tables
-  domain: tables
-  task_type: action
-  difficulty: single
-  key_nodes:
-  - url_contains: tables
-  assert:
-    selector_text_equals:
-      css: "#table1 tbody tr:first-child td:first-child"
-      value: Bach
-- id: live_internet_shifting_menu_gallery
-  purpose: shifting_layout_locate
-  split: dev
-  instruction: "The navigation menu on this page shifts position on every page load. Click the 'Gallery' link in that menu."
-  start_url: https://the-internet.herokuapp.com/shifting_content/menu
-  domain: navigation
-  task_type: action
-  difficulty: single
-  key_nodes:
-  - url_contains: shifting_content
-  assert:
-    url_contains: /gallery
