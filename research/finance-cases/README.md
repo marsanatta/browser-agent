@@ -52,3 +52,10 @@ Trajectory debug for a single case: `research/finance-cases/capture_traj.py`.
   while NVIDIA > Apple by market cap (true at run time); refresh if it flips.
 - All `verified` values are independent page-state checks, never agent self-report.
 - This is a worktree branch (`autoresearch/finance-cases`); NOT merged to main.
+
+## Stability check — pass^3 (k=3)
+`live_cmc_apple_marketcap` re-run 3× because companiesmarketcap.com shows a
+commercial/ad pop-up that initially blocks navigation. Result: **3/3 verified**
+(steps 17 / 25 / 16 — run 2 fought the pop-up harder but recovered). Conclusion:
+the agent reliably works around the commercial pop-up on its own; capability noted
+in the gallery `why` text. No prompt/code change needed.

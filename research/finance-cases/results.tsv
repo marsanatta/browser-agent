@@ -6,3 +6,4 @@ iteration	case_id	site	task_type	nominal	verified	asked	blocked	verdict	notes
 5	live_screenerin_magic_formula	screener.in	action	true	true	false	false	GOOD	7 steps; directory -> /screens/59 magic-formula
 6	live_screenerin_tcs_roce_deepdive	screener.in	retrieval	true	true	false	false	GOOD	17 steps; search TCS -> /company/TCS ROCE
 7	live_screenerin_sort_loginwall_abstain	screener.in	action(abstain)	false	true	true	false	GOOD	11 steps; correct loginwall abstention (expect_abstain)
+passk	live_cmc_apple_marketcap	companiesmarketcap.com	action	true	true	false	false	PASS^3 3/3	commercial ad pop-up handled; steps 17/25/16 (run2 fought popup harder); stable
