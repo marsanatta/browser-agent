@@ -57,6 +57,9 @@ function reduce(state, ev) {
   if (type === "RUN_ERROR") {
     return { ...state, run: { ...state.run, status: "error", error: payload.error } };
   }
+  if (type === "RUN_STOPPED") {
+    return { ...state, run: { ...state.run, status: "stopped" } };
+  }
 
   const stepId = payload.step_id ?? payload.call_id;
   if (type === "TEXT_MESSAGE") {
@@ -365,6 +368,7 @@ export default function App() {
   function stop() {
     sourceRef.current?.close();
     setRunning(false);
+    dispatch({ type: "RUN_STOPPED" });
   }
 
   function onPick(ex) {
@@ -785,6 +789,9 @@ function RunVerdict({ run }) {
   const { t } = useTranslation();
   if (run.status === "error") {
     return <div className="verdict error">{t("verdict.runError", { error: run.error })}</div>;
+  }
+  if (run.status === "stopped") {
+    return <div className="verdict">{t("verdict.stopped")}</div>;
   }
   if (run.status !== "finished") {
     return <div className="verdict running">{t("verdict.running")}</div>;

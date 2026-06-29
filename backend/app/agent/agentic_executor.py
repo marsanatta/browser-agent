@@ -21,6 +21,7 @@ send_and_wait returns). A handler emits, in order, per tool call:
 
 from __future__ import annotations
 
+import anyio
 import asyncio
 import json
 import os
@@ -277,21 +278,24 @@ class AgenticExecutor:
             )
         finally:
             # Teardown AFTER the verdict is sent. A still-running session (the finish path)
-            # is cancelled rather than awaited for its closing turn.
-            if send_task is not None and not send_task.done():
-                send_task.cancel()
-                # gather(return_exceptions=True) absorbs send_task's OWN cancellation without
-                # raising, while still propagating an ambient cancel of run()'s task — don't
-                # swallow a CancelledError we didn't request.
-                await asyncio.gather(send_task, return_exceptions=True)
-            client = state.get("client")
-            if client is not None:
-                try:
-                    await client.stop()
-                except Exception:
-                    pass
-            if launched:
-                await self._provider.close()
+            # is cancelled rather than awaited for its closing turn. On a client disconnect
+            # the SSE consumer's anyio scope is cancelled and that cancel propagates straight
+            # into this finally (via the q.get() await); shield it so anyio's level-triggered
+            # cancel can't kill these awaits mid-flight and leak the driver task + browser.
+            with anyio.CancelScope(shield=True):
+                if send_task is not None and not send_task.done():
+                    send_task.cancel()
+                    # gather(return_exceptions=True) absorbs send_task's OWN cancellation
+                    # without raising.
+                    await asyncio.gather(send_task, return_exceptions=True)
+                client = state.get("client")
+                if client is not None:
+                    try:
+                        await client.stop()
+                    except Exception:
+                        pass
+                if launched:
+                    await self._provider.close()
 
     def _tokens(self, ledger: dict) -> dict:
         """The run's token ledger, in the run_finished/gateway.tokens shape. Also push

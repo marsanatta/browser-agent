@@ -17,6 +17,7 @@ them with real Pydantic params.
 
 from __future__ import annotations
 
+import anyio
 import asyncio
 
 import pytest
@@ -359,3 +360,97 @@ async def test_repeated_rejected_finish_abstains_not_loops(monkeypatch):
     assert _last_finished(payloads)["nominal_completion"] is False
     asks = [p.get("question", "") for p in payloads.get(EventType.ASK_USER, [])]
     assert any("rejected 5x" in q for q in asks), asks
+
+
+# --- client disconnect mid-run must tear the agent down, not leak it -----------
+@pytest.mark.anyio
+async def test_client_disconnect_mid_run_tears_down(monkeypatch):
+    """On a client disconnect, sse-starlette cancels the stream's anyio task group
+    without aclosing the body iterator; the route's gen() wrapper must aclose run()
+    so its finally cancels the detached driver task and closes the browser. This
+    reproduces that path faithfully (consumer inside a cancelled task group) and
+    asserts teardown ran. The shielded aclose is load-bearing: drop the shield and
+    anyio's level-triggered cancel kills the teardown awaits, leaving provider.closed
+    False — so this test fails on the original bug AND on a regression."""
+    page = _FakePage()
+    provider = _FakeProvider(page)
+    executor = _new_executor(provider)
+    driver_cancelled = asyncio.Event()
+
+    async def midflight_drive(self, task, run_id, page, state, ledger, emit, loop):
+        try:
+            emit(events.step_started(f"{run_id}-s1", "observe: x"))
+            emit(events.step_finished(f"{run_id}-s1", "ok"))
+            await asyncio.Event().wait()  # agent mid-action; never finishes on its own
+        except asyncio.CancelledError:
+            driver_cancelled.set()
+            raise
+        finally:
+            emit(_DONE)
+
+    monkeypatch.setattr(AgenticExecutor, "_drive", midflight_drive)
+
+    async def gen():  # the exact wrapper from app.main.agent_run
+        agen = executor.run("do x")
+        try:
+            async for ev in agen:
+                yield ev
+        finally:
+            with anyio.move_on_after(30, shield=True):
+                await agen.aclose()
+
+    async with anyio.create_task_group() as tg:
+
+        async def consume():
+            async for ev in gen():
+                if ev.type == EventType.STEP_FINISHED:
+                    tg.cancel_scope.cancel()  # client disconnect, mid-run
+
+        tg.start_soon(consume)
+
+    assert provider.launched is True
+    assert provider.closed is True  # browser torn down despite the cancel
+    assert driver_cancelled.is_set()  # detached driver task was cancelled, not leaked
+
+
+@pytest.mark.anyio
+async def test_closing_the_stream_tears_down_the_run(monkeypatch):
+    """aclosing the route's gen() wrapper (send-timeout, GC, explicit close) must close
+    run() so its teardown fires. `async for x in executor.run()` alone does NOT propagate
+    aclose to the inner generator, so the wrapper must hold it and aclose it explicitly —
+    drop that and provider.closed stays False here."""
+    page = _FakePage()
+    provider = _FakeProvider(page)
+    executor = _new_executor(provider)
+    driver_cancelled = asyncio.Event()
+
+    async def midflight_drive(self, task, run_id, page, state, ledger, emit, loop):
+        try:
+            emit(events.step_started(f"{run_id}-s1", "observe: x"))
+            emit(events.step_finished(f"{run_id}-s1", "ok"))
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            driver_cancelled.set()
+            raise
+        finally:
+            emit(_DONE)
+
+    monkeypatch.setattr(AgenticExecutor, "_drive", midflight_drive)
+
+    async def gen():  # the exact wrapper from app.main.agent_run
+        agen = executor.run("do x")
+        try:
+            async for ev in agen:
+                yield ev
+        finally:
+            with anyio.move_on_after(30, shield=True):
+                await agen.aclose()
+
+    g = gen()
+    async for ev in g:
+        if ev.type == EventType.STEP_FINISHED:
+            break  # mid-run
+    await g.aclose()  # the consumer closes the stream
+
+    assert provider.closed is True
+    assert driver_cancelled.is_set()

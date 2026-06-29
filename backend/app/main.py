@@ -7,6 +7,7 @@ All payloads serialize through `redact()` inside `Event.to_sse()`.
 
 from __future__ import annotations
 
+import anyio
 import asyncio
 import json
 import os
@@ -305,8 +306,20 @@ async def agent_run(
     )
 
     async def gen():
-        async for event in executor.run(task):
-            yield event.to_sse()
+        agen = executor.run(task)
+        try:
+            async for event in agen:
+                yield event.to_sse()
+        finally:
+            # On client disconnect sse-starlette cancels this stream's task group but does
+            # not aclose the body iterator, so executor.run()'s finally (which cancels its
+            # detached driver task and closes the Copilot session + browser) never fires and
+            # the agent keeps driving the page to completion. aclose() throws GeneratorExit
+            # in to run that teardown; shield it because anyio's level-triggered cancel would
+            # otherwise kill the teardown awaits mid-flight. Bounded so a hung close can't
+            # pin the worker.
+            with anyio.move_on_after(30, shield=True):
+                await agen.aclose()
 
     return EventSourceResponse(gen())
 

@@ -58,6 +58,7 @@ const en = {
     runError: "Run error: {{error}}",
     connectionLost: "connection lost — your access session may have expired",
     running: "Running…",
+    stopped: "Stopped by you",
     state: {
       verified: "Goal-verified ✓",
       unverified: "Actions completed — not goal-verified",
@@ -237,6 +238,7 @@ const zhHant = {
     runError: "執行錯誤：{{error}}",
     connectionLost: "連線中斷——你的存取工作階段可能已過期",
     running: "執行中…",
+    stopped: "已由你停止",
     state: {
       verified: "目標已驗證 ✓",
       unverified: "動作已完成——未經目標驗證",
