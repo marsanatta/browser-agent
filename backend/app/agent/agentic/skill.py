@@ -49,6 +49,13 @@ Rules:
 - Use the EXACT visible text as `target` (e.g. "Form Authentication").
 - After each click, check the reply: if the page did NOT change, the click missed —
   observe again and pick a better target rather than repeating.
+- If click fails with a TimeoutError several times in a row, the page is probably
+  covered by an OVERLAY — an interstitial ad, a cookie wall, or a modal. Handle it
+  before retrying: first observe for a close/dismiss control ("Close", "Close Ad",
+  "x", "Skip", "No thanks", "Accept") and click it, then re-check whether the blocker
+  is gone. If no close control works and the page stays blocked, navigate to the
+  page's own URL again to reload it (this clears one-shot interstitials), then retry
+  your original action.
 - When SEVERAL elements share the SAME name (a list or table with one repeated action label
   per row, or two identical links/buttons), you CANNOT pick one by name — it is ambiguous and
   click(target) will fail with AMBIGUOUS. Instead read observe's `i` and `near` fields to tell
