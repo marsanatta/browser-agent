@@ -204,6 +204,25 @@ examples shown in the UI, the source of truth for this list). Each ships a discr
 | **stockanalysis.com** — compare NVDA vs JPM P/E, drill into the winner | cross-page reasoning: read each live P/E, judge which is higher, open the winner's Balance Sheet | `url_contains /nvda/financials/balance-sheet` |
 | **screener.in** — search TCS → read ROCE | search + read a live company metric | `url_contains /company/TCS` |
 
+**Rubric-targeted hard cases.** A focused set that probes the three things the test grades —
+**silent-failure prevention**, **self-correction**, and **self-maintenance** — each with a
+discriminating state check (never a loose URL match). Every assertion was confirmed *discriminating*
+on the live page before encoding (`research/selector_probe*.py`); they run via the eval harness
+(`eval/passk_live.py`, one subprocess per run) and the first three are in the live gallery.
+
+| Hard case | Axis it probes | Why it's hard | Verified by |
+|---|---|---|---|
+| **todomvc** — add 3 items, complete the 2nd, filter to Active | **silent-failure** | the URL never changes — only the real DOM state separates success from failure, so a lazy `url_contains` would falsely pass. There is no Add button: items commit on **Enter**. | `selector_text_equals .todo-count "2 items left"` |
+| **uitestingplayground/disabledinput** — enable, then type | **self-correction** | the field starts *disabled*; typing first silently fails — the agent must enable it and **wait for editability** before typing | `input_value_equals #inputField "hello world"` |
+| **uitestingplayground/ajax** — click, wait for the result | **self-correction** | the result appears ~15 s later via AJAX — the agent must **state-wait**, not declare done early | `selector_text_equals #content "Data loaded with AJAX get request."` |
+| **the-internet/dynamic_controls** — Remove, wait until gone | **self-correction** | the removal is **async** (~2 s); the agent must wait for the state change, not act on stale state | `selector_text_equals #message "It's gone!"` |
+| **selectorshub** — type into the *First Crush* field | **self-maintenance** | the input lives inside a **shadow DOM** — plain locators miss it; the locator cascade must pierce the shadow root | `input_value_equals #inp_val "browser agent"` |
+| **the-internet/add_remove_elements** — Add 3 elements | **self-maintenance** | the created *Delete* buttons have **no stable id/selector** — the agent must locate dynamically-generated, id-less elements | `element_count #elements .added-manually == 3` |
+
+Two of these drove real engine fixes: a **`getByPlaceholder` locator tier** (the todomvc / shadow
+inputs are named only by their placeholder) and **`fill` pressing Enter on a trailing newline** (so
+Enter-to-submit inputs with no button — todomvc, search boxes — actually commit).
+
 **Population evidence (not just hand-picked cases).** The live eval set has **80 tasks across 19
 domains**, split by site into dev / holdout / sealed so "generalization" is real, not
 memorization. Scored by the independent check, on the default agentic engine:

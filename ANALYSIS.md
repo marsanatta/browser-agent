@@ -223,6 +223,20 @@ Yes; this scales better than any single engine seam.
   two-pass admission probe (`validate_candidates.py`) is reused to admit new cases. Exploring a new
   capability is "add tagged YAML → run the standard harness" — exactly the loop used to grow the set
   to 80.
+- **A rubric-targeted hard-case set probes the three graded behaviours directly.** Six `live_*`
+  widget cases: **silent-failure** (todomvc — URL-invariant client state read from `.todo-count`),
+  **self-correction** (disabledinput / ajax / dynamic_controls — disabled-then-enable, async state
+  waits), and **self-maintenance** (selectorshub shadow-DOM input, add_remove generated id-less
+  elements). They needed two new **verify primitives** (`input_value_equals`, `element_count`,
+  shared by harness and production) and surfaced two real **engine** gaps now fixed — a
+  `getByPlaceholder` locator tier and `fill` pressing Enter on a trailing newline (Enter-to-submit
+  inputs with no button). Every assertion was confirmed *discriminating* on the live page first
+  (`research/selector_probe*.py`).
+- **One run per process for agentic eval (`passk_live.py`).** Running many agentic sessions in one
+  long-lived process intermittently drops the Copilot agent-mode session (`JSON-RPC -32603 … Session
+  not found`); a subprocess per run mirrors production (one task per request) and is reliable. The
+  agentic engine and the deployed system are unaffected — this was a test-harness batching artifact,
+  not a product reliability bug.
 
 ---
 
