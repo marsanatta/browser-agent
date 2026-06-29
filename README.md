@@ -211,15 +211,21 @@ correctly. The lesson: validate the test before blaming the system.
 
 ## Works well (with examples)
 
-These patterns are reliable. Each row names a real site and operation, drawn from the live eval
-set (`eval/eval_set/live_real_world.yaml`).
+These are the **good cases in the live demo gallery** (`frontend/src/examples.js` — the picked
+examples shown in the UI, the source of truth for this list). Each ships a discriminating success
+**criterion**, so a finished run shows **verified ✓**, not just *nominal* (§4).
 
-| Site | Operation that works | Why it works |
-|------|----------------------|--------------|
-| `the-internet.herokuapp.com` | Dynamic Loading: click Start and wait for the hidden text to load; Status Codes: click the link for HTTP 200 and confirm the page | Server-rendered, stable ARIA roles and links. |
-| `en.wikipedia.org` | Open a named article (Helium, Oxygen); type in the search box and press Enter; pick an autocomplete suggestion (Argon); click the Sign In link | Clear link/role names; the largest slice of the eval set (19 cases). |
-| `books.toscrape.com` | Open a book category from the sidebar; open a product page and report its price or stock count | Static e-commerce; deterministic text extraction. |
-| `docs.python.org`, `developer.mozilla.org`, `arxiv.org`, `www.gov.uk`, `stackoverflow.com`, `www.gnu.org` | Open a named navigation page (Help, Blog, Questions, Licenses, a standard-library module page) | Server-rendered public docs with stable navigation links. |
+| Gallery case (live) | What it exercises | Verified by (criterion) |
+|---|---|---|
+| **docs.python.org** — Std Library → json module | two-hop documentation navigation | `url_contains library/json` |
+| **Wikipedia** — pick 'Argon' from autocomplete | a real typeahead-widget interaction | `h1_equals "Argon"` |
+| **GOV.UK** — Driving & transport → Driving licences | two-hop browse | `url_contains browse/driving/driving-licences` |
+| **Amazon** — search "usb c cable" → open first result | clicks through the headless "Continue shopping" anti-bot interstitial, searches, opens the product | `url_contains /dp/` |
+| **the-internet** — read the on-load modal's title | a modal that pops up on load | `selector_text_equals .modal-title h3` |
+| **httpbin** — fill + submit a multi-field order form | text / tel / email / radio / checkboxes / textarea, each named from its wrapping `<label>` | `url_contains httpbin.org/post` |
+| **stockanalysis.com** — Apple → Balance Sheet | multi-step financial drill-down | `url_contains financials/balance-sheet` |
+| **stockanalysis.com** — compare NVDA vs JPM P/E, drill into the winner | cross-page reasoning: read each live P/E, judge which is higher, open the winner's Balance Sheet | `url_contains /nvda/financials/balance-sheet` |
+| **screener.in** — search TCS → read ROCE | search + read a live company metric | `url_contains /company/TCS` |
 
 **Population evidence (not just hand-picked cases).** The live eval set has **80 tasks across 19
 domains**, split by site into dev / holdout / sealed so "generalization" is real, not
@@ -245,17 +251,22 @@ scored only once, so its number cannot be over-fit.
 
 ## Known limitations (with examples)
 
-These cases are hard, unstable, or unsupported. They are listed **on purpose**. With one named
-exception, every one is **detected and reported**, not silently wrong.
+These are the **limitation cases in the live demo gallery** (`frontend/src/examples.js`). They are
+listed **on purpose**; every one is **detected and reported** (an honest abstain / give-up), never
+silently wrong.
 
-| Case | Real example | Status |
+| Case | Real example (live gallery) | Status |
 |------|--------------|--------|
-| **Login wall** | `screener.in` — a public screen opens fine, but sorting/customizing it redirects to a sign-up/login page | Honest give-up. The agent hits the wall **mid-task** (not on a bare login page) and abstains instead of faking the sort. |
+| **Login wall** | `screener.in` — a public screen opens, but sorting it redirects to a sign-up / login page | Honest give-up: the agent hits the wall **mid-task** and abstains instead of faking the sort. |
 | **CAPTCHA** | `google.com/recaptcha/api2/demo` — Submit is gated by a reCAPTCHA | Honest give-up. The agent will not solve or bypass a CAPTCHA. |
-| **Anti-bot wall** | `g2.com` — HTTP 403; a DataDome challenge shell whose HTML loads `captcha-delivery.com` | Fails closed: the agent abstains honestly (no false success) and never spoofs a fingerprint — a correctly-routed wall, not a wrong result. |
+| **Anti-bot (DataDome)** | `g2.com` — HTTP 403; a DataDome challenge shell whose HTML loads `captcha-delivery.com` | Detects the wall and abstains honestly (no false success); never spoofs a fingerprint. |
+| **Anti-bot (Cloudflare)** | `nowsecure.nl` — the modern "Just a moment…" managed challenge | Recognizes the block (body: "performing security verification") and abstains. Route, don't evade. |
 | **iframe contents** | `the-internet.herokuapp.com/iframe` — typing inside a rich-text editor in an iframe | The grounding cannot act inside the iframe, so the agent **gives up honestly** (not silent). |
-| **Grounding miss on a dense page** | `en.wikipedia.org` periodic-table navigation; some `stackoverflow.com` navigation | Honest non-completion: the agent cannot locate the target, burns its step budget, and gives up. |
-| **Failures are expensive** | any task where the target cannot be found | The agentic loop retries up to its 25-step budget (~$0.08–0.10/task), so a failure costs more than plan-then-execute's early give-up. |
+
+**Beyond the gallery cases**, two honest limitations apply across tasks: a **grounding miss on a
+dense page** (e.g. Wikipedia periodic-table navigation) ends in honest non-completion once the step
+budget runs out; and **failures are expensive** — the agentic loop retries to its 25-step budget
+(~$0.08–0.10/task), so a failure costs more than `script-orchestration`'s early give-up.
 
 **One honest gap in how walls are handled.** Anti-bot / CAPTCHA walls now get a distinct `BLOCKED`
 classification (`detect_block`, naming the cause), but detection runs **after** acting, there is no
@@ -266,7 +277,7 @@ into the loop is future work.
 
 ### Unsupported — real probe evidence
 
-These two walls were probed with the real browser (`backend/probe_unsupported.py`: headless
+These three walls were probed with the real browser (`backend/probe_unsupported.py`: headless
 Chromium, `domcontentloaded`, 30 s timeout). Each row is the observed state, not a guess. The point
 is that the agent **fails closed and reports failure** — it never tries to log in, solve a CAPTCHA,
 or spoof a fingerprint.
@@ -275,6 +286,7 @@ or spoof a fingerprint.
 |-----------|------|--------------------|-----------------------|
 | CAPTCHA | `google.com/recaptcha/api2/demo` | HTTP 200, the form fields visible; the reCAPTCHA itself is a cross-origin challenge iframe the agent cannot act on | The agent can fill the form, but Submit is gated by a CAPTCHA it will not solve. |
 | Anti-bot (DataDome) | `g2.com` | HTTP 403, empty body — a ~2.5 KB DataDome challenge shell whose HTML loads `captcha-delivery.com` | DataDome blocks the automated client at the edge (403) and serves a challenge shell. The agent abstains honestly — never a false success, never a fingerprint spoof. |
+| Anti-bot (Cloudflare) | `nowsecure.nl` | HTTP 403, title "Just a moment…", body "Performing security verification … protect against malicious bots" | A managed JS challenge served inline; `detect_block` matches the body text and the agent abstains. |
 
 Routed-away categories (never evaded): Cloudflare Turnstile / DataDome / PerimeterX, CAPTCHA
 pages, login / MFA gates, and banking / SSO / healthcare sites.
