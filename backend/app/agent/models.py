@@ -36,19 +36,16 @@ from typing import Any
 
 from app.obs.tracing import redact
 
-# Per-role model defaults. Routing principle (docs/architecture/02, docs/00):
-# keep the cheapest *adequate* model on the hot path (execution / L2 re-rank), pay
-# for a strong PLANNER (a bad plan multiplies downstream retries, each a billed
-# call), and reserve the expensive frontier model for the rare deep REPLANNER
-# (the peek-the-page replan).
-#
-# Picks from research/2026-06-26 (cost + SOTA capability per role; both the legacy
-# premium-request-multiplier and the 2026-06 usage-based token billing favour the
-# same models). The exact SDK id strings follow the menu's naming convention and
-# are NOT re-confirmed against client.list_models() — MODEL_MENU is the single
-# source of truth; correct an id here if the live Copilot menu differs.
-PLANNER_MODEL = "claude-opus-4.8"      # top web-agent planner (Online-Mind2Web/OSWorld)
-EXECUTION_MODEL = "claude-haiku-4.5"   # hot-path tool-calling / L2, cheap+adequate
+# Per-role model defaults. Current default = a UNIFORM frontier model
+# (claude-opus-4.8) across roles, for maximum quality. The cost-optimized routing
+# (cheapest *adequate* model on the hot path / execution, a strong PLANNER, and the
+# frontier model reserved only for the rare deep REPLANNER) is the better call when
+# cost/latency matter — restore it here, or override per-role via the UI/API
+# (model_exec / think_exec, ...). The exact SDK id strings follow the menu's naming
+# convention and are NOT re-confirmed against client.list_models() — MODEL_MENU is the
+# single source of truth; correct an id here if the live Copilot menu differs.
+PLANNER_MODEL = "claude-opus-4.8"      # top web-agent planner
+EXECUTION_MODEL = "claude-opus-4.8"    # hot-path tool-calling / L2
 REPLANNER_MODEL = "claude-opus-4.8"    # rare deep replan that drives the browser
 
 # Curated, selectable ids for the per-role UI picker and override validation (the
@@ -95,14 +92,14 @@ def resolve_model(value: str | None, role: str, menu: Collection[str] = MODEL_ME
 # Thinking level (reasoning effort) per role. The Copilot SDK exposes a 4-level
 # scale — no "minimal"/"off"/"max" — via create_session(reasoning_effort=...) and
 # set_model(..., reasoning_effort=...) (verified against github-copilot-sdk source).
-# Planner spends (once/task, high leverage); the hot path stays cheap (on a
-# manual-thinking model like Haiku the knob is a no-op = non-thinking, which is what
-# we want); the rare replanner thinks hardest. NOTE: Copilot may clamp the requested
-# level per model — treat it as a hint and assert via the reasoning_tokens meter.
+# Current default = a UNIFORM "medium" across roles. (The cost-tuned alternative:
+# planner high once/task; the hot path low — on a manual-thinking model the knob is a
+# no-op = non-thinking; the rare replanner highest.) NOTE: Copilot may clamp the
+# requested level per model — treat it as a hint and assert via the reasoning_tokens meter.
 THINKING_LEVELS = ("low", "medium", "high", "xhigh")
-PLANNER_EFFORT = "high"
-EXECUTION_EFFORT = "low"
-REPLANNER_EFFORT = "xhigh"
+PLANNER_EFFORT = "medium"
+EXECUTION_EFFORT = "medium"
+REPLANNER_EFFORT = "medium"
 
 EFFORT_DEFAULTS = {
     "plan": PLANNER_EFFORT,
