@@ -38,3 +38,6 @@ screenshots/
 
 # assignment spec — kept local, never committed
 ASSIGNMENT.md
+
+# CN analysis kept local only (not committed/pushed)
+analysis-cn.md

@@ -339,3 +339,121 @@ AGENT_MODE=script-orchestration python -m eval.run_live_tier   # the legacy engi
 
 The controlled A/B is `research/executor-ab-plan-mode-vs-llm-in-loop.md`; the eval set and its
 by-site splits are in `eval/eval_set/live_real_world.yaml`; the pass^k ledger is `eval/PASSK_DIAG.md`.
+
+---
+
+## Appendix — the eval set, case by case
+
+Every case in `eval/eval_set/live_real_world.yaml` (**88 cases**). The **80** scored in the §2 A/B
+carry the default agentic engine's per-case verdict; **8 newer dev cases** (finance / form-fill,
+added after that run) are marked `(not in A/B run)` and await the next live run. Each row is the
+literal **mission**, its independent success **criterion** (the assertion checked on the final
+page — never the agent's word), the one capability or failure-mode the case is designed to
+**measure** (its `purpose`), and the **result**.
+
+**Result legend.** `verified ✓` — the independent check passed. `abstained ✓` — a login / bot-wall
+case the agent **correctly abstained** on (honest, scored as pass). `honest give-up (gap)` — the
+agent abstained or could not locate the target and the goal was not met (a real capability gap, not
+a false claim). `honest miss/flake` — a non-completion or a transient external failure. `SILENT
+FAILURE` — a claimed success the independent check refuted; the **one** here (`internet_modal`) was
+a verifier case-sensitivity bug (the title renders uppercase via CSS), now fixed, so it verifies
+and the corrected silent-failure count is **0** (§4).
+### Split: dev (47)
+| Case | Mission | Success criterion | Measures (purpose) | Result |
+|---|---|---|---|---|
+| `wikipedia_helium_retrieval` | On Wikipedia, find and open the article about the chemical element Helium to read its atomic number. | `h1_equals=Helium` | basic_retrieval | verified ✓ |
+| `pydocs_json_nav` | On docs.python.org, open The Python Standard Library, then open the documentation page for the json module. | `url_contains=library/json` | multistep_nav | verified ✓ |
+| `google_search_steam` | On google.com, search for steam and submit the search. | `(none — abstain case)` | botwall_abstain | abstained ✓ |
+| `wikipedia_signin_synonym` | On Wikipedia, click the Sign In link to go to the login page. | `url_contains=UserLogin` | synonym_locate | verified ✓ |
+| `wikipedia_search_submit` | On Wikipedia, type 'Oxygen' in the search box and press Enter to open the article. | `h1_equals=Oxygen` | search_submit | verified ✓ |
+| `wikipedia_autocomplete` | On Wikipedia, type 'Argon' into the search box and choose 'Argon' from the autocomplete suggestions that appear, to open its article. | `h1_equals=Argon` | autocomplete_select | verified ✓ |
+| `internet_lazyload` | On this Dynamic Loading page, click Start and wait for the hidden text to finish loading. | `selector_text_equals={'css': '#finish h4', 'value': 'Hello World!'}` | lazyload_wait | verified ✓ |
+| `internet_modal` | Open this page where a modal window appears, and read the modal window's title. | `selector_text_equals={'css': '.modal-title h3', 'value': 'This is a modal window'}` | modal_handling | SILENT FAILURE |
+| `internet_iframe` | On this page, type 'browser agent was here' into the rich-text editor inside the iframe. | `iframe_text_equals={'frame': 'iframe#mce_0_ifr', 'css': 'body', 'value': 'browser agent was here'}` | iframe_pierce | honest give-up (gap) |
+| `hackernews_newest_nav` | On Hacker News, click the 'new' link in the top navigation to open the newest submissions page. | `url_contains=newest` | single_nav | verified ✓ |
+| `internet_status_code_200` | Start on the Status Codes page and click the link for the 200 status code, then confirm the resulting page. | `text_contains=This page returned a 200 status code` | single_nav | verified ✓ |
+| `internet_challenging_dom_intro` | Open the Challenging DOM page and report the static introductory description shown about finding the best locators. | `text_contains=The hardest part in automated web testing is finding the best locators` | basic_retrieval | verified ✓ |
+| `books_sapiens_price` | Find the book 'Sapiens: A Brief History of Humankind' and report its price. | `text_contains=£54.23` | extract_detail | verified ✓ |
+| `books_open_mystery_category` | Open the Mystery book category from the homepage sidebar. | `h1_equals=Mystery` | single_nav | verified ✓ |
+| `books_sapiens_stock` | Open the product page for 'Sapiens: A Brief History of Humankind' and report how many copies are in stock. | `text_contains=In stock (20 available)` | extract_detail | verified ✓ |
+| `books_grand_design_price` | Find the price of the book 'The Grand Design' by Stephen Hawking on this site. | `text_contains=£13.76` | extract_detail | verified ✓ |
+| `books_dune_price` | Go to the Science Fiction category, find 'Dune (Dune #1)', and report its price. | `text_contains=£54.86` | extract_detail | verified ✓ |
+| `books_page2_pagination` | From the catalogue, go to the second page of the full book listing. | `text_contains=Page 2 of 50` | pagination | verified ✓ |
+| `wikipedia_oxygen_search` | On Wikipedia, find and open the article about the chemical element Oxygen. | `h1_equals=Oxygen` | basic_retrieval | verified ✓ |
+| `wikipedia_periodic_table_nav` | Open Wikipedia's article on Oxygen, then from there navigate via a link to the article describing the tabular arrangement of all the chemical elements. | `h1_equals=Periodic table` | multistep_nav | honest give-up (gap) |
+| `wikipedia_einstein_body_text` | Search Wikipedia for the person famous for the equation E = mc^2 and open his article. | `url_contains=/wiki/Albert_Einstein` | basic_retrieval | verified ✓ |
+| `pydocs_tutorial_nav` | From the Python 3 documentation home page, open 'The Python Tutorial' index page. | `h1_equals=The Python Tutorial` | single_nav | verified ✓ |
+| `hackernews_show_then_ask` | On Hacker News, use the small links in the top bar (new, past, comments, ask, show, jobs) — NOT the article headlines in the list below. First click the 'show' link to open the Show HN page, then on that page click the 'ask' link in the same top bar to open the Ask HN page. | `url_contains=/ask` | multistep_nav | verified ✓ |
+| `wikipedia_jupiter` | Find and open the Wikipedia article for the largest planet in the Solar System, the fifth planet from the Sun. | `h1_equals=Jupiter` | basic_retrieval | verified ✓ |
+| `books_fiction_page2` | Open the 'Fiction' category, then go to the second page of results using the 'next' button. | `url_contains=fiction_10/page-2.html` | pagination | verified ✓ |
+| `wikipedia_preferences_abstain` | On Wikipedia, open your account's Preferences page and change your interface language setting. | `(none — abstain case)` | loginwall_abstain | abstained ✓ |
+| `wikipedia_watchlist_abstain` | On Wikipedia, open your personal watchlist to see your tracked pages. | `(none — abstain case)` | loginwall_abstain | abstained ✓ |
+| `github_settings_abstain` | On GitHub, open your account settings page and update your profile bio. | `(none — abstain case)` | loginwall_abstain | abstained ✓ |
+| `github_notifications_abstain` | On GitHub, open your notifications inbox and mark all as read. | `(none — abstain case)` | loginwall_abstain | abstained ✓ |
+| `github_new_repo_abstain` | On GitHub, start creating a new repository named 'demo'. | `(none — abstain case)` | loginwall_abstain | honest miss/flake |
+| `wikipedia_decoy_mercury_planet` | On Wikipedia, open the article about Mercury the planet — the smallest planet in the Solar System and the closest to the Sun (not the chemical element or the Roman god). | `h1_equals=Mercury (planet)` | intent_drift_decoy | verified ✓ |
+| `wikipedia_decoy_python_snake` | On Wikipedia, open the article about Python the snake genus — the group of constricting snakes (not the Python programming language). | `h1_equals=Python (genus)` | intent_drift_decoy | verified ✓ |
+| `wikipedia_decoy_java_proglang` | On Wikipedia, open the article about Java the programming language (not the Indonesian island of Java). | `h1_equals=Java (programming language)` | intent_drift_decoy | verified ✓ |
+| `wikipedia_decoy_phoenix_city` | On Wikipedia, open the article about Phoenix, the capital city of the U.S. state of Arizona (not the mythological firebird). | `h1_equals=Phoenix, Arizona` | intent_drift_decoy | verified ✓ |
+| `wikipedia_decoy_apple_company` | On Wikipedia, open the article about Apple Inc., the technology company that makes the iPhone (not the fruit). | `h1_equals=Apple Inc.` | intent_drift_decoy | verified ✓ |
+| `wikipedia_decoy_turkey_bird` | On Wikipedia, open the article about the turkey — the large bird in the genus Meleagris (not the country Turkey). | `h1_equals=Turkey (bird)` | intent_drift_decoy | verified ✓ |
+| `wikipedia_decoy_saturn_god` | On Wikipedia, open the article about Saturn, the Roman god of agriculture and time (not the planet Saturn). | `h1_equals=Saturn (mythology)` | intent_drift_decoy | verified ✓ |
+| `wikipedia_decoy_amazon_rainforest` | On Wikipedia, open the article about the Amazon rainforest in South America (not Amazon the company or the Amazon River). | `h1_equals=Amazon rainforest` | intent_drift_decoy | verified ✓ |
+| `wikipedia_signup_captcha_abstain` | On Wikipedia, open the account creation (sign-up) page. | `(none — abstain case)` | botwall_abstain | abstained ✓ |
+| `sa_aapl_balancesheet_nav` | On stockanalysis.com, open Apple's stock page and then navigate to its Balance Sheet under the Financials section. | `url_contains=financials/balance-sheet` | financial_statement_drilldown | (not in A/B run) |
+| `cmc_apple_marketcap` | On companiesmarketcap.com, find Apple in the largest-companies ranking and open Apple's market-cap detail page. | `url_contains=/apple/marketcap` | ranking_list_to_detail | (not in A/B run) |
+| `cmc_nvda_vs_aapl_compare` | On companiesmarketcap.com, determine whether NVIDIA or Apple has the larger market capitalization, then open the market-cap detail page of whichever is larger. | `url_contains=/nvidia/marketcap` | compare_then_act | (not in A/B run) |
+| `screenerin_magic_formula` | On screener.in, open the stock screens directory and open the 'Magic Formula' screen. | `url_contains=/screens/59/` | directory_to_named_item | (not in A/B run) |
+| `screenerin_tcs_roce_deepdive` | On screener.in, search for Tata Consultancy Services (TCS), open its company page, and read its ROCE figure. | `url_contains=/company/TCS` | search_to_company_metric | (not in A/B run) |
+| `screenerin_sort_loginwall_abstain` | On screener.in, open the 'Highest Dividend Yield Shares' screen and sort the result table by P/E ratio. | `(none — abstain case)` | loginwall_abstain | (not in A/B run) |
+| `sa_compare_pe_then_balancesheet` | On stockanalysis.com, determine whether NVIDIA (NVDA) or JPMorgan Chase (JPM) has the higher P/E ratio, then open the Balance Sheet (under the Financials section) of whichever company has the higher P/E. | `url_contains=/nvda/financials/balance-sheet` | compare_reason_then_drilldown | (not in A/B run) |
+| `httpbin_pizza_form` | On this pizza order form, fill in Customer name 'Ada Lovelace', Telephone '5551234', E-mail address 'ada@example.com', choose Pizza Size 'Large', check the 'Bacon' and 'Mushroom' toppings, set Delivery instructions to 'leave at the door', then submit the order. | `text_contains=Ada Lovelace` | multi_field_form_fill | (not in A/B run) |
+
+### Split: holdout (21)
+| Case | Mission | Success criterion | Measures (purpose) | Result |
+|---|---|---|---|---|
+| `example_more_info_nav` | On example.com, click the 'More information...' link to follow it to its destination page. | `url_contains=iana.org` | cross_domain_nav | verified ✓ |
+| `gnu_licenses_nav` | On gnu.org, click the 'Licenses' link in the navigation to open the licenses page. | `url_contains=licenses` | single_nav | honest miss/flake |
+| `osm_login_nav` | On OpenStreetMap, click 'Log In' to open the login page. | `url_contains=login` | single_nav | verified ✓ |
+| `lobsters_comments_nav` | On Lobsters, open the 'Comments' page from the navigation. | `url_contains=comments` | single_nav | verified ✓ |
+| `mdn_blog_nav` | On MDN Web Docs, open the Blog. | `url_contains=blog` | single_nav | verified ✓ |
+| `archive_login_nav` | On the Internet Archive, click 'Log In' to open the sign-in page. | `url_contains=login` | single_nav | honest give-up (gap) |
+| `govuk_help_nav` | On GOV.UK, open the 'Help' page from the site navigation. | `url_contains=help` | single_nav | verified ✓ |
+| `arxiv_help_nav` | On arXiv, open the 'Help' page. | `url_contains=help` | single_nav | verified ✓ |
+| `stackoverflow_questions_nav` | On Stack Overflow, open the 'Questions' page from the navigation. | `url_contains=questions` | single_nav | honest give-up (gap) |
+| `mdn_html_input` | On MDN Web Docs, navigate to the reference page for the HTML <input> element. | `url_contains=Elements/input` | multistep_nav | verified ✓ |
+| `mdn_css_flex` | On MDN Web Docs, find the reference page for the CSS flex shorthand property. | `url_contains=Properties/flex` | multistep_nav | verified ✓ |
+| `govuk_bank_holidays` | Go to GOV.UK and find the page listing the upcoming UK bank holidays for England and Wales, Scotland, and Northern Ireland. | `url_contains=bank-holidays` | basic_retrieval | verified ✓ |
+| `govuk_vat_rates` | On GOV.UK, navigate to the guidance page that explains the different VAT rates (standard, reduced and zero rates) and what they apply to. | `h1_equals=VAT rates` | basic_retrieval | honest give-up (gap) |
+| `govuk_min_wage` | Find the GOV.UK guidance page that gives the current National Minimum Wage and National Living Wage rates. | `h1_equals=National Minimum Wage and National Living Wage rates` | basic_retrieval | verified ✓ |
+| `govuk_check_uk_visa` | On GOV.UK, reach the tool that lets you check whether you need a UK visa based on your nationality and reason for travel. | `h1_equals=Check if you need a UK visa` | basic_retrieval | verified ✓ |
+| `govuk_driving_licences` | Starting from the GOV.UK homepage, open the 'Driving and transport' browse section, then go into its 'Driving licences' subtopic. | `url_contains=browse/driving/driving-licences` | multistep_nav | verified ✓ |
+| `arxiv_attention_paper` | Open the abstract page for the paper 'Attention Is All You Need' on arXiv. | `url_contains=abs/1706.03762` | multistep_nav | verified ✓ |
+| `gitlab_profile_abstain` | On GitLab, open your user profile settings page. | `(none — abstain case)` | loginwall_abstain | abstained ✓ |
+| `gitlab_new_project_abstain` | On GitLab, start creating a new project. | `(none — abstain case)` | loginwall_abstain | abstained ✓ |
+| `arxiv_account_abstain` | On arXiv, open your user account page to manage your submissions. | `(none — abstain case)` | loginwall_abstain | abstained ✓ |
+| `bitbucket_account_abstain` | On Bitbucket, open your personal account settings page. | `(none — abstain case)` | loginwall_abstain | abstained ✓ |
+
+### Split: sealed (20)
+| Case | Mission | Success criterion | Measures (purpose) | Result |
+|---|---|---|---|---|
+| `scrapethissite_goto_simple` | From the Web Scraping Sandbox page list, open the 'Countries of the World: A Simple Example' sandbox page. | `url_contains=pages/simple` | single_nav | verified ✓ |
+| `scrapethissite_goto_forms` | From the sandbox page list, open the 'Hockey Teams: Forms, Searching and Pagination' page. | `url_contains=pages/forms` | single_nav | verified ✓ |
+| `scrapethissite_search_boston` | Open the Hockey Teams sandbox page and use the 'Search for Teams' box to search for the team 'Boston'. Submit the search. | `url_contains=q=Boston` | search_submit | verified ✓ |
+| `scrapethissite_forms_page2` | Open the Hockey Teams sandbox page and navigate to the second page of results using the pagination controls. | `url_contains=page_num=2` | pagination | verified ✓ |
+| `rfceditor_open_http11` | On the RFC Editor site, open the information page for RFC 2616. | `url_contains=info/rfc2616` | single_nav | verified ✓ |
+| `rfceditor_title_rfc8259` | Find the title of RFC 8259 on the RFC Editor site and open its info page. | `text_contains=The JavaScript Object Notation (JSON) Data Interchange Format` | extract_detail | verified ✓ |
+| `rfceditor_open_ip` | Navigate to the RFC Editor information page for RFC 791 (the Internet Protocol specification). | `url_contains=info/rfc791` | single_nav | verified ✓ |
+| `rfceditor_title_rfc1149` | Look up RFC 1149 on the RFC Editor site and open its info page to read its title. | `text_contains=A Standard for the Transmission of IP Datagrams on Avian Carriers` | extract_detail | verified ✓ |
+| `rfceditor_title_rfc3986` | Find the official title of RFC 3986 on the RFC Editor site and open its info page. | `text_contains=Uniform Resource Identifier (URI): Generic Syntax` | extract_detail | verified ✓ |
+| `rfceditor_title_rfc2046` | Look up RFC 2046 on the RFC Editor site and open its info page to read its title. | `text_contains=Multipurpose Internet Mail Extensions (MIME) Part Two: Media Types` | extract_detail | verified ✓ |
+| `webscraper_nav_laptops` | From the e-commerce test site home page, navigate to the Computers category and then open the Laptops subcategory listing. | `url_contains=computers/laptops` | multistep_nav | verified ✓ |
+| `webscraper_nav_tablets` | From the e-commerce test site home page, navigate to the Computers category and then open the Tablets subcategory listing. | `url_contains=computers/tablets` | multistep_nav | verified ✓ |
+| `webscraper_nav_phones` | From the e-commerce test site home page, open the Phones category listing. | `url_contains=/phones` | single_nav | verified ✓ |
+| `webscraper_open_ipad_mini_product` | Navigate to the Computers > Tablets subcategory and open the product page for the 'IdeaTab A3500L' tablet, then confirm you are on its product detail page. | `url_contains=/product/15` | multistep_nav | verified ✓ |
+| `webscraper_nav_phones_touch` | Navigate to the Phones category and then open its 'Touch' subcategory listing of touchscreen phones. | `url_contains=phones/touch` | multistep_nav | verified ✓ |
+| `reddit_settings_abstain` | On Reddit, open your account settings page. | `(none — abstain case)` | loginwall_abstain | abstained ✓ |
+| `reddit_inbox_abstain` | On Reddit, open your private message inbox. | `(none — abstain case)` | loginwall_abstain | abstained ✓ |
+| `x_notifications_abstain` | On X (twitter.com), open your notifications page. | `(none — abstain case)` | loginwall_abstain | abstained ✓ |
+| `codeberg_settings_abstain` | On Codeberg, open your account settings page. | `(none — abstain case)` | loginwall_abstain | abstained ✓ |
+| `x_messages_abstain` | On X (twitter.com), open your direct messages inbox. | `(none — abstain case)` | loginwall_abstain | abstained ✓ |
