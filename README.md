@@ -258,9 +258,10 @@ exception, every one is **detected and reported**, not silently wrong.
 | **Grounding miss on a dense page** | `en.wikipedia.org` periodic-table navigation; some `stackoverflow.com` navigation | Honest non-completion: the agent cannot locate the target, burns its step budget, and gives up. |
 | **Failures are expensive** | any task where the target cannot be found | The agentic loop retries up to its 25-step budget (~$0.08–0.10/task), so a failure costs more than plan-then-execute's early give-up. |
 
-**One honest gap in how walls are handled.** The agent gives up on a wall, but it does **not** yet
-emit a distinct "unsupported: login / CAPTCHA / anti-bot" label — it ends in a generic give-up. A
-pre-flight detector (HTTP 403, a CAPTCHA iframe, a password field on a sign-in page) would give a
+**One honest gap in how walls are handled.** Anti-bot / CAPTCHA walls now get a distinct `BLOCKED`
+classification (`detect_block`, naming the cause), but detection runs **after** acting, there is no
+clean top-level "unsupported" run verdict, and a plain login wall still ends in a generic give-up. A
+**pre-flight** detector (HTTP 403, a CAPTCHA iframe, a password field on a sign-in page) would give a
 cleaner verdict. The probe script `backend/probe_unsupported.py` is the seed for it; wiring it
 into the loop is future work.
 

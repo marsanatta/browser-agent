@@ -208,9 +208,11 @@ two-pass admission (#5) is what keeps those assertions strict.
   at each step and gives up on the first sign (route, don't evade). Concrete probes (a reCAPTCHA
   demo, g2.com's DataDome 403) with status codes and element counts are in
   [`README.md`](./README.md) (Known limitations) and `backend/probe_unsupported.py`.
-- **Bot-wall detection is incomplete.** `detect_block` misses the modern "Just a moment…" Cloudflare
-  managed challenge, so a small fraction of sites can slip past as a generic miss rather than a
-  labeled abstain — a known gap, with the probe script as the seed for a pre-flight detector.
+- **Bot-wall detection is post-action, not exhaustive.** `detect_block` now catches the modern
+  "Just a moment…" Cloudflare interstitial (its "performing security verification / protect against
+  malicious bots" text) and DataDome (the `captcha-delivery.com` challenge host), but it runs *after*
+  acting (not pre-flight), and a plain login wall or an interactive checkbox variant can still slip
+  past as a generic miss — the probe script is the seed for a pre-flight detector.
 - **iframe contents.** Grounding builds against the top frame only, so a rich-text editor inside an
   iframe is not actionable; the agent abstains honestly.
 - **Queue + autoscale not built** (§3); single-desktop deploy.
