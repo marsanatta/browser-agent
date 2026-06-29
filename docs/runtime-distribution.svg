@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 300" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <rect width="720" height="300" fill="#ffffff"/>
+  <text x="40" y="42" font-size="20" font-weight="700" fill="#0f172a">Where a task's wall-time goes</text>
+  <text x="40" y="66" font-size="13" fill="#64748b">Live, instrumented: avg 44.9 s / task &#183; ~8 model calls &#183; 4 representative tasks</text>
+
+  <!-- stacked bar -->
+  <g>
+    <rect x="40" y="96" width="567.6" height="58" rx="6" fill="#4f46e5"/>
+    <rect x="607.6" y="96" width="66" height="58" fill="#14b8a6"/>
+    <rect x="673.6" y="96" width="26.4" height="58" rx="6" fill="#94a3b8"/>
+    <text x="323" y="131" font-size="18" font-weight="700" fill="#ffffff" text-anchor="middle">86%</text>
+    <text x="640" y="131" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">10%</text>
+  </g>
+
+  <!-- legend -->
+  <g font-size="13.5">
+    <rect x="40" y="186" width="13" height="13" rx="2" fill="#4f46e5"/>
+    <text x="60" y="197" fill="#1e293b" font-weight="600">LLM round-trips</text>
+    <text x="172" y="197" fill="#64748b">38.8 s &#8212; the bottleneck (~5.2 s &#215; ~8 calls)</text>
+    <rect x="40" y="210" width="13" height="13" rx="2" fill="#14b8a6"/>
+    <text x="60" y="221" fill="#1e293b" font-weight="600">Browser actions</text>
+    <text x="172" y="221" fill="#64748b">4.4 s &#8212; click / fill / navigate / observe + screenshot</text>
+    <rect x="40" y="234" width="13" height="13" rx="2" fill="#94a3b8"/>
+    <text x="60" y="245" fill="#1e293b" font-weight="600">Browser launch</text>
+    <text x="172" y="245" fill="#64748b">1.8 s &#8212; one-time, per task</text>
+  </g>
+
+  <line x1="40" y1="268" x2="680" y2="268" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="40" y="288" font-size="12.5" fill="#475569">Task time scales with the <tspan font-weight="700" fill="#4f46e5">number of model calls</tspan>, not page weight &#8212; so speed-ups come from fewer / faster calls, not the browser.</text>
+</svg>

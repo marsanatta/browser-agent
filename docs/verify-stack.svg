@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 438" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <rect width="720" height="438" fill="#ffffff"/>
+  <text x="40" y="40" font-size="20" font-weight="700" fill="#0f172a">How correctness is verified &#8212; never by the agent's word</text>
+  <text x="40" y="63" font-size="13" fill="#64748b">Every layer is independent of the agent's claim; per-step &#8594; multi-run, increasingly strict.</text>
+
+  <!-- left rail arrow -->
+  <line x1="64" y1="96" x2="64" y2="372" stroke="#a5b4fc" stroke-width="2"/>
+  <polygon points="64,378 59,368 69,368" fill="#a5b4fc"/>
+  <text x="52" y="240" font-size="11.5" fill="#6366f1" transform="rotate(-90 52 240)" text-anchor="middle">per-step &#8594; multi-run</text>
+
+  <!-- layers -->
+  <g>
+    <rect x="92" y="92" width="588" height="48" rx="7" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="108" y="113" font-size="14" font-weight="700" fill="#3730a3">1 &#183; In-loop verify gate</text>
+    <text x="108" y="131" font-size="12" fill="#475569">finish(success=true) only if a deterministic check passes on the live DOM/URL &#8212; and the page isn't blocked</text>
+
+    <rect x="92" y="150" width="588" height="48" rx="7" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="108" y="171" font-size="14" font-weight="700" fill="#3730a3">2 &#183; Independent post-hoc assertion</text>
+    <text x="108" y="189" font-size="12" fill="#475569">separate code + a hand-authored assertion that never reads the agent's claimed output</text>
+
+    <rect x="92" y="208" width="588" height="48" rx="7" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="108" y="229" font-size="14" font-weight="700" fill="#3730a3">3 &#183; Nominal vs verified (CuP)</text>
+    <text x="108" y="247" font-size="12" fill="#475569">counts claimed-success that an independent check refutes = the silent-failure rate</text>
+
+    <rect x="92" y="266" width="588" height="48" rx="7" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="108" y="287" font-size="14" font-weight="700" fill="#3730a3">4 &#183; Per-split, sealed scored once</text>
+    <text x="108" y="305" font-size="12" fill="#475569">dev / holdout / sealed, disjoint by site &#8212; generalization, not memorization</text>
+
+    <rect x="92" y="324" width="588" height="48" rx="7" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="108" y="345" font-size="14" font-weight="700" fill="#3730a3">5 &#183; pass^k (k=5)</text>
+    <text x="108" y="363" font-size="12" fill="#475569">all k runs must independently verify &#8212; the reliability bar for side-effecting tasks</text>
+  </g>
+
+  <!-- result strip -->
+  <rect x="92" y="388" width="588" height="34" rx="7" fill="#ecfdf5" stroke="#a7f3d0"/>
+  <text x="386" y="410" font-size="13" font-weight="700" fill="#047857" text-anchor="middle">Result: 0 silent failures / 80 tasks &#160;&#183;&#160; verified 0.913 (73/80) &#160;&#183;&#160; pass^k 1.000 (0 false-success / 8)</text>
+</svg>

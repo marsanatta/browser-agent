@@ -32,7 +32,6 @@ evaded.
 - [Works well (with examples)](#works-well-with-examples)
 - [Known limitations (with examples)](#known-limitations-with-examples)
 - [How quality is checked](#how-quality-is-checked)
-- [Cost, scalability, correctness](#cost-scalability-correctness)
 - [Repo layout](#repo-layout)
 - [Where AI helped](#where-ai-helped)
 - [Security](#security)
@@ -301,28 +300,6 @@ claim.
   criterion, "verified ✓" means that independent check really passed on the final page. Without
   one, the run is shown as **"actions completed — not goal-verified"**, deliberately distinct from
   a verified pass. We do not sell "verified" as a blanket guarantee.
-
----
-
-## Cost, scalability, correctness
-
-See [`ANALYSIS.md`](./ANALYSIS.md) for the full discussion; the architecture numbers are in
-[`research/executor-ab-plan-mode-vs-llm-in-loop.md`](./research/executor-ab-plan-mode-vs-llm-in-loop.md).
-
-- **Runtime.** Per-task time is dominated by the Copilot round-trips, not the browser. The
-  agentic loop makes about **10 tool-calling round-trips per task**, bounded by 25 steps and 120
-  seconds. The browser actions themselves run in milliseconds.
-- **Cost.** The Copilot subscription is **flat-rate, not per-token**, so the real limit is
-  **requests per task** (~10), bounded by the Copilot quota and rate limit — not a dollar bill.
-  For comparison only, the per-task cost modeled from Copilot's own token ledger is about
-  **$0.04 on `claude-haiku-4.5`**, ~16% lower than plan-then-execute at the same model. Dollar
-  figures from earlier research are different-model estimates and are **not** quoted as facts.
-- **Scalability.** The browser is **stateless and ephemeral per task** (~300–500 MB each,
-  recycled on close), so no state leaks between tasks and you scale by running more workers. The
-  binding ceiling is the Copilot rate limit, not browser RAM. A queue + autoscale shape is
-  designed-for but **not built** — an honest limitation. Deployment today is a single desktop.
-- **Correctness.** Graded by the independent check, reported as nominal vs verified. See
-  [How quality is checked](#how-quality-is-checked).
 
 ---
 
