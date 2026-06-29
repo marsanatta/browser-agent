@@ -194,6 +194,7 @@ class AgenticExecutor:
             "last_verify_ok": False,
             "blocked": False,
             "history": [],        # #1: recent (action, target) keys for stagnation detection
+            "finish_rejects": 0,  # gate-rejected success claims; stops the re-finish loop
             "client": None,
         }
         # Honest token ledger (browser-pilot pattern): accrued from the assistant.usage
@@ -522,12 +523,27 @@ class AgenticExecutor:
                     ):
                         reason = "the caller's success criterion is not met on the live page"
                     if reason is not None:
+                        # A rejected success claim consumes budget AND resets the (now stale) verify
+                        # flag, so the model must re-verify before any re-finish can pass the gate —
+                        # otherwise its loose self-verify lets it re-claim success forever (only the
+                        # 120s wall-clock stopped the old loop). After repeated rejection (or budget
+                        # exhaustion) stop the loop with an honest abstain rather than spinning.
+                        state["tools"] += 1
+                        state["last_verify_ok"] = False
+                        rejects = state["finish_rejects"] = state["finish_rejects"] + 1
                         emit(events.tool_call_end(call_id, f"REJECTED: {reason}"))
                         emit(events.step_finished(step_id, "failed"))
+                        if rejects >= 5 or state["tools"] > self._tool_budget:
+                            state["finished"] = True
+                            state["success"] = False
+                            emit(events.ask_user(step_id, f"Stopping: success claim rejected {rejects}x — "
+                                                 f"the goal is not verified ({reason})."))
+                            emit(_DONE)  # type: ignore[arg-type]
+                            return "ack — end your turn now."
                         emit(events.ask_user(step_id, f"Success claim rejected by the verifier: {reason}."))
-                        return (f"REJECTED by the verification gate: {reason}. The goal is NOT "
-                                "verified. Call verify(goal) and only finish(success=true) once it "
-                                "confirms, or finish(success=false).")
+                        return (f"REJECTED by the verification gate: {reason}. Your last verify is now "
+                                "stale — re-verify the actual goal state with verify(goal), and only "
+                                "finish(success=true) once it confirms, or finish(success=false).")
                 state["finished"] = True
                 state["success"] = bool(p.success)
                 emit(events.tool_call_end(call_id, f"finished success={p.success}"))

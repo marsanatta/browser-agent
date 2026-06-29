@@ -337,3 +337,25 @@ async def test_y1_click_resets_stale_verify_then_finish_rejected(monkeypatch):
     payloads = await _run_with_script(monkeypatch, page, script)
     assert _last_finished(payloads)["nominal_completion"] is False
     assert EventType.ASK_USER in payloads
+
+
+@pytest.mark.anyio
+async def test_repeated_rejected_finish_abstains_not_loops(monkeypatch):
+    """Repeated rejected success claims must stop the loop with an honest abstain at the
+    finish_rejects cap (5) — not spin to the 120s session timeout. Each rejected finish also
+    resets last_verify_ok (root cause), so a blind re-finish cannot pass without a fresh
+    verify."""
+    from app.agent.agentic_executor import _Finish
+
+    page = _FakePage(url="https://example.test/a", body="nothing relevant")
+
+    async def script(h):
+        # 5 success claims, NO prior verify -> each rejected ("no satisfied verify");
+        # the 5th trips the abstain cap instead of looping forever.
+        for _ in range(5):
+            await h["finish"](_Finish(success=True, note="claim"))
+
+    payloads = await _run_with_script(monkeypatch, page, script)
+    assert _last_finished(payloads)["nominal_completion"] is False
+    asks = [p.get("question", "") for p in payloads.get(EventType.ASK_USER, [])]
+    assert any("rejected 5x" in q for q in asks), asks
