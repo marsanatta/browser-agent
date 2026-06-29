@@ -59,6 +59,28 @@ async def test_detect_block_passes_clean_page(page):
 
 
 @pytest.mark.anyio
+async def test_detect_block_flags_datadome_challenge(page):
+    # DataDome 403 interstitial (real g2.com behaviour): empty visible body, the whole
+    # page is a challenge loaded from geo.captcha-delivery.com in a script. URL/selector/
+    # text markers all miss it (nothing visible), so without the HTML-host check the
+    # agent silently "succeeds" on a blocked page.
+    await page.set_content("<script>var dd={'host':'geo.captcha-delivery.com'};</script>")
+    assert await verify.detect_block(page) is not None
+
+
+@pytest.mark.anyio
+async def test_detect_block_ignores_datadome_host_on_full_page(page):
+    # A usable page that merely embeds anti-bot scoring must NOT be flagged just because
+    # the HTML mentions the delivery host — only an empty-body challenge page is a block.
+    # (Mirrors the invisible-helper caution: do not route usable pages to unsupported.)
+    await page.set_content(
+        "<h1>Marketing Software</h1><p>" + ("Compare top marketing tools. " * 20)
+        + "</p><script>var ref='captcha-delivery.com';</script>"
+    )
+    assert await verify.detect_block(page) is None
+
+
+@pytest.mark.anyio
 async def test_blocked_action_abstains_not_silent_success():
     # A clean page whose button injects a CAPTCHA on click (mirrors google's press ->
     # /sorry/): the click changes the DOM, but detect_block overrides success -> the

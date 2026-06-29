@@ -102,6 +102,14 @@ _BLOCK_TEXT_MARKERS = (
     "performing security verification",            # cloudflare "Just a moment..." interstitial
     "protect against malicious bots",              # cloudflare interstitial body
 )
+# JS-challenge interstitials (DataDome on g2.com, etc.) serve the challenge from a
+# dedicated delivery host referenced only in the page HTML/script — never in the
+# visible body — so the URL/selector/text checks above all miss them (the rendered
+# body is empty). Match the delivery host in the raw HTML, gated on an empty body so a
+# normal page that merely embeds anti-bot scoring (full content) is NOT flagged.
+_BLOCK_HTML_MARKERS = (
+    "captcha-delivery.com",   # datadome: geo.captcha-delivery.com challenge/captcha host
+)
 
 
 async def detect_block(page: Any) -> str | None:
@@ -133,6 +141,16 @@ async def detect_block(page: Any) -> str | None:
     for marker in _BLOCK_TEXT_MARKERS:
         if marker in text:
             return f"text:{marker}"
+    # The block page renders no real content — its whole body is the JS challenge. Only
+    # then pay for page.content() and look for an anti-bot delivery host in the raw HTML.
+    if len(text.strip()) < 200:
+        try:
+            html = (await page.content()).lower()
+        except Exception:
+            html = ""
+        for marker in _BLOCK_HTML_MARKERS:
+            if marker in html:
+                return f"challenge:{marker}"
     return None
 
 
