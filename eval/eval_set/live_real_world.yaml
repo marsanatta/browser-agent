@@ -1019,3 +1019,16 @@ tasks:
   difficulty: multi_same_domain
   expect_abstain: true
   abstain_reason: impossible
+- id: live_sa_compare_pe_then_balancesheet
+  purpose: compare_reason_then_drilldown
+  split: dev
+  instruction: On stockanalysis.com, determine whether Apple (AAPL) or Microsoft (MSFT) has the higher P/E ratio, then open the Balance Sheet (under the Financials section) of whichever company has the higher P/E.
+  start_url: https://stockanalysis.com/
+  domain: finance
+  task_type: action
+  difficulty: multi_same_domain
+  key_nodes:
+  - url_contains: stocks/msft
+  - url_contains: stocks/aapl
+  assert:
+    url_contains: /aapl/financials/balance-sheet
