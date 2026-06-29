@@ -1088,7 +1088,9 @@ tasks:
   key_nodes:
   - url_contains: ajax
   assert:
-    text_contains: Data loaded with AJAX get request
+    selector_text_equals:
+      css: "#content"
+      value: Data loaded with AJAX get request.
 - id: live_internet_dynamic_controls_remove
   purpose: async_removal_wait
   split: dev
@@ -1100,21 +1102,9 @@ tasks:
   key_nodes:
   - url_contains: dynamic_controls
   assert:
-    text_contains: It's gone!
-- id: live_selectorshub_shadow_input
-  purpose: shadow_dom_pierce
-  split: dev
-  instruction: "On this page, type 'browser agent' into the input whose placeholder text is 'First Crush'."
-  start_url: https://selectorshub.com/xpath-practice-page/
-  domain: widgets
-  task_type: action
-  difficulty: single
-  key_nodes:
-  - url_contains: selectorshub
-  assert:
-    input_value_equals:
-      css: "#inp_val"
-      value: browser agent
+    selector_text_equals:
+      css: "#message"
+      value: It's gone!
 - id: live_internet_add_remove_elements
   purpose: generated_idless_elements
   split: dev

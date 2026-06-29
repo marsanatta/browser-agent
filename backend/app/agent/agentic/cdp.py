@@ -305,7 +305,7 @@ async def read_text(page: Any, target: str) -> str:
 
 # --- LOCATE: deterministic tier cascade (no LLM). count==1 resolves; ambiguity
 #     STOPS rather than silently resolving the first node (the silent wrong-pick).
-_TIERS = ("role_name", "role", "placeholder", "id", "testid", "aria_exact", "href", "text")
+_TIERS = ("role_name", "role", "id", "placeholder", "testid", "aria_exact", "href", "text")
 
 
 def _build(page: Any, strategy: str, el: Element) -> Any:
@@ -403,8 +403,8 @@ async def click(loc: Any) -> None:
 
 async def fill(loc: Any, value: str) -> None:
     # A trailing newline is the agent's "type then submit" convention: many inputs (search
-    # boxes, todo/chat fields) commit on Enter and have NO submit button. Strip it, fill, then
-    # press Enter so those inputs actually submit.
+    # boxes, todo/chat fields) commit on Enter and have NO submit button. Strip trailing
+    # newline(s), fill, then press Enter so those inputs actually submit.
     submit = value.endswith("\n")
     if submit:
         value = value.rstrip("\n")

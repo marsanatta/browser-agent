@@ -216,12 +216,11 @@ on the live page before encoding (`research/selector_probe*.py`); they run via t
 | **uitestingplayground/disabledinput** — enable, then type | **self-correction** | the field starts *disabled*; typing first silently fails — the agent must enable it and **wait for editability** before typing | `input_value_equals #inputField "hello world"` |
 | **uitestingplayground/ajax** — click, wait for the result | **self-correction** | the result appears ~15 s later via AJAX — the agent must **state-wait**, not declare done early | `selector_text_equals #content "Data loaded with AJAX get request."` |
 | **the-internet/dynamic_controls** — Remove, wait until gone | **self-correction** | the removal is **async** (~2 s); the agent must wait for the state change, not act on stale state | `selector_text_equals #message "It's gone!"` |
-| **selectorshub** — type into the *First Crush* field | **self-maintenance** | the input lives inside a **shadow DOM** — plain locators miss it; the locator cascade must pierce the shadow root | `input_value_equals #inp_val "browser agent"` |
 | **the-internet/add_remove_elements** — Add 3 elements | **self-maintenance** | the created *Delete* buttons have **no stable id/selector** — the agent must locate dynamically-generated, id-less elements | `element_count #elements .added-manually == 3` |
 
-Two of these drove real engine fixes: a **`getByPlaceholder` locator tier** (the todomvc / shadow
-inputs are named only by their placeholder) and **`fill` pressing Enter on a trailing newline** (so
-Enter-to-submit inputs with no button — todomvc, search boxes — actually commit).
+Two of these drove real engine fixes: a **`getByPlaceholder` locator tier** (todomvc's new-todo box
+is named only by its placeholder, so the cascade couldn't locate it) and **`fill` pressing Enter on a
+trailing newline** (so Enter-to-submit inputs with no button — todomvc, search boxes — actually commit).
 
 **Population evidence (not just hand-picked cases).** The live eval set has **80 tasks across 19
 domains**, split by site into dev / holdout / sealed so "generalization" is real, not

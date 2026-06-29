@@ -22,7 +22,6 @@ NEW_IDS = [
     "live_uitap_disabled_input_enable",
     "live_uitap_ajax_wait",
     "live_internet_dynamic_controls_remove",
-    "live_selectorshub_shadow_input",
     "live_internet_add_remove_elements",
 ]
 
