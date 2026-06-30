@@ -1148,12 +1148,6 @@ li.is-active .steprow {
   background: color-mix(in srgb, var(--muted) 10%, transparent);
 }
 
-.gallery-badge[data-badge="keyboard"] {
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
