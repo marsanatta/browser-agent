@@ -33,5 +33,5 @@
 
   <!-- result strip -->
   <rect x="92" y="388" width="588" height="34" rx="7" fill="#ecfdf5" stroke="#a7f3d0"/>
-  <text x="386" y="410" font-size="13" font-weight="700" fill="#047857" text-anchor="middle">Result: 0 silent failures / 80 tasks &#160;&#183;&#160; verified 0.913 (73/80) &#160;&#183;&#160; pass^k 1.000 (0 false-success / 8)</text>
+  <text x="386" y="410" font-size="13" font-weight="700" fill="#047857" text-anchor="middle">Result: 93 tasks &#160;&#183;&#160; verified 0.957 (89/93) &#160;&#183;&#160; 0 silent at pass@1, 1 surfaced by pass^k</text>
 </svg>
