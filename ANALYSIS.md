@@ -186,6 +186,17 @@ this section remains the haiku-era reference, not a claim about the current defa
 - **The ceiling is the model rate limit, not CPU/RAM.** Since 86% of a task is model round-trips
   (§1), throughput is bounded by the **Copilot premium-request quota**, not browser memory. Adding
   workers helps only until the quota binds.
+- **The eval harness exploits this directly — process-isolated parallel runs.** Because each case
+  is an independent ephemeral browser + its own Copilot CLI session, the set runs **N cases
+  concurrently as isolated subprocesses** (`research/run_eval_parallel.py`: an
+  `asyncio.Semaphore(jobs)` over `eval.run_one` children — deliberately *not* in-process concurrent
+  sessions, which intermittently drop the Copilot session; one isolated subprocess per case is the
+  reliable unit). Default **jobs=8** is tuned from three converging sources: a sibling project's
+  historically-validated Copilot batch concurrency (6, ramping to 8-10), the SDK's ~100-concurrent
+  429 threshold (copilot-sdk #299), and local probes at N=6 and N=12 that ran clean (0 session-drops,
+  ~0.36 GB/run). Effect: the 125-run pass^k sweep finishes in **~3-4 min** versus the ~30-45 min a
+  sequential one-at-a-time loop takes — the "workers are independent, just run more" property applied
+  to the eval itself.
 - **Honest limit:** the deployment is a single Azure Container Apps replica today; a work-queue +
   autoscale shape is **designed-for, not built**.
 
@@ -300,7 +311,7 @@ behind it.
 |---|---|---|
 | Verified rate (total) | **0.957 (89/93)** | all 93 tasks |
 | **Silent-failure rate (CuP)** | **0/93** | every miss is an honest abstain or a flagged failure, never a false claim |
-| pass^k (k=5; all 5 runs must verify) | **1.000**, false-success **0/8** | 8 adversarial diagnostic tasks |
+| pass^k (k=5; all 5 runs must verify) | **1.000 (25/25)**, 95% CI [0.87, 1.0], false-success **0/125** | 25 adversarial + side-effecting tasks |
 
 Per split, never pooled (pooling lets easy tasks hide hard ones):
 
@@ -313,9 +324,17 @@ Per split, never pooled (pooling lets easy tasks hide hard ones):
 
 **Silent-failure rate is the headline metric:** the system is allowed to be wrong only when it
 *says so*. A silent failure = a claimed success that an independent check refutes; there are none on
-the eval set. **pass^k** then raises the bar for reliability under repetition — on 8 adversarial
-tasks (intent-drift decoys, renamed / hidden-menu / control selector perturbations, dead-button and
-impossible-goal stagnation, synonym-locate) all 5 of 5 runs verified with **0 false successes**.
+the eval set. **pass^k** then raises the bar for reliability under repetition — across **25 tasks**
+(12 deterministic diagnostic contrast-pairs: renamed / hidden-menu / control selector perturbations,
+dead-button and impossible-goal stagnation, synonym-locate; 8 Wikipedia intent-drift decoys; and 5
+side-effecting form tasks — `todomvc / disabledinput / ajax / dynamic_controls / add_remove`) —
+**all 5 of 5 runs verified, 0 false successes (0/125 runs)**. The point estimate is 1.000, but at
+this n the honest interval is what matters: the 95% **Wilson** interval is **[0.87, 1.0]**
+(Clopper-Pearson exact lower bound 0.863) — a binomial CI, deliberately **not** a bootstrap, which
+collapses to a misleading [1,1] when every task passes. Expanding the pool from 8 → 25 tasks — and
+adding the side-effecting tasks the pass^k discipline most cares about — tightened that lower bound
+from **0.63 → 0.86**; pushing it materially higher needs a larger deterministic pool (≈35 tasks for
+0.90), noted but not claimed. The runs were executed in parallel (see [§3(a)](#a-runtime--throughput)).
 
 ### 4.3 The independent checks (why a claim can't pass by lying)
 

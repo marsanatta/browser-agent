@@ -2,8 +2,8 @@
 
 Loads the controlled diagnostic set (eval/eval_set/diagnostic.yaml) and runs each task
 through the SAME harness._run_once k times, then aggregates per-task pass^k + per-purpose
-verified / false-success(CuP) / abstain-correctness / cost, with a mean±bootstrap CI over
-tasks. harness.py and its scoring are ONE LINE UNCHANGED — this is purely an external
+verified / false-success(CuP) / abstain-correctness / cost, with a Wilson 95% CI on the pass^k
+proportion. harness.py and its scoring are ONE LINE UNCHANGED — this is purely an external
 k-loop + aggregation (respects the "eval untouched" guardrail).
 
   dev split drives before/after;  --sealed runs ONLY the sealed split, once, at the end.
@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import math
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -27,23 +28,17 @@ DIAG_PATH = Path(__file__).resolve().parent / "eval_set" / "diagnostic.yaml"
 REPORT_PATH = Path(__file__).resolve().parent / "PASSK_DIAG.md"
 
 
-def _bootstrap_ci(values: list[float], iters: int = 1000, seed: int = 12345) -> tuple[float, float]:
-    """95% CI of the mean via bootstrap resampling (benchmark generate_plots.py:163-174).
-    Deterministic (fixed seed) so the verifier is reproducible."""
-    if not values:
+def _wilson_ci(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """95% Wilson score interval for a binomial proportion (k of n tasks achieve pass^k).
+    Unlike a bootstrap of the mean, this does NOT collapse to a misleading [1,1] at the k==n
+    boundary — it keeps the real small-n uncertainty. Closed-form, deterministic."""
+    if n == 0:
         return (0.0, 0.0)
-    n = len(values)
-    # LCG (no Math.random / numpy needed; deterministic across runs)
-    state = seed
-    means = []
-    for _ in range(iters):
-        s = 0.0
-        for _ in range(n):
-            state = (1103515245 * state + 12345) & 0x7FFFFFFF
-            s += values[state % n]
-        means.append(s / n)
-    means.sort()
-    return (means[int(0.025 * iters)], means[int(0.975 * iters)])
+    p = k / n
+    d = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / d
+    half = (z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / d
+    return (max(0.0, center - half), min(1.0, center + half))
 
 
 async def _run(tasks: list[EvalTask], k: int) -> tuple[dict[str, Any], _CountingGateway]:
@@ -104,7 +99,7 @@ async def main() -> None:
 
     passk_vals = [1.0 if v["passk"] else 0.0 for v in per_task.values()]
     overall_passk = sum(passk_vals) / len(passk_vals) if passk_vals else 0.0
-    lo, hi = _bootstrap_ci(passk_vals)
+    lo, hi = _wilson_ci(sum(1 for v in passk_vals if v), len(passk_vals))
     n_fs = sum(v["false_success"] for v in per_task.values())
     total_calls = gw.calls
     usd = gw.tokens.get("total_nano_aiu", 0) / 1e11
