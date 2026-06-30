@@ -380,7 +380,7 @@ can't hide extra spend.
 
 ### 4.5 Honest scoping of the numbers
 
-`n = 80` is a **coverage** check, not a population estimate; per-split rates are directional. The
+`n = 93` is a **coverage** check, not a population estimate; per-split rates are directional. The
 runtime numbers (§1) are 4 representative tasks on one deployment, so they characterize *where* the
 time goes (the 86% model share is robust) rather than a precise per-task SLA. Live public sites
 flake by a few tasks per run, and the A/B is a single run — so we trust the large deltas (40→72
