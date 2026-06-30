@@ -16,7 +16,7 @@ TOOL_BUDGET = 25         # max tool calls before we force the agent to wrap up
 SESSION_TIMEOUT = 120.0  # wall-clock for the whole task
 
 # Exposed to the SDK as the selectable tool names.
-TOOL_NAMES = ["observe", "read", "click", "fill", "navigate", "verify", "finish"]
+TOOL_NAMES = ["observe", "read", "click", "fill", "navigate", "press", "verify", "finish"]
 
 SKILL = """You are a browser automation agent. You drive a real browser to complete a task.
 
@@ -34,6 +34,14 @@ You have these tools:
 - fill(target OR index, value): type `value` into a field by its label `target`, or by
   `index` to pick a SPECIFIC field among same-named ones.
 - navigate(url): go to an absolute URL (only to reach a different site).
+- press(keys): press a key, or a space-separated SEQUENCE, on the page — e.g.
+  press("ArrowDown"), press("ArrowUp ArrowUp ArrowDown"), press("Enter"), press("Escape"),
+  press("Space"). Keys go to the focused field OR the whole page. Use press when the page is
+  KEYBOARD-DRIVEN and clicking won't do it: an arrow-key game (e.g. 2048), a slideshow
+  (Right/Space to advance), a typing test; to OPERATE a control that is NOT clickable (a
+  native dropdown — click it, then press("ArrowDown") then press("Enter"); a checkbox —
+  press("Space")); or to DISMISS an overlay/modal that won't close (press("Escape")). After
+  pressing, verify the post-state like any other action.
 - verify(goal): DETERMINISTICALLY check, against the LIVE page, whether a concrete
   post-state you expect actually holds, and whether the page is blocked. `goal` is one
   or more of: url_contains (a substring the URL should contain), text_visible (text

@@ -44,6 +44,16 @@ export const EXAMPLES = [
     task: "In the first example (Remove/Add), click 'Remove' and wait until the checkbox is removed.",
     url: "https://the-internet.herokuapp.com/dynamic_controls",
     criterion: { selector_text_equals: { css: "#message", value: "It's gone!" } } },
+  // ---- good: keyboard-driven sites (the agent self-discovers the keys via the press tool) ----
+  { id: "revealjs-slides", group: "good", badge: "verified",
+    task: "On the reveal.js demo presentation, advance forward through the slideshow to reach the 4th slide.",
+    url: "https://revealjs.com/demo/", criterion: { url_contains: "#/3" } },
+  { id: "play2048", group: "good", badge: "keyboard",
+    task: "Play the 2048 game: make several moves to slide and merge the numbered tiles.",
+    url: "https://play2048.co/" },
+  { id: "monkeytype", group: "good", badge: "keyboard",
+    task: "On monkeytype.com, take the typing test by typing the words shown on screen.",
+    url: "https://monkeytype.com/" },
   // ---- limitation (the agent abstains / fails closed) ----
   { id: "internet-iframe", group: "limitation", badge: "abstain",
     task: "On this page, type 'browser agent was here' into the rich-text editor inside the iframe.",

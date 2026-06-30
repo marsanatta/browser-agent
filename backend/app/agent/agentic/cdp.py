@@ -425,6 +425,18 @@ async def fill(loc: Any, value: str) -> None:
             pass
 
 
+async def press_key(page: Any, keys: str) -> None:
+    """Press one key, or a space-separated SEQUENCE, on the page via page.keyboard — the
+    keys reach the focused element OR a document-level keydown listener (so this drives
+    keyboard-only pages: arrow-key games like 2048, slideshow nav, typing tests). Key names
+    are Playwright's: Enter, Tab, Escape, Space, ArrowUp/Down/Left/Right, PageDown, Backspace,
+    or a combo like Control+A. A short pause after each key lets the page's handler run (a
+    2048 tile slide, a reveal.js slide change) before the next key is sent."""
+    for k in keys.split():
+        await page.keyboard.press(k)
+        await page.wait_for_timeout(80)
+
+
 # Set text into a rich-text editable host and notify the editor (TinyMCE listens on
 # input). designMode is forced on first so the host is genuinely editable; a single
 # wrapping <p> mirrors how these editors structure content, so the editor's own

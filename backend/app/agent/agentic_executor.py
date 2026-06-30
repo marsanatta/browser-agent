@@ -132,6 +132,12 @@ class _Finish(BaseModel):
     note: str = Field(default="", description="One-line reason / what was done")
 
 
+class _Press(BaseModel):
+    keys: str = Field(description="One key or a space-separated SEQUENCE to press on the page, "
+                      "using Playwright key names: Enter, Tab, Escape, Space, ArrowUp, ArrowDown, "
+                      "ArrowLeft, ArrowRight, PageDown, Backspace, or a combo like Control+A.")
+
+
 class AgenticExecutor:
     def __init__(
         self,
@@ -479,6 +485,27 @@ class AgenticExecutor:
                 emit(events.step_finished(step_id, "ok"))
                 return json.dumps({"url": page.url})
 
+            async def press(p: _Press) -> str:
+                if (g := gate("press", p.keys)) is not None:
+                    return g
+                state["last_verify_ok"] = False  # a keypress can change page state -> stale verify
+                step_id, call_id = next_ids()
+                emit(events.step_started(step_id, f"press: {p.keys}"))
+                emit(events.tool_call_start(step_id, "press", call_id))
+                emit(events.tool_call_args(call_id, {"keys": p.keys}))
+                try:
+                    await asyncio.wait_for(cdp.press_key(page, p.keys), HANDLER_TIMEOUT)
+                except asyncio.TimeoutError:
+                    return self._finish_tool(emit, step_id, call_id, page, "press timeout", False,
+                                             "PRESS_TIMEOUT: the page did not respond; try finish or another approach.")
+                except Exception as exc:
+                    return self._finish_tool(emit, step_id, call_id, page, f"press error: {type(exc).__name__}", False,
+                                             f"PRESS_ERROR: {type(exc).__name__} — check the key name.")
+                await shot(step_id, None, f"press: {p.keys}")
+                emit(events.tool_call_end(call_id, f"pressed {p.keys} url={page.url}"))
+                emit(events.step_finished(step_id, "ok"))
+                return json.dumps({"pressed": p.keys, "url": page.url})
+
             async def verify_tool(p: _Verify) -> str:
                 """DETERMINISTIC verifier surfaced as a tool: browser-agent's own
                 verify._goal_satisfied + detect_block, reading the REAL page. It never
@@ -581,6 +608,8 @@ class AgenticExecutor:
                             handler=fill, params_type=_Fill, skip_permission=True),
                 define_tool("navigate", description="Go to an absolute URL.",
                             handler=navigate, params_type=_Url, skip_permission=True),
+                define_tool("press", description="Press a key or space-separated key sequence on the page (for keyboard-driven pages, or a control that is not clickable).",
+                            handler=press, params_type=_Press, skip_permission=True),
                 define_tool("verify", description="Deterministically check a goal holds on the live page.",
                             handler=verify_tool, params_type=_Verify, skip_permission=True),
                 define_tool("finish", description="End the task with a success verdict.",
