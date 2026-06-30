@@ -418,6 +418,20 @@ export default function App() {
           start();
         }}
       >
+        <label className="field url">
+          <span>
+            {t("runbar.startUrl")}
+            <Hint k="startUrl" />
+          </span>
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://…"
+            autoComplete="off"
+            spellCheck={false}
+            inputMode="url"
+          />
+        </label>
         <label className="field">
           <span>
             {t("runbar.task")}
@@ -439,20 +453,47 @@ export default function App() {
             spellCheck={false}
           />
         </label>
-        <label className="field url">
-          <span>
-            {t("runbar.startUrl")}
-            <Hint k="startUrl" />
-          </span>
-          <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://…"
-            autoComplete="off"
-            spellCheck={false}
-            inputMode="url"
-          />
-        </label>
+        <div className="criterion" role="group" aria-labelledby="criterion-label">
+          <div className="criterion-title" id="criterion-label">
+            {t("criterion.heading")}
+            <Hint k="criterion" />
+          </div>
+          <div className="criterion-grid">
+            <label className="field">
+              <span>{t("criterion.check")}</span>
+              <select value={critType} onChange={(e) => setCritType(e.target.value)}>
+                <option value="">{t("criterion.none")}</option>
+                <option value="url_contains">{t("criterion.urlContains")}</option>
+                <option value="h1_equals">{t("criterion.h1Equals")}</option>
+                <option value="selector_text_equals">{t("criterion.selectorTextEquals")}</option>
+              </select>
+            </label>
+            {critType === "selector_text_equals" && (
+              <label className="field">
+                <span>{t("criterion.css")}</span>
+                <input
+                  value={critCss}
+                  onChange={(e) => setCritCss(e.target.value)}
+                  placeholder={t("criterion.cssPlaceholder")}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+            )}
+            {critType && (
+              <label className="field">
+                <span>{t("criterion.value")}</span>
+                <input
+                  value={critValue}
+                  onChange={(e) => setCritValue(e.target.value)}
+                  placeholder={t("criterion.valuePlaceholder")}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+            )}
+          </div>
+        </div>
         {running ? (
           <span className="btnwrap">
             <button type="button" className="btn ghost" disabled>
@@ -468,48 +509,6 @@ export default function App() {
           </span>
         )}
       </form>
-
-      <details className="criterion">
-        <summary>
-          {t("criterion.heading")}
-          <Hint k="criterion" />
-        </summary>
-        <div className="criterion-grid">
-          <label className="field">
-            <span>{t("criterion.check")}</span>
-            <select value={critType} onChange={(e) => setCritType(e.target.value)}>
-              <option value="">{t("criterion.none")}</option>
-              <option value="url_contains">{t("criterion.urlContains")}</option>
-              <option value="h1_equals">{t("criterion.h1Equals")}</option>
-              <option value="selector_text_equals">{t("criterion.selectorTextEquals")}</option>
-            </select>
-          </label>
-          {critType === "selector_text_equals" && (
-            <label className="field">
-              <span>{t("criterion.css")}</span>
-              <input
-                value={critCss}
-                onChange={(e) => setCritCss(e.target.value)}
-                placeholder={t("criterion.cssPlaceholder")}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </label>
-          )}
-          {critType && (
-            <label className="field">
-              <span>{t("criterion.value")}</span>
-              <input
-                value={critValue}
-                onChange={(e) => setCritValue(e.target.value)}
-                placeholder={t("criterion.valuePlaceholder")}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </label>
-          )}
-        </div>
-      </details>
 
       {models && modelSel && effortSel && (
         <details className="models">

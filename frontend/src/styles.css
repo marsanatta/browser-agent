@@ -60,10 +60,10 @@ textarea {
 
 .runbar {
   display: flex;
-  gap: 12px;
-  align-items: flex-end;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
   margin: 22px 0 8px;
-  flex-wrap: wrap;
 }
 
 .field {
@@ -76,6 +76,18 @@ textarea {
 
 .field.url {
   flex: 1 1 200px;
+}
+
+/* `.field`'s `flex: 1 1 280px` basis is meant for the horizontal criterion/model
+   grids; in this column container a flex-basis applies to height, so neutralize it. */
+.runbar > .field,
+.runbar > .criterion,
+.runbar > .btnwrap {
+  flex: 0 0 auto;
+}
+
+.runbar > .btnwrap {
+  align-self: flex-end;
 }
 
 .field span {
@@ -200,13 +212,19 @@ textarea {
 }
 
 .criterion {
-  margin: 6px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 12px 14px;
   font-size: 13px;
 }
 
-.criterion summary {
-  cursor: pointer;
+.criterion-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--muted);
+  font-size: 12px;
 }
 
 .criterion-grid {
