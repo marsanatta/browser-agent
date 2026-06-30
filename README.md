@@ -246,6 +246,15 @@ agent never claimed success on any of them. This is a single run; live sites fla
 so treat small per-split differences as noise. The sealed split is scored only once, so its number
 cannot be over-fit.
 
+**pass^k tempers this honestly — the table above is a *single* run (pass@1).** Repeating all 93
+tasks five times (`research/run_eval_parallel.py`) gives a task-level **pass^k of 0.957 (89/93)** and
+surfaces **one** silent failure that pass@1 missed: `govuk_vat_rates`, where on 1 of 5 runs the agent
+drifts to a *sibling* gov.uk VAT page and its self-chosen in-loop verify can't catch the wrong page
+(the independent assert does). That is **intent drift — an open problem we mitigate, not solve** —
+and exactly why we report **pass^k, not pass@1**. False-success rate over all 465 runs: **1/465 ≈
+0.2%**. Separately, on a targeted 25-task adversarial + side-effecting set, pass^k is **1.000
+(25/25)**, 95% CI [0.87, 1.0].
+
 ---
 
 ## Known limitations (with examples)

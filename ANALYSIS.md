@@ -309,9 +309,10 @@ behind it.
 
 | Measure | Result | Scope |
 |---|---|---|
-| Verified rate (total) | **0.957 (89/93)** | all 93 tasks |
-| **Silent-failure rate (CuP)** | **0/93** | every miss is an honest abstain or a flagged failure, never a false claim |
-| pass^k (k=5; all 5 runs must verify) | **1.000 (25/25)**, 95% CI [0.87, 1.0], false-success **0/125** | 25 adversarial + side-effecting tasks |
+| Verified rate, single run | **0.957 (89/93)** | all 93 tasks, one run (pass@1) |
+| Silent-failure rate (CuP), pass@1 | **0/93** | in *that* run every miss was an honest abstain / give-up, no false claim |
+| pass^k, targeted hard set (k=5) | **1.000 (25/25)**, 95% CI [0.87, 1.0], 0/125 false-success | 25 adversarial + side-effecting tasks |
+| **pass^k, full set (k=5)** | **0.957 (89/93)**, 95% CI [0.90, 0.98]; **1 silent failure** (1/465 runs) | all 93 tasks × 5 runs each |
 
 Per split, never pooled (pooling lets easy tasks hide hard ones):
 
@@ -323,8 +324,10 @@ Per split, never pooled (pooling lets easy tasks hide hard ones):
 | **Total** | **93** | **0.957 (89/93)** | **0** |
 
 **Silent-failure rate is the headline metric:** the system is allowed to be wrong only when it
-*says so*. A silent failure = a claimed success that an independent check refutes; there are none on
-the eval set. **pass^k** then raises the bar for reliability under repetition — across **25 tasks**
+*says so*. A silent failure = a claimed success that an independent check refutes; a single pass@1
+run shows **none** — but that is the lucky-draw number, and **pass^k is what catches the rest**
+(the full-set pass^k below surfaces exactly one). **pass^k** raises the bar for reliability under
+repetition — across **25 tasks**
 (12 deterministic diagnostic contrast-pairs: renamed / hidden-menu / control selector perturbations,
 dead-button and impossible-goal stagnation, synonym-locate; 8 Wikipedia intent-drift decoys; and 5
 side-effecting form tasks — `todomvc / disabledinput / ajax / dynamic_controls / add_remove`) —
@@ -335,6 +338,20 @@ collapses to a misleading [1,1] when every task passes. Expanding the pool from 
 adding the side-effecting tasks the pass^k discipline most cares about — tightened that lower bound
 from **0.63 → 0.86**; pushing it materially higher needs a larger deterministic pool (≈35 tasks for
 0.90), noted but not claimed. The runs were executed in parallel (see [§3(a)](#a-runtime--throughput)).
+
+**The full-set pass^k is the more honest number — and it found a silent failure that pass@1 missed.**
+Running all **93 tasks at k=5 (465 runs)** gives a task-level pass^k of **0.957 (89/93)**, 95% Wilson
+[0.90, 0.98]. Of the four tasks that don't clear all five runs, three are **honest** (the
+`internet_iframe` editor limitation and two site/anti-bot nav failures — 0/5 verified, but never a
+false claim). The fourth, **`govuk_vat_rates`, is a true silent failure on 1 of its 5 runs**: the
+agent drifted to a *sibling* gov.uk page (`/guidance/vat-rates-on-different-goods-and-services`)
+instead of the asked `/vat-rates`, and its **self-chosen in-loop verify — which adapts to whatever
+page it lands on — could not catch the wrong page**; only the independent `h1_equals "VAT rates"`
+assert did. This is a concrete instance of the **intent-drift limitation the project mitigates but
+does not claim to solve**, and the clearest argument for its own rule to **report pass^k, not
+pass@1**: the single run scored 0 silent failures by drawing the good page; pass^k exposed the real
+~20% wrong-page rate on this one (mildly ambiguous) task. Over all 465 runs the false-success rate is
+**1/465 ≈ 0.2%** (95% upper bound ~1.2%) — not zero, and stated as such.
 
 ### 4.3 The independent checks (why a claim can't pass by lying)
 
