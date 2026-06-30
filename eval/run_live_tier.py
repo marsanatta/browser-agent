@@ -19,10 +19,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
-from app.agent.models import LLMGateway
-
 from eval import audit
-from eval.harness import _CountingGateway, _run_once
+from eval.harness import _run_once, make_gateway
 from eval.loader import EvalTask, load_tasks, select_splits
 
 LIVE_PATH = Path(__file__).resolve().parent / "eval_set" / "live_real_world.yaml"
@@ -66,7 +64,7 @@ def _site(t: EvalTask) -> str:
 
 
 async def _run(tasks: list[EvalTask]):
-    gw = _CountingGateway(LLMGateway())
+    gw = make_gateway()
     rows = []
     traces = []
     try:

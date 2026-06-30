@@ -14,9 +14,7 @@ import json
 from pathlib import Path
 from urllib.parse import urlparse
 
-from app.agent.models import LLMGateway
-
-from eval.harness import _CountingGateway, _run_once
+from eval.harness import _run_once, make_gateway
 from eval.loader import load_tasks
 from eval.run_live_tier import LIVE_PATH
 
@@ -25,7 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 async def run_split(split: str):
     tasks = [t for t in load_tasks(LIVE_PATH) if t.split == split]
-    gw = _CountingGateway(LLMGateway())
+    gw = make_gateway()
     rows = []
     try:
         for t in tasks:

@@ -26,7 +26,13 @@ from typing import Any
 
 from app.agent.agentic_executor import AgenticExecutor
 from app.agent.executor import Executor
-from app.agent.models import LLMGateway
+from app.agent.models import (
+    AGENTIC_EFFORT,
+    AGENTIC_MODEL,
+    EXECUTION_EFFORT,
+    EXECUTION_MODEL,
+    LLMGateway,
+)
 from app.agent.planner import LLMPlanner, PlanResult, SubTask
 from app.browser.provider import PlaywrightProvider
 from app.stream.events import EventType
@@ -93,6 +99,18 @@ class _CountingGateway:
 
     async def close(self) -> None:
         await self._inner.close()
+
+
+def make_gateway() -> _CountingGateway:
+    """Eval gateway on the model/effort production uses for the engine under test,
+    mirroring main.py's workhorse_role: AgenticExecutor (default) -> AGENTIC_MODEL/EFFORT;
+    AGENT_MODE=script-orchestration -> EXECUTION_MODEL/EFFORT. A bare LLMGateway() defaults
+    to the cheap exec model and would silently run the agentic eval off the deployed model."""
+    script = os.getenv("AGENT_MODE") == "script-orchestration"
+    return _CountingGateway(LLMGateway(
+        workhorse_model=EXECUTION_MODEL if script else AGENTIC_MODEL,
+        workhorse_effort=EXECUTION_EFFORT if script else AGENTIC_EFFORT,
+    ))
 
 
 class _StartUrlPlanner:
@@ -258,7 +276,7 @@ def _to_result(task: EvalTask, rec: RunRecord) -> TaskResult:
 
 
 async def run_eval(tasks: list[EvalTask], k: int = K_SIDE_EFFECT) -> dict[str, Any]:
-    gateway = _CountingGateway(LLMGateway())
+    gateway = make_gateway()
     agent_results: list[TaskResult] = []
     baseline_results: list[TaskResult] = []
     passk_runs: dict[str, list[TaskResult]] = {}

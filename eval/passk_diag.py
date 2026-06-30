@@ -20,8 +20,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from app.agent.models import LLMGateway
-from eval.harness import _CountingGateway, _run_once
+from eval.harness import _CountingGateway, _run_once, make_gateway
 from eval.loader import EvalTask, load_tasks
 
 DIAG_PATH = Path(__file__).resolve().parent / "eval_set" / "diagnostic.yaml"
@@ -42,7 +41,7 @@ def _wilson_ci(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
 
 
 async def _run(tasks: list[EvalTask], k: int) -> tuple[dict[str, Any], _CountingGateway]:
-    gw = _CountingGateway(LLMGateway())
+    gw = make_gateway()
     per_task: dict[str, dict[str, Any]] = {}
     try:
         for t in tasks:

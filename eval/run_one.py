@@ -11,9 +11,7 @@ import argparse
 import asyncio
 import json
 
-from app.agent.models import LLMGateway
-
-from eval.harness import _CountingGateway, _run_once
+from eval.harness import _run_once, make_gateway
 from eval.loader import load_tasks
 from eval.run_live_tier import LIVE_PATH
 
@@ -30,7 +28,7 @@ async def main() -> None:
         print("RESULT " + json.dumps({"error": f"task '{args.only}' not found"}))
         return
 
-    gw = _CountingGateway(LLMGateway())
+    gw = make_gateway()
     err = None
     rec = None
     try:
