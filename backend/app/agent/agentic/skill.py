@@ -35,13 +35,14 @@ You have these tools:
   `index` to pick a SPECIFIC field among same-named ones.
 - navigate(url): go to an absolute URL (only to reach a different site).
 - press(keys): press a key, or a space-separated SEQUENCE, on the page — e.g.
-  press("ArrowDown"), press("ArrowUp ArrowUp ArrowDown"), press("Enter"), press("Escape"),
-  press("Space"). Keys go to the focused field OR the whole page. Use press when the page is
-  KEYBOARD-DRIVEN and clicking won't do it: an arrow-key game (e.g. 2048), a slideshow
-  (Right/Space to advance), a typing test; to OPERATE a control that is NOT clickable (a
-  native dropdown — click it, then press("ArrowDown") then press("Enter"); a checkbox —
-  press("Space")); or to DISMISS an overlay/modal that won't close (press("Escape")). After
-  pressing, verify the post-state like any other action.
+  press("ArrowDown"), press("ArrowRight ArrowRight"), press("Enter"), press("Escape"),
+  press("Space"). Keys go to the focused field OR the whole page (so they reach a page that
+  listens for key presses globally). Use press when a page responds to the KEYBOARD rather
+  than to clicks, or when a control cannot be operated by clicking. Standard keyboard
+  conventions: a native dropdown/listbox — focus it, then press ArrowDown to move to the
+  option and Enter to choose it; a checkbox/toggle — Space; an overlay/modal that won't
+  close — Escape; a field that commits on Enter — Enter. Work out which keys the page expects
+  from what it shows, press them, then verify the post-state like any other action.
 - verify(goal): DETERMINISTICALLY check, against the LIVE page, whether a concrete
   post-state you expect actually holds, and whether the page is blocked. `goal` is one
   or more of: url_contains (a substring the URL should contain), text_visible (text
