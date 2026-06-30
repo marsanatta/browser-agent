@@ -50,6 +50,7 @@ from app.obs.tracing import redact
 PLANNER_MODEL = "claude-opus-4.8"      # top web-agent planner (Online-Mind2Web/OSWorld)
 EXECUTION_MODEL = "claude-haiku-4.5"   # hot-path tool-calling / L2, cheap+adequate
 REPLANNER_MODEL = "claude-opus-4.8"    # rare deep replan that drives the browser
+AGENTIC_MODEL = "claude-opus-4.8"      # LLM-in-loop single workhorse — own role, not the cheap script exec
 
 # Curated, selectable ids for the per-role UI picker and override validation (the
 # subset we route among, not the whole vendor menu). Used as the FALLBACK when the
@@ -71,6 +72,7 @@ ROLE_DEFAULTS = {
     "plan": PLANNER_MODEL,
     "exec": EXECUTION_MODEL,
     "replanner": REPLANNER_MODEL,
+    "agentic": AGENTIC_MODEL,
 }
 
 
@@ -103,11 +105,13 @@ THINKING_LEVELS = ("low", "medium", "high", "xhigh")
 PLANNER_EFFORT = "high"
 EXECUTION_EFFORT = "low"
 REPLANNER_EFFORT = "xhigh"
+AGENTIC_EFFORT = "medium"
 
 EFFORT_DEFAULTS = {
     "plan": PLANNER_EFFORT,
     "exec": EXECUTION_EFFORT,
     "replanner": REPLANNER_EFFORT,
+    "agentic": AGENTIC_EFFORT,
 }
 
 

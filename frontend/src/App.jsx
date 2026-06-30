@@ -287,9 +287,9 @@ export default function App() {
       }
       params.set("max_replans", String(maxReplans));
     } else {
-      // agentic = one Copilot session: the single model + thinking is the workhorse (exec role)
-      if (modelSel) params.set("model_exec", modelSel.exec);
-      if (effortSel) params.set("think_exec", effortSel.exec);
+      // agentic = one session; its workhorse is the "agentic" role (frontier), not script's cheap exec
+      if (modelSel) params.set("model_exec", modelSel.agentic);
+      if (effortSel) params.set("think_exec", effortSel.agentic);
     }
     const criterion = opts.criterion !== undefined ? opts.criterion : buildCriterion(critType, critValue, critCss);
     if (criterion) params.set("criterion", JSON.stringify(criterion));
@@ -534,8 +534,8 @@ export default function App() {
               <label className="field">
                 <span>{t("models.model")}</span>
                 <select
-                  value={modelSel.exec}
-                  onChange={(e) => setModelSel((s) => ({ ...s, exec: e.target.value }))}
+                  value={modelSel.agentic}
+                  onChange={(e) => setModelSel((s) => ({ ...s, agentic: e.target.value }))}
                 >
                   {models.menu.map((id) => (
                     <option key={id} value={id} translate="no">
@@ -547,8 +547,8 @@ export default function App() {
               <label className="field">
                 <span>{t("models.thinking")}</span>
                 <select
-                  value={effortSel.exec}
-                  onChange={(e) => setEffortSel((s) => ({ ...s, exec: e.target.value }))}
+                  value={effortSel.agentic}
+                  onChange={(e) => setEffortSel((s) => ({ ...s, agentic: e.target.value }))}
                 >
                   {models.thinking_levels.map((lv) => (
                     <option key={lv} value={lv} translate="no">

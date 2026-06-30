@@ -291,13 +291,15 @@ async def agent_run(
     if parsed_criterion is not None:
         verify_hook = _make_verify_hook(parsed_criterion)
     menu = await _model_menu()
+    # agentic's single workhorse is its own role (frontier model); script's exec is the cheap hot path
+    workhorse_role = "exec" if (agent_mode or os.getenv("AGENT_MODE")) == "script-orchestration" else "agentic"
     executor = _build_executor(
         url,
         plan_model=resolve_model(model_plan, "plan", menu),
-        exec_model=resolve_model(model_exec, "exec", menu),
+        exec_model=resolve_model(model_exec, workhorse_role, menu),
         replanner_model=resolve_model(model_replanner, "replanner", menu),
         plan_effort=resolve_effort(think_plan, "plan"),
-        exec_effort=resolve_effort(think_exec, "exec"),
+        exec_effort=resolve_effort(think_exec, workhorse_role),
         replanner_effort=resolve_effort(think_replanner, "replanner"),
         max_replans=max(0, min(int(max_replans), 10)),  # clamp to a sane range
         agent_mode=agent_mode,
